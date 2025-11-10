@@ -1,0 +1,6 @@
+@echo off
+echo [WAIT] Waiting for backend service to start...
+timeout /t 8 /nobreak > nul
+echo [START] Running API tests...
+.venv\Scripts\python.exe scripts\test_prediction_api.py
+

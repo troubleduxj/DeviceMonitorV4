@@ -1,0 +1,1067 @@
+<script setup lang="ts">
+import {
+  computed,
+  h,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  resolveDirective,
+  withDirectives,
+  watch,
+} from 'vue'
+import {
+  NButton,
+  NForm,
+  NFormItem,
+  NInput,
+  NPagination,
+  NPopconfirm,
+  NSelect,
+  NTag,
+  useMessage,
+} from 'naive-ui'
+
+import CommonPage from '@/components/page/CommonPage.vue'
+import CrudModal from '@/components/table/CrudModal.vue'
+import CrudTable from '@/components/table/CrudTable.vue'
+import TheIcon from '@/components/icon/TheIcon.vue'
+import ViewToggle from '@/components/common/ViewToggle.vue'
+import DeviceInfoSearchBar from '@/components/query-bar/DeviceInfoSearchBar.vue'
+import { PermissionDataWrapper } from '@/components/Permission'
+import PermissionButton from '@/components/Permission/PermissionButton.vue'
+
+import { renderIcon } from '@/utils'
+import api from '@/api'
+// ✅ Shared API 迁移 (2025-10-25)
+import { deviceApi, deviceTypeApi } from '@/api/device-shared'
+import { useRouter } from 'vue-router'
+
+defineOptions({ name: '设备基础信息' })
+
+// ==================== 类型定义 ====================
+
+interface QueryItems {
+  device_type: string
+  [key: string]: any
+}
+
+interface DeviceType {
+  type_code: string
+  type_name: string
+  [key: string]: any
+}
+
+interface DeviceInfo {
+  id?: string | number
+  device_code: string
+  device_name: string
+  device_type: string
+  device_model: string
+  manufacturer: string
+  online_address: string
+  status?: string
+  [key: string]: any
+}
+
+const $table = ref<any>(null)
+const queryItems = ref<QueryItems>({
+  device_type: 'welding', // 默认选择焊机
+})
+const vPermission = resolveDirective('permission')
+const $message = useMessage()
+const router = useRouter()
+
+// 设备类型数据
+const deviceTypes = ref<DeviceType[]>([])
+
+// 表单初始化内容
+const initForm = {
+  device_name: '',
+  manufacturer: '',
+  device_code: '',
+  device_type: 'welding',
+  device_model: '',
+  online_address: '',
+}
+
+// 设备数据
+const tableData = ref([]) // 用于表格视图
+const cardData = ref([]) // 用于卡片视图
+const loading = ref(false)
+
+// 分页数据
+const pagination = ref({
+  page: 1,
+  pageSize: 20, // 默认每页20个
+  itemCount: 0,
+  showSizePicker: true,
+  pageSizes: [20, 24, 48, 96],
+  showQuickJumper: true,
+  prefix: ({ itemCount }) => `共 ${itemCount} 条`,
+  suffix: ({ startIndex, endIndex }) => `显示 ${startIndex}-${endIndex} 条`,
+})
+
+// 显示模式
+const viewMode = ref('card') // 'table' 或 'card'
+
+// 计算属性：根据视图模式返回对应的数据
+const devices = computed(() => {
+  return viewMode.value === 'table' ? tableData.value : cardData.value
+})
+
+// 视图切换选项
+const viewOptions = [
+  {
+    value: 'table',
+    label: '表格',
+    icon: 'material-symbols:table-chart',
+  },
+  {
+    value: 'card',
+    label: '卡片',
+    icon: 'material-symbols:grid-view',
+  },
+]
+
+// 模态框状态
+const modalVisible = ref(false)
+const modalTitle = ref('')
+const modalAction = ref('')
+const modalLoading = ref(false)
+const modalForm = ref({ ...initForm })
+const modalFormRef = ref(null)
+
+// 处理添加设备
+const handleAdd = () => {
+  modalAction.value = 'add'
+  modalTitle.value = '新建设备'
+  modalForm.value = { ...initForm }
+  modalVisible.value = true
+}
+
+// 处理编辑设备
+const handleEdit = (row: DeviceInfo) => {
+  modalAction.value = 'edit'
+  modalTitle.value = '编辑设备'
+  modalForm.value = { ...row } as any
+  modalVisible.value = true
+}
+
+// 处理删除设备
+const handleDelete = async (ids) => {
+  try {
+    const idList = Array.isArray(ids) ? ids : [ids]
+    if (idList.length > 1) {
+      await deviceApi.batchDelete(idList)
+    } else {
+      await deviceApi.delete(idList[0])
+    }
+    $message?.success('删除设备成功')
+    getDevices() // 统一刷新
+  } catch (error) {
+    console.error('删除设备失败:', error)
+    $message?.error(`删除设备失败: ${error.message || '未知错误'}`)
+  }
+}
+
+// 跳转到设备维修记录
+const handleViewRepairRecords = (device) => {
+  router.push({
+    path: '/device-maintenance/repair-records',
+    query: {
+      device_id: device.id,
+      device_name: device.device_name,
+      device_code: device.device_code
+    }
+  })
+}
+
+// 卡片样式辅助函数
+const getDeviceCardClass = (is_locked) => {
+  const baseClass = 'device-card'
+  return is_locked ? `${baseClass} device-card--locked` : `${baseClass} device-card--inuse`
+}
+
+const getStatusClass = (is_locked) => {
+  return is_locked ? 'status-indicator--locked' : 'status-indicator--inuse'
+}
+
+const getStatusTagType = (is_locked) => {
+  return is_locked ? 'error' : 'success'
+}
+
+const getStatusText = (is_locked) => {
+  return is_locked ? '锁定' : '在用'
+}
+
+// 处理保存设备
+const handleSave = async () => {
+  try {
+    await modalFormRef.value?.validate()
+    modalLoading.value = true
+
+    if (modalAction.value === 'add') {
+      await deviceApi.create(modalForm.value)
+      $message?.success('新建设备成功')
+    } else {
+      await deviceApi.update(modalForm.value.id!, modalForm.value)
+      $message?.success('编辑设备成功')
+    }
+
+    modalVisible.value = false
+    getDevices() // 统一刷新
+  } catch (error) {
+    console.error('保存设备失败:', error)
+    $message?.error(`保存设备失败: ${error.message || '未知错误'}`)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+// 统一获取数据
+const getDevices = async () => {
+  loading.value = true
+  const params = {
+    ...queryItems.value,
+    page: pagination.value.page,
+    page_size: pagination.value.pageSize,
+  }
+  try {
+    const response = await deviceApi.list(params)
+    console.log('设备列表API v2响应数据:', response)
+
+    if (response && response.data) {
+      console.log('设备列表API响应数据:', response)
+      const dataItems = Array.isArray(response.data) ? response.data : response.data.items || []
+
+      if (Array.isArray(dataItems)) {
+        tableData.value = dataItems
+        cardData.value = dataItems
+        // 从API响应中正确获取总记录数
+        pagination.value.itemCount =
+          response.total || response.meta?.total || response.data.total || dataItems.length
+        console.log('设备表格数据:', tableData.value)
+        console.log('设备卡片数据:', cardData.value)
+        console.log('设备分页信息:', {
+          page: pagination.value.page,
+          pageSize: pagination.value.pageSize,
+          itemCount: pagination.value.itemCount,
+          totalPages: Math.ceil(pagination.value.itemCount / pagination.value.pageSize),
+        })
+      } else {
+        console.error('设备API返回数据格式不正确:', dataItems)
+        $message?.error('获取设备数据失败: 数据格式不正确')
+        tableData.value = []
+        cardData.value = []
+        pagination.value.itemCount = 0
+      }
+    } else {
+      console.error('设备API返回数据格式不正确:', response)
+      $message?.error('获取设备数据失败: 数据格式不正确')
+      tableData.value = []
+      cardData.value = []
+      pagination.value.itemCount = 0
+    }
+  } catch (error) {
+    console.error('获取设备列表失败:', error)
+    $message?.error(`获取设备列表失败: ${error.message || '未知错误'}`)
+    tableData.value = []
+    cardData.value = []
+    pagination.value.itemCount = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+// 添加loadTableData方法（模板中使用）
+const loadTableData = () => {
+  getDevices()
+}
+
+const handleSearch = (params) => {
+  queryItems.value = { ...params }
+  pagination.value.page = 1
+  console.log('搜索参数:', queryItems.value)
+  getDevices()
+}
+
+const handleReset = () => {
+  queryItems.value = { device_type: 'welding' }
+  pagination.value.page = 1
+  console.log('重置搜索条件')
+  getDevices()
+}
+
+const handlePageChange = (page) => {
+  pagination.value.page = page
+  getDevices()
+}
+
+const handlePageSizeChange = (pageSize) => {
+  pagination.value.pageSize = pageSize
+  pagination.value.page = 1
+  getDevices()
+}
+
+// 设备类型代码映射为中文名称
+const getDeviceTypeName = (typeCode) => {
+  if (deviceTypes.value && deviceTypes.value.length > 0) {
+    const deviceType = deviceTypes.value.find((type) => type.type_code === typeCode)
+    if (deviceType) {
+      return deviceType.type_name
+    }
+  }
+
+  // 降级处理：使用默认映射
+  const defaultTypeMap = {
+    welding: '焊机',
+    cutting: '切割设备',
+    assembly: '装配设备',
+    server: '服务器',
+    network: '网络设备',
+    storage: '存储设备',
+    security: '安全设备',
+    other: '其他',
+  }
+
+  return defaultTypeMap[typeCode] || typeCode
+}
+
+// 权限相关处理
+const handleContactAdmin = () => {
+  $message.info('请联系系统管理员获取设备信息查看权限')
+}
+
+// 加载设备类型数据
+const loadDeviceTypes = async () => {
+  try {
+    const response = await deviceTypeApi.list()
+    if (response && response.data) {
+      const typeData = Array.isArray(response.data) ? response.data : response.data.items || []
+      deviceTypes.value = typeData
+      console.log('设备类型数据加载成功:', deviceTypes.value)
+    }
+  } catch (error) {
+    console.warn('获取设备类型失败，使用默认选项:', error)
+    $message.warning('获取设备类型失败，使用默认选项')
+    // deviceTypes保持空数组，计算属性会自动使用降级选项
+  }
+}
+
+onMounted(async () => {
+  try {
+    await loadDeviceTypes()
+    await getDevices()
+    console.log('设备数据加载完成:', devices.value)
+  } catch (error) {
+    console.error('设备数据加载失败:', error)
+    $message?.error('设备数据加载失败')
+  }
+})
+
+// 监听视图模式切换
+const stopWatchViewMode = watch(viewMode, (newMode) => {
+  // 切换视图时保持每页20条不变
+  pagination.value.pageSize = 20
+  pagination.value.page = 1 // 重置到第一页
+  getDevices() // 重新获取数据
+})
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 停止watch监听器
+  stopWatchViewMode()
+  // 清理数据
+  tableData.value = []
+  cardData.value = []
+})
+
+// 设备类型选项 - 计算属性，支持动态获取和降级处理
+const deviceTypeOptions = computed(() => {
+  const baseOptions = [{ label: '全部设备', value: '' }]
+
+  if (deviceTypes.value && deviceTypes.value.length > 0) {
+    const dynamicOptions = deviceTypes.value.map((type) => ({
+      label: type.type_name,
+      value: type.type_code,
+    }))
+    return [...baseOptions, ...dynamicOptions]
+  }
+
+  // 降级处理：API调用失败时使用默认选项
+  const defaultOptions = [
+    { label: '焊机', value: 'welding' },
+    { label: '切割设备', value: 'cutting' },
+    { label: '装配设备', value: 'assembly' },
+    { label: '服务器', value: 'server' },
+    { label: '网络设备', value: 'network' },
+    { label: '存储设备', value: 'storage' },
+    { label: '安全设备', value: 'security' },
+    { label: '其他', value: 'other' },
+  ]
+  return [...baseOptions, ...defaultOptions]
+})
+
+// 设备状态选项 (暂时注释，未来可能使用)
+// const statusOptions = [
+//   { label: '在线', value: 'active' },
+//   { label: '离线', value: 'inactive' },
+//   { label: '维护中', value: 'maintenance' },
+//   { label: '故障', value: 'fault' },
+// ]
+
+const columns = [
+  {
+    title: '设备名称',
+    key: 'device_name',
+    width: 150,
+    ellipsis: { tooltip: true },
+    align: 'center',
+  },
+  {
+    title: '设备厂家',
+    key: 'manufacturer',
+    width: 120,
+    ellipsis: { tooltip: true },
+    align: 'center',
+  },
+  {
+    title: '设备编码',
+    key: 'device_code',
+    width: 180,
+    ellipsis: { tooltip: true },
+    align: 'center',
+  },
+  {
+    title: '设备类型',
+    key: 'device_type',
+    width: 120,
+    align: 'center',
+    render(row: DeviceInfo) {
+      return h(NTag, { type: 'info' }, { default: () => getDeviceTypeName(row.device_type) })
+    },
+  },
+  {
+    title: '设备型号',
+    key: 'device_model',
+    width: 150,
+    ellipsis: { tooltip: true },
+    align: 'center',
+  },
+  {
+    title: '在线地址',
+    key: 'online_address',
+    width: 140,
+    ellipsis: { tooltip: true },
+    align: 'center',
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 360,
+    align: 'center',
+    fixed: 'right',
+    hideInExcel: true,
+    render(row: DeviceInfo) {
+      return [
+        h(PermissionButton, {
+          permission: 'GET /api/v2/device/maintenance/repair-records',
+          size: 'small',
+          type: 'info',
+          secondary: true,
+          onClick: () => handleViewRepairRecords(row),
+        }, {
+          default: () => '维修记录',
+          icon: renderIcon('mdi:clipboard-text-outline', { size: 14 }),
+        }),
+        h(NButton, {
+          size: 'small',
+          type: 'info',
+          secondary: true,
+          style: 'margin-left: 8px;',
+          onClick: () => {
+            // 跳转到数据模型预览页面，查看该设备的数据模型
+            router.push({
+              path: '/data-model/preview',
+              query: {
+                device_code: row.device_code,
+                device_name: row.device_name,
+                device_type: row.device_type,
+              },
+            })
+          },
+        }, {
+          default: () => '查看数据',
+          icon: renderIcon('mdi:chart-line', { size: 14 }),
+        }),
+        h(PermissionButton, {
+          permission: 'PUT /api/v2/devices/{id}',
+          size: 'small',
+          type: 'primary',
+          secondary: true,
+          style: 'margin-left: 8px;',
+          onClick: () => handleEdit(row),
+        }, {
+          default: () => '编辑',
+          icon: renderIcon('material-symbols:edit-outline', { size: 14 }),
+        }),
+        h(PermissionButton, {
+          permission: 'DELETE /api/v2/devices/{id}',
+          size: 'small',
+          type: 'error',
+          style: 'margin-left: 8px;',
+          needConfirm: true,
+          confirmTitle: '删除确认',
+          confirmContent: '确定删除该设备吗？此操作不可恢复。',
+          onConfirm: () => handleDelete([row.id!], false)
+        }, {
+          default: () => '删除',
+          icon: renderIcon('material-symbols:delete-outline', { size: 14 }),
+        }),
+      ]
+    },
+  },
+]
+
+// 表单验证规则
+const deviceRules = {
+  device_name: [
+    {
+      required: true,
+      message: '请输入设备名称',
+      trigger: ['input', 'blur'],
+    },
+  ],
+  manufacturer: [
+    {
+      required: true,
+      message: '请输入设备厂家',
+      trigger: ['input', 'blur'],
+    },
+  ],
+  device_code: [
+    {
+      required: true,
+      message: '请输入设备编码',
+      trigger: ['input', 'blur'],
+    },
+  ],
+  device_type: [
+    {
+      required: true,
+      message: '请选择设备类型',
+      trigger: ['change', 'blur'],
+    },
+  ],
+  device_model: [
+    {
+      required: true,
+      message: '请输入设备型号',
+      trigger: ['input', 'blur'],
+    },
+  ],
+  online_address: [
+    {
+      required: true,
+      message: '请输入在线地址',
+      trigger: ['input', 'blur'],
+    },
+    {
+      pattern: /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/,
+      message: '请输入正确的IP地址格式',
+      trigger: ['input', 'blur'],
+    },
+  ],
+}
+</script>
+
+<template>
+  <CommonPage show-footer>
+    <template #action>
+      <div class="w-full flex items-center justify-end">
+        <!-- 右侧操作区域：视图切换 + 新建设备按钮 -->
+        <div class="flex items-center gap-10">
+          <ViewToggle
+            v-model="viewMode"
+            :options="viewOptions"
+            size="small"
+            :show-label="false"
+            :icon-size="16"
+            align="right"
+          />
+          <PermissionButton permission="POST /api/v2/devices" type="primary" @click="handleAdd">
+            <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建设备
+          </PermissionButton>
+        </div>
+      </div>
+    </template>
+
+    <!-- 表格视图 -->
+    <div v-if="viewMode === 'table'" class="table-container">
+      <DeviceInfoSearchBar
+        :model-value="queryItems"
+        :device-type-options="deviceTypeOptions"
+        @update:model-value="(val) => (queryItems = val)"
+        @search="handleSearch"
+        @reset="handleReset"
+      />
+
+      <PermissionDataWrapper
+        :data="tableData"
+        :loading="loading"
+        permission="GET /api/v2/devices"
+        permission-name="设备信息查看"
+        empty-title="暂无设备信息"
+        empty-description="当前没有设备信息数据，您可以点击上方的【新建设备】按钮来创建第一台设备"
+        loading-text="正在加载设备信息数据..."
+        @refresh="loadTableData"
+        @contact="handleContactAdmin"
+        @create="handleAdd"
+      >
+        <template #default="{ data }">
+          <n-data-table :columns="columns" :data="data" :loading="loading" />
+
+          <div v-if="data.length > 0" class="mt-6 flex justify-center">
+            <n-pagination
+              v-model:page="pagination.page"
+              v-model:page-size="pagination.pageSize"
+              :item-count="pagination.itemCount"
+              :page-sizes="pagination.pageSizes"
+              :show-size-picker="pagination.showSizePicker"
+              :show-quick-jumper="pagination.showQuickJumper"
+              :prefix="pagination.prefix"
+              :suffix="pagination.suffix"
+              @update:page="handlePageChange"
+              @update:page-size="handlePageSizeChange"
+            />
+          </div>
+        </template>
+      </PermissionDataWrapper>
+    </div>
+
+    <!-- 卡片视图 -->
+    <div v-if="viewMode === 'card'" class="card-container">
+      <DeviceInfoSearchBar
+        :model-value="queryItems"
+        :device-type-options="deviceTypeOptions"
+        @update:model-value="(val) => (queryItems = val)"
+        @search="handleSearch"
+        @reset="handleReset"
+      />
+
+      <PermissionDataWrapper
+        :data="cardData"
+        :loading="loading"
+        permission="GET /api/v2/devices"
+        permission-name="设备信息查看"
+        empty-title="暂无设备信息"
+        empty-description="当前没有设备信息数据，您可以点击上方的【新建设备】按钮来创建第一台设备"
+        loading-text="正在加载设备信息数据..."
+        @refresh="loadTableData"
+        @contact="handleContactAdmin"
+        @create="handleAdd"
+      >
+        <template #default="{ data }">
+          <!-- 卡片网格 -->
+          <div class="device-grid">
+            <NCard
+              v-for="device in data"
+              :key="device.id"
+              class="device-card"
+              :class="getDeviceCardClass(device.status)"
+              hoverable
+            >
+          <!-- 设备状态指示器 -->
+          <div class="status-indicator" :class="getStatusClass(device.status)"></div>
+
+          <!-- 设备基本信息 -->
+          <div class="device-header">
+            <div class="device-info">
+              <div class="device-name-row">
+                <TheIcon icon="material-symbols:precision-manufacturing" :size="20" class="welding-icon mr-8" />
+                <h3 class="device-name">{{ device.device_name }}</h3>
+              </div>
+              <p class="device-id">{{ device.device_code }}</p>
+            </div>
+            <div class="device-type">
+              <NTag type="info" size="small">
+                {{ getDeviceTypeName(device.device_type) }}
+              </NTag>
+            </div>
+          </div>
+
+          <!-- 设备状态 -->
+          <div class="device-status">
+            <NTag :type="getStatusTagType(device.status)" size="small">
+              {{ getStatusText(device.status) }}
+            </NTag>
+          </div>
+
+          <!-- 监控数据 -->
+          <div class="monitoring-data">
+            <div class="data-row">
+              <span class="data-label">🏭 设备厂家:</span>
+              <span class="data-value">{{ device.manufacturer || '--' }}</span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">📦 设备型号:</span>
+              <span class="data-value">{{ device.device_model || '--' }}</span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">🌐 在线地址:</span>
+              <span class="data-value">{{ device.online_address || '--' }}</span>
+            </div>
+          </div>
+
+          <!-- 设备操作 -->
+          <div class="device-actions">
+            <PermissionButton
+              permission="GET /api/v2/device/maintenance/repair-records"
+              size="small"
+              type="info"
+              class="mr-8"
+              @click="handleViewRepairRecords(device)"
+              title="维修记录"
+            >
+              <TheIcon icon="mdi:clipboard-text-outline" :size="14" />
+            </PermissionButton>
+            <NButton
+              size="small"
+              type="info"
+              class="mr-8"
+              @click="router.push({
+                path: '/data-model/preview',
+                query: {
+                  device_code: device.device_code,
+                  device_name: device.device_name,
+                  device_type: device.device_type,
+                },
+              })"
+              title="查看数据"
+            >
+              <TheIcon icon="mdi:chart-line" :size="14" />
+            </NButton>
+            <PermissionButton
+              permission="PUT /api/v2/devices/{id}"
+              size="small"
+              type="primary"
+              class="mr-8"
+              @click="handleEdit(device)"
+              title="编辑"
+            >
+              <TheIcon icon="mdi:pencil" :size="14" />
+            </PermissionButton>
+            <PermissionButton
+              permission="DELETE /api/v2/devices/{id}"
+              size="small"
+              type="error"
+              title="删除"
+              needConfirm
+              confirmTitle="删除确认"
+              confirmContent="确定删除该设备吗？此操作不可恢复。"
+              @confirm="() => handleDelete([device.id])"
+            >
+              <TheIcon icon="mdi:delete" :size="14" />
+            </PermissionButton>
+          </div>
+        </NCard>
+      </div>
+
+      <!-- 分页组件 -->
+      <div v-if="data.length > 0" class="mt-6 flex justify-center">
+        <NPagination
+          v-model:page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :item-count="pagination.itemCount"
+          :page-sizes="pagination.pageSizes"
+          :show-size-picker="pagination.showSizePicker"
+          :show-quick-jumper="pagination.showQuickJumper"
+          :prefix="pagination.prefix"
+          :suffix="pagination.suffix"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
+      </div>
+        </template>
+      </PermissionDataWrapper>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <CrudModal
+      v-model:visible="modalVisible"
+      :title="modalTitle"
+      :loading="modalLoading"
+      @save="handleSave"
+    >
+      <NForm
+        ref="modalFormRef"
+        label-placement="left"
+        label-align="left"
+        :label-width="80"
+        :model="modalForm"
+        :rules="deviceRules"
+        :disabled="modalAction === 'view'"
+      >
+        <NFormItem label="设备名称" path="device_name">
+          <NInput v-model:value="modalForm.device_name" placeholder="请输入设备名称" />
+        </NFormItem>
+        <NFormItem label="设备厂家" path="manufacturer">
+          <NInput v-model:value="modalForm.manufacturer" placeholder="请输入设备厂家" />
+        </NFormItem>
+        <NFormItem label="设备编码" path="device_code">
+          <NInput v-model:value="modalForm.device_code" placeholder="请输入设备编码" />
+        </NFormItem>
+        <NFormItem label="设备类型" path="device_type">
+          <NSelect
+            v-model:value="modalForm.device_type"
+            :options="deviceTypeOptions"
+            placeholder="请选择设备类型"
+          />
+        </NFormItem>
+        <NFormItem label="设备型号" path="device_model">
+          <NInput v-model:value="modalForm.device_model" placeholder="请输入设备型号" />
+        </NFormItem>
+        <NFormItem label="在线地址" path="online_address">
+          <NInput v-model:value="modalForm.online_address" placeholder="请输入在线地址" />
+        </NFormItem>
+      </NForm>
+    </CrudModal>
+  </CommonPage>
+</template>
+
+<style scoped>
+/* 设备网格布局 */
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+/* 设备卡片样式 */
+.device-card {
+  position: relative;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--n-color-primary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.device-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--n-color-primary);
+  opacity: 0.1;
+  z-index: -1;
+}
+
+.device-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--n-box-shadow-color);
+}
+
+.device-card--active {
+  border-color: var(--n-success-color);
+  background: var(--n-color-embedded);
+}
+
+.device-card--inactive {
+  border-color: var(--n-border-color);
+  background: var(--n-color-embedded);
+}
+
+.device-card--maintenance {
+  border-color: var(--n-warning-color);
+  background: var(--n-color-embedded);
+}
+
+.device-card--locked {
+  border-color: var(--n-error-color);
+  background: var(--n-color-embedded);
+}
+
+.device-card--inuse {
+  border-color: var(--n-success-color);
+  background: var(--n-color-embedded);
+}
+
+/* 状态指示器 */
+.status-indicator {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.status-indicator--active {
+  background: var(--n-success-color);
+  box-shadow: 0 0 0 4px var(--n-success-color-hover);
+}
+
+.status-indicator--inactive {
+  background: var(--n-border-color);
+  box-shadow: 0 0 0 4px var(--n-border-color-hover);
+  animation: none;
+}
+
+.status-indicator--maintenance {
+  background: var(--n-warning-color);
+  box-shadow: 0 0 0 4px var(--n-warning-color-hover);
+}
+
+.status-indicator--locked {
+  background: var(--n-error-color);
+  box-shadow: 0 0 0 4px var(--n-error-color-hover);
+}
+
+.status-indicator--inuse {
+  background: var(--n-success-color);
+  box-shadow: 0 0 0 4px var(--n-success-color-hover);
+}
+
+/* 设备头部信息 */
+.device-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  padding-right: 30px;
+}
+
+.device-info {
+  flex: 1;
+}
+
+.device-name-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.welding-icon {
+  color: var(--n-primary-color);
+  flex-shrink: 0;
+}
+
+.device-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--n-title-text-color);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.device-id {
+  font-size: 13px;
+  color: var(--n-secondary-text-color);
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.device-type {
+  margin-left: 10px;
+}
+
+/* 设备状态 */
+.device-status {
+  margin-bottom: 15px;
+}
+
+/* 监控数据 */
+.monitoring-data {
+  margin-bottom: 15px;
+}
+
+.data-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.data-label {
+  color: var(--n-secondary-text-color);
+  margin-right: 8px;
+  min-width: 80px;
+  font-weight: 500;
+}
+
+.data-value {
+  color: var(--n-text-color);
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* 设备位置 */
+.device-location {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* 设备操作 */
+.device-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 15px;
+  border-top: 1px solid var(--n-divider-color);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .device-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 15px 0;
+  }
+
+  .device-card {
+    padding: 15px;
+  }
+
+  .device-name {
+    font-size: 16px;
+  }
+
+  .data-row {
+    font-size: 13px;
+  }
+
+  .data-label {
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 480px) {
+  .device-header {
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 20px;
+  }
+
+  .device-type {
+    margin-left: 0;
+  }
+
+  .device-actions {
+    flex-direction: column;
+  }
+}
+</style>

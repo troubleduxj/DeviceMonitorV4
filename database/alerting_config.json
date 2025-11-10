@@ -1,0 +1,116 @@
+{
+  "alert_rules": [
+    {
+      "rule_id": "api_migration_failure",
+      "rule_name": "API迁移失败告警",
+      "alert_type": "migration_failure",
+      "severity": "critical",
+      "condition": "SELECT COUNT(*) FROM t_sys_migration_logs WHERE migration_id = 'api_permission_migration' AND status = 'failed' AND created_at > NOW() - INTERVAL '5 minutes'",
+      "threshold": 1.0,
+      "duration": 60,
+      "enabled": true,
+      "notification_channels": ["email"],
+      "suppression_duration": 300,
+      "auto_recovery": true,
+      "recovery_action": "retry_api_migration"
+    },
+    {
+      "rule_id": "api_consistency_issue",
+      "rule_name": "API数据一致性问题",
+      "alert_type": "consistency_issue",
+      "severity": "error",
+      "condition": "SELECT AVG(consistency_ratio) FROM t_sys_consistency_checks WHERE migration_id = 'api_permission_migration' AND created_at > NOW() - INTERVAL '10 minutes'",
+      "threshold": 0.95,
+      "duration": 300,
+      "enabled": true,
+      "notification_channels": ["email"],
+      "suppression_duration": 600,
+      "auto_recovery": false,
+      "recovery_action": null
+    },
+    {
+      "rule_id": "dual_write_error_high",
+      "rule_name": "双写错误率过高",
+      "alert_type": "dual_write_error",
+      "severity": "warning",
+      "condition": "SELECT COUNT(*) FROM t_sys_dual_write_logs WHERE (source_success = FALSE OR target_success = FALSE) AND created_at > NOW() - INTERVAL '5 minutes'",
+      "threshold": 10.0,
+      "duration": 120,
+      "enabled": true,
+      "notification_channels": ["email"],
+      "suppression_duration": 300,
+      "auto_recovery": false,
+      "recovery_action": null
+    },
+    {
+      "rule_id": "switch_performance_degradation",
+      "rule_name": "切换性能下降",
+      "alert_type": "performance_degradation",
+      "severity": "warning",
+      "condition": "SELECT AVG(response_time_ms) FROM t_sys_read_switch_logs WHERE created_at > NOW() - INTERVAL '10 minutes'",
+      "threshold": 200.0,
+      "duration": 300,
+      "enabled": true,
+      "notification_channels": ["email"],
+      "suppression_duration": 600,
+      "auto_recovery": false,
+      "recovery_action": null
+    },
+    {
+      "rule_id": "switch_error_rate_high",
+      "rule_name": "切换错误率过高",
+      "alert_type": "switch_failure",
+      "severity": "error",
+      "condition": "SELECT COUNT(CASE WHEN success = FALSE THEN 1 END) * 100.0 / COUNT(*) FROM t_sys_read_switch_logs WHERE created_at > NOW() - INTERVAL '5 minutes'",
+      "threshold": 5.0,
+      "duration": 180,
+      "enabled": true,
+      "notification_channels": ["email"],
+      "suppression_duration": 300,
+      "auto_recovery": true,
+      "recovery_action": "rollback_switch"
+    }
+  ],
+  "notification_configs": [
+    {
+      "channel": "email",
+      "enabled": true,
+      "config": {
+        "smtp_server": "smtp.example.com",
+        "smtp_port": 587,
+        "username": "migration-alert@company.com",
+        "password": "your_email_password",
+        "from_email": "migration-alert@company.com",
+        "to_emails": [
+          "admin@company.com",
+          "dev-team@company.com"
+        ],
+        "use_tls": true
+      }
+    },
+    {
+      "channel": "webhook",
+      "enabled": false,
+      "config": {
+        "url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "channel": "slack",
+      "enabled": false,
+      "config": {
+        "webhook_url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      }
+    },
+    {
+      "channel": "dingtalk",
+      "enabled": false,
+      "config": {
+        "webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN"
+      }
+    }
+  ]
+}

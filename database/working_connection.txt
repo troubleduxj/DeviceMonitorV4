@@ -1,0 +1,1 @@
+postgresql://postgres:Hanatech%40123@localhost:5432/devicemonitor

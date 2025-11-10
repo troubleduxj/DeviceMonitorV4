@@ -1,0 +1,36 @@
+# Windows 环境变量快速设置指南
+
+## 图形界面方式（推荐，5分钟）
+
+1. 右键 "此电脑" → "属性"
+2. 点击 "高级系统设置"
+3. 点击 "环境变量"
+
+4. 在"系统变量"部分，点击 "新建":
+   变量名: ANDROID_HOME
+   变量值: C:\Users\你的用户名\AppData\Local\Android\Sdk
+   点击 "确定"
+
+5. 在"系统变量"部分，找到 "Path"，点击 "编辑"
+   点击 "新建"，依次添加（每个一行）:
+   %ANDROID_HOME%\platform-tools
+   %ANDROID_HOME%\emulator
+   %ANDROID_HOME%\tools
+   %ANDROID_HOME%\tools\bin
+   
+   点击 "确定"
+
+6. 点击所有对话框的 "确定"
+
+7. 重启 PowerShell（重要！）
+
+## PowerShell 验证
+
+重启 PowerShell 后运行:
+
+Write-Host $env:ANDROID_HOME
+adb --version
+
+如果都有输出，说明配置成功！
+
+

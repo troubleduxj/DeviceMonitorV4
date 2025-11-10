@@ -1,0 +1,61 @@
+{
+  "switch_configs": [
+    {
+      "config_id": "api_gradual_switch",
+      "table_name": "api",
+      "current_source": "source",
+      "target_source": "target",
+      "strategy": "gradual",
+      "switch_percentage": 0.0,
+      "user_groups": [],
+      "conditions": {
+        "consistency_threshold": 0.99,
+        "error_rate_threshold": 0.01,
+        "latency_threshold": 100,
+        "time_range": {
+          "start": 9,
+          "end": 17
+        }
+      },
+      "rollback_enabled": true,
+      "auto_rollback_threshold": 0.05,
+      "status": "inactive"
+    },
+    {
+      "config_id": "user_permissions_canary_switch",
+      "table_name": "user_permissions",
+      "current_source": "source",
+      "target_source": "target",
+      "strategy": "canary",
+      "switch_percentage": 5.0,
+      "user_groups": ["beta_users", "internal_users"],
+      "conditions": {
+        "consistency_threshold": 0.99,
+        "error_rate_threshold": 0.005,
+        "latency_threshold": 50
+      },
+      "rollback_enabled": true,
+      "auto_rollback_threshold": 0.02,
+      "status": "inactive"
+    },
+    {
+      "config_id": "role_permissions_blue_green_switch",
+      "table_name": "role_permissions",
+      "current_source": "source",
+      "target_source": "target",
+      "strategy": "blue_green",
+      "switch_percentage": 100.0,
+      "user_groups": [],
+      "conditions": {
+        "consistency_threshold": 0.95,
+        "error_rate_threshold": 0.02,
+        "latency_threshold": 200
+      },
+      "rollback_enabled": true,
+      "auto_rollback_threshold": 0.1,
+      "status": "inactive"
+    }
+  ],
+  "switch_rules": [],
+  "updated_at": "2024-01-10T10:00:00Z"
+}

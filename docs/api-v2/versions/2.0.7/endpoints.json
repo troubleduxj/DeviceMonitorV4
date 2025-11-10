@@ -1,0 +1,2508 @@
+[
+  {
+    "path": "/api/v2/base/access_token",
+    "method": "POST",
+    "name": "login_access_token",
+    "summary": "用户登录获取访问令牌",
+    "description": "用户登录接口 - API v2版本\n\n提供与v1相同的登录功能，但返回v2格式的响应",
+    "tags": [
+      "基础功能 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/base/userinfo",
+    "method": "GET",
+    "name": "get_user_info",
+    "summary": "获取当前用户信息",
+    "description": "获取当前登录用户信息 - API v2版本",
+    "tags": [
+      "基础功能 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/base/usermenu",
+    "method": "GET",
+    "name": "get_user_menu",
+    "summary": "获取当前用户菜单",
+    "description": "获取当前用户可访问的菜单 - API v2版本",
+    "tags": [
+      "基础功能 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/base/logout",
+    "method": "POST",
+    "name": "logout",
+    "summary": "用户登出",
+    "description": "用户登出接口 - API v2版本\n\n注意：JWT令牌是无状态的，实际的令牌失效需要在客户端处理\n这里主要是提供一个标准的登出端点",
+    "tags": [
+      "基础功能 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/base/refresh",
+    "method": "POST",
+    "name": "refresh_token",
+    "summary": "刷新访问令牌",
+    "description": "刷新访问令牌 - API v2版本",
+    "tags": [
+      "基础功能 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/base/userapi",
+    "method": "GET",
+    "name": "get_user_api",
+    "summary": "获取用户可访问的API列表",
+    "description": "获取当前用户可访问的API列表 - API v2版本\n\n根据用户角色权限返回可访问的V2 API接口列表",
+    "tags": [
+      "基础功能 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/login",
+    "method": "POST",
+    "name": "login",
+    "summary": "用户登录",
+    "description": "用户登录接口 - API v2版本\n\n支持JWT令牌生成、验证、刷新功能和令牌黑名单机制",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/userinfo",
+    "method": "GET",
+    "name": "get_user_info",
+    "summary": "获取当前用户信息 (兼容路径)",
+    "description": "获取当前登录用户信息 - API v2版本",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/user",
+    "method": "GET",
+    "name": "get_user_info",
+    "summary": "获取当前用户信息",
+    "description": "获取当前登录用户信息 - API v2版本",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/user-apis",
+    "method": "GET",
+    "name": "get_user_apis",
+    "summary": "获取当前用户API权限 (兼容路径)",
+    "description": "获取当前用户的API权限列表 - API v2版本",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/user/apis",
+    "method": "GET",
+    "name": "get_user_apis",
+    "summary": "获取当前用户API权限",
+    "description": "获取当前用户的API权限列表 - API v2版本",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/user/menus",
+    "method": "GET",
+    "name": "get_user_menus",
+    "summary": "获取当前用户菜单权限",
+    "description": "获取当前用户的菜单权限列表 - API v2版本（包含按钮权限）",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/change-password",
+    "method": "POST",
+    "name": "change_password",
+    "summary": "修改密码",
+    "description": "用户修改密码接口 - API v2版本\n\n允许用户修改自己的密码",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/refresh",
+    "method": "POST",
+    "name": "refresh_token",
+    "summary": "刷新访问令牌",
+    "description": "刷新访问令牌接口\n\n使用刷新令牌获取新的访问令牌和刷新令牌",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/logout",
+    "method": "POST",
+    "name": "logout",
+    "summary": "用户登出",
+    "description": "用户登出接口 - API v2版本\n\n支持JWT令牌黑名单机制，确保令牌失效",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/auth/logout-all",
+    "method": "POST",
+    "name": "logout_all_devices",
+    "summary": "从所有设备登出",
+    "description": "从所有设备登出接口\n\n使所有设备上的令牌失效",
+    "tags": [
+      "认证管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/avatar/generate/{username}",
+    "method": "GET",
+    "name": "generate_user_avatar",
+    "summary": "生成用户头像",
+    "description": "根据用户名生成 SVG 头像\n\nArgs:\n    username: 用户名\n    size: 头像尺寸（50-500像素）\n    \nReturns:\n    SVG 格式的头像",
+    "tags": [
+      "头像生成 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/",
+    "method": "GET",
+    "name": "get_users_v2",
+    "summary": "获取用户列表 v2",
+    "description": "获取用户列表 - v2版本使用标准化响应",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/export",
+    "method": "GET",
+    "name": "export_users_v2",
+    "summary": "导出用户数据 v2",
+    "description": "导出用户数据 v2版本\n\n新功能：\n- 支持多种导出格式（csv, json）\n- 筛选条件支持\n- 标准化响应格式",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/batch",
+    "method": "DELETE",
+    "name": "batch_delete_users_v2",
+    "summary": "批量删除用户 v2",
+    "description": "批量删除用户 v2版本\n\n使用标准化数据格式：{\"ids\": [1, 2, 3]}\n返回标准化响应格式，包含用户友好的错误提示",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}",
+    "method": "GET",
+    "name": "get_user_v2",
+    "summary": "获取用户详情 v2",
+    "description": "获取用户详情 v2版本\n\n新功能：\n- 标准化响应格式\n- 增强的用户信息",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}",
+    "method": "PUT",
+    "name": "update_user_v2",
+    "summary": "更新用户 v2",
+    "description": "更新用户 v2版本\n\n新功能：\n- 标准化响应格式\n- 支持部分字段更新\n- 角色关联更新",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/",
+    "method": "POST",
+    "name": "create_user_v2",
+    "summary": "创建用户 v2",
+    "description": "创建用户 v2版本\n\n新功能：\n- 标准化响应格式\n- 支持角色关联\n- 部门关联",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}",
+    "method": "DELETE",
+    "name": "delete_user_v2",
+    "summary": "删除用户 v2",
+    "description": "删除用户 v2版本\n\n新功能：\n- 标准化响应格式\n- 完整的admin用户保护机制\n- 与批量删除一致的保护逻辑\n\nRequirements: 需求5.1, 需求5.2, 需求4.1, 需求4.2, 需求4.3",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/roles",
+    "method": "GET",
+    "name": "get_user_roles_v2",
+    "summary": "获取用户角色 v2",
+    "description": "获取用户角色 v2版本\n\n新功能：\n- 标准化响应格式\n- 详细的角色信息",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/permissions",
+    "method": "GET",
+    "name": "get_user_permissions_v2",
+    "summary": "获取用户权限 v2",
+    "description": "获取用户权限 v2版本\n\n新功能：\n- 通过角色计算用户权限\n- 包含API权限和菜单权限\n- 标准化响应格式",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/roles",
+    "method": "PUT",
+    "name": "set_user_roles_v2",
+    "summary": "设置用户角色 v2",
+    "description": "设置用户角色 v2版本\n\n新功能：\n- 标准化响应格式\n- 角色验证\n- 批量角色设置",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/_batch-update",
+    "method": "PATCH",
+    "name": "batch_update_users_v2",
+    "summary": "批量更新用户 v2",
+    "description": "批量更新用户 v2版本\n\n新功能：\n- 批量更新多个用户\n- 支持不同用户的不同更新字段\n- 详细的成功/失败统计\n- 标准化响应格式",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}",
+    "method": "PATCH",
+    "name": "patch_user_v2",
+    "summary": "更新用户 v2",
+    "description": "部分更新用户 v2版本\n\n新功能：\n- 只更新提供的字段\n- 支持角色和部门更新\n- 标准化响应格式",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/actions/reset-password",
+    "method": "POST",
+    "name": "reset_user_password_v2",
+    "summary": "重置用户密码 v2",
+    "description": "重置用户密码 v2版本\n\n新功能：\n- 标准化响应格式\n- 自定义密码支持\n- 安全检查",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/actions/activate",
+    "method": "POST",
+    "name": "activate_user_v2",
+    "summary": "激活用户 v2",
+    "description": "激活用户 v2版本\n\n新功能：\n- 动作型操作，语义更清晰\n- 标准化响应格式\n- 安全检查",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/actions/deactivate",
+    "method": "POST",
+    "name": "deactivate_user_v2",
+    "summary": "禁用用户 v2",
+    "description": "禁用用户 v2版本\n\n新功能：\n- 动作型操作，语义更清晰\n- 标准化响应格式\n- 安全检查",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/{user_id}/status",
+    "method": "PATCH",
+    "name": "update_user_status_v2",
+    "summary": "更新用户状态 v2",
+    "description": "更新用户状态 v2版本\n\n新功能：\n- 专门用于状态更新的端点\n- 标准化响应格式\n- 安全检查",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/_batch-activate",
+    "method": "POST",
+    "name": "batch_activate_users_v2",
+    "summary": "批量激活用户 v2",
+    "description": "批量激活用户 v2版本\n\n新功能：\n- 专门用于批量激活操作\n- 标准化响应格式\n- 批量操作结果统计\n- 安全检查",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/_batch-deactivate",
+    "method": "POST",
+    "name": "batch_deactivate_users_v2",
+    "summary": "批量禁用用户 v2",
+    "description": "批量禁用用户 v2版本\n\n新功能：\n- 专门用于批量禁用操作\n- 标准化响应格式\n- 批量操作结果统计\n- 安全检查",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/_batch-create",
+    "method": "POST",
+    "name": "batch_create_users_v2",
+    "summary": "批量创建用户 v2",
+    "description": "批量创建用户 v2版本\n\n新功能：\n- 批量创建多个用户\n- 详细的成功/失败统计\n- 标准化响应格式",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/users/search",
+    "method": "POST",
+    "name": "search_users_v2",
+    "summary": "复杂查询用户 v2",
+    "description": "复杂查询用户 v2版本\n\n新功能：\n- 支持复杂查询条件\n- 多字段筛选\n- 日期范围查询\n- 角色筛选\n- 自定义排序\n- 标准化响应格式",
+    "tags": [
+      "用户管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/",
+    "method": "GET",
+    "name": "get_roles",
+    "summary": "获取角色列表",
+    "description": "获取角色列表，支持搜索、过滤、分页、排序",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/",
+    "method": "POST",
+    "name": "create_role",
+    "summary": "创建角色",
+    "description": "创建新角色",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/batch",
+    "method": "DELETE",
+    "name": "batch_delete_roles",
+    "summary": "批量删除角色",
+    "description": "批量删除多个角色",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/batch",
+    "method": "POST",
+    "name": "batch_create_roles",
+    "summary": "批量创建角色",
+    "description": "批量创建多个角色",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/batch",
+    "method": "PUT",
+    "name": "batch_update_roles",
+    "summary": "批量更新角色",
+    "description": "批量更新多个角色",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/users",
+    "method": "GET",
+    "name": "get_role_users",
+    "summary": "获取角色用户",
+    "description": "获取指定角色的用户列表",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/users",
+    "method": "POST",
+    "name": "add_role_users",
+    "summary": "添加角色用户",
+    "description": "为角色添加用户",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/users/{user_id}",
+    "method": "DELETE",
+    "name": "remove_role_user",
+    "summary": "移除角色用户",
+    "description": "从角色中移除指定用户",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/children",
+    "method": "GET",
+    "name": "get_role_children",
+    "summary": "获取子角色",
+    "description": "获取指定角色的子角色列表",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/children",
+    "method": "POST",
+    "name": "create_role_child",
+    "summary": "创建子角色",
+    "description": "为指定角色创建子角色",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}",
+    "method": "PUT",
+    "name": "update_role",
+    "summary": "更新角色",
+    "description": "更新角色信息",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}",
+    "method": "DELETE",
+    "name": "delete_role",
+    "summary": "删除角色",
+    "description": "删除指定角色",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/permissions",
+    "method": "GET",
+    "name": "get_role_permissions",
+    "summary": "获取角色权限",
+    "description": "获取指定角色的权限配置",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/permissions",
+    "method": "POST",
+    "name": "add_role_permissions",
+    "summary": "添加角色权限",
+    "description": "为角色添加权限",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/permissions",
+    "method": "PUT",
+    "name": "update_role_permissions",
+    "summary": "更新角色权限",
+    "description": "更新角色的权限配置",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}/permissions",
+    "method": "DELETE",
+    "name": "delete_role_permissions",
+    "summary": "删除角色权限",
+    "description": "删除角色的指定权限",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}",
+    "method": "PATCH",
+    "name": "patch_role",
+    "summary": "部分更新角色",
+    "description": "部分更新角色信息",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/tree",
+    "method": "GET",
+    "name": "get_roles_tree",
+    "summary": "获取角色树形结构",
+    "description": "获取完整的角色层级树形结构",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/roles/{role_id}",
+    "method": "GET",
+    "name": "get_role",
+    "summary": "获取角色详情",
+    "description": "获取指定角色的详细信息",
+    "tags": [
+      "角色管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/",
+    "method": "GET",
+    "name": "get_menus",
+    "summary": "获取菜单列表",
+    "description": "获取菜单列表 - 支持搜索、过滤和树形视图",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/{menu_id}/children",
+    "method": "GET",
+    "name": "get_menu_children",
+    "summary": "获取子菜单",
+    "description": "获取指定菜单的直接子菜单列表",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/batch",
+    "method": "POST",
+    "name": "batch_create_menus",
+    "summary": "批量创建菜单",
+    "description": "批量创建多个菜单",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/batch",
+    "method": "PATCH",
+    "name": "batch_update_menus",
+    "summary": "批量更新菜单",
+    "description": "批量更新多个菜单",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/batch",
+    "method": "DELETE",
+    "name": "batch_delete_menus",
+    "summary": "批量删除菜单",
+    "description": "批量删除多个菜单",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/tree",
+    "method": "GET",
+    "name": "get_menu_tree",
+    "summary": "获取菜单树",
+    "description": "获取完整的菜单树结构",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/{menu_id}",
+    "method": "GET",
+    "name": "get_menu",
+    "summary": "获取菜单详情",
+    "description": "根据ID获取菜单详细信息",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/",
+    "method": "POST",
+    "name": "create_menu",
+    "summary": "创建菜单",
+    "description": "创建新菜单",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/{menu_id}",
+    "method": "PATCH",
+    "name": "update_menu",
+    "summary": "部分更新菜单",
+    "description": "部分更新菜单信息",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/{menu_id}",
+    "method": "PUT",
+    "name": "put_update_menu",
+    "summary": "完整更新菜单",
+    "description": "完整更新菜单信息",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/{menu_id}/usage",
+    "method": "GET",
+    "name": "check_menu_usage",
+    "summary": "检查菜单使用情况",
+    "description": "检查菜单是否被角色使用或有子菜单",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/menus/{menu_id}",
+    "method": "DELETE",
+    "name": "delete_menu",
+    "summary": "删除菜单",
+    "description": "删除指定菜单",
+    "tags": [
+      "菜单管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/",
+    "method": "GET",
+    "name": "get_departments",
+    "summary": "获取部门列表",
+    "description": "获取部门列表 - 支持搜索、过滤和树形视图",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments",
+    "method": "GET",
+    "name": "get_departments",
+    "summary": "获取部门列表",
+    "description": "获取部门列表 - 支持搜索、过滤和树形视图",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/tree",
+    "method": "GET",
+    "name": "get_department_tree",
+    "summary": "获取部门树",
+    "description": "获取完整的部门树结构",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}",
+    "method": "GET",
+    "name": "get_department",
+    "summary": "获取部门详情",
+    "description": "根据ID获取部门详细信息",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/",
+    "method": "POST",
+    "name": "create_department",
+    "summary": "创建部门",
+    "description": "创建新部门",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments",
+    "method": "POST",
+    "name": "create_department",
+    "summary": "创建部门",
+    "description": "创建新部门",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/batch",
+    "method": "POST",
+    "name": "batch_create_departments",
+    "summary": "批量创建部门",
+    "description": "批量创建多个部门",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}",
+    "method": "PUT",
+    "name": "update_department",
+    "summary": "更新部门",
+    "description": "更新部门信息",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}",
+    "method": "PATCH",
+    "name": "patch_department",
+    "summary": "部分更新部门",
+    "description": "部分更新部门信息（PATCH方法）",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/batch",
+    "method": "DELETE",
+    "name": "batch_delete_departments",
+    "summary": "批量删除部门",
+    "description": "批量删除多个部门（支持软删除和硬删除）",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}",
+    "method": "DELETE",
+    "name": "delete_department",
+    "summary": "删除部门",
+    "description": "删除指定部门（软删除）",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}/children",
+    "method": "GET",
+    "name": "get_department_children",
+    "summary": "获取直接子部门",
+    "description": "获取指定部门的直接子部门列表",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}/users",
+    "method": "GET",
+    "name": "get_department_users",
+    "summary": "获取部门用户",
+    "description": "获取指定部门的用户列表",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}/users/{user_id}",
+    "method": "PUT",
+    "name": "add_user_to_department",
+    "summary": "用户加入部门",
+    "description": "将指定用户加入到部门",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/departments/{dept_id}/users/{user_id}",
+    "method": "DELETE",
+    "name": "remove_user_from_department",
+    "summary": "用户移出部门",
+    "description": "将指定用户从部门移出",
+    "tags": [
+      "部门管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis",
+    "method": "GET",
+    "name": "get_apis",
+    "summary": "获取API列表",
+    "description": "获取API列表",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/{api_id}",
+    "method": "GET",
+    "name": "get_api",
+    "summary": "获取API详情",
+    "description": "获取API详情",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis",
+    "method": "POST",
+    "name": "create_api",
+    "summary": "创建API",
+    "description": "创建API",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/batch",
+    "method": "PUT",
+    "name": "batch_update_apis",
+    "summary": "批量更新API",
+    "description": "批量更新API",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/{api_id}",
+    "method": "PUT",
+    "name": "update_api",
+    "summary": "更新API",
+    "description": "更新API",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/batch",
+    "method": "DELETE",
+    "name": "batch_delete_apis",
+    "summary": "批量删除API",
+    "description": "批量删除API v2版本\n\n使用标准化数据格式：{\"ids\": [1, 2, 3]}\n返回标准化响应格式，包含用户友好的错误提示",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/{api_id}",
+    "method": "DELETE",
+    "name": "delete_api",
+    "summary": "删除API",
+    "description": "删除API",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/batch",
+    "method": "POST",
+    "name": "batch_create_apis",
+    "summary": "批量创建API",
+    "description": "批量创建API",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/apis/refresh",
+    "method": "POST",
+    "name": "refresh_apis",
+    "summary": "刷新API",
+    "description": "刷新API列表（从路由自动发现）",
+    "tags": [
+      "API管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups",
+    "method": "GET",
+    "name": "get_api_groups",
+    "summary": "获取API分组列表",
+    "description": "获取API分组列表，支持分页和全量获取",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/all",
+    "method": "GET",
+    "name": "get_all_api_groups",
+    "summary": "获取所有API分组",
+    "description": "获取所有API分组（不分页）",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}",
+    "method": "GET",
+    "name": "get_api_group",
+    "summary": "获取API分组详情",
+    "description": "获取API分组详情",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups",
+    "method": "POST",
+    "name": "create_api_group",
+    "summary": "创建API分组",
+    "description": "创建API分组",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}",
+    "method": "PUT",
+    "name": "update_api_group",
+    "summary": "更新API分组",
+    "description": "更新API分组",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}",
+    "method": "PATCH",
+    "name": "patch_api_group",
+    "summary": "部分更新API分组",
+    "description": "部分更新API分组（只更新提供的字段）",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/batch",
+    "method": "DELETE",
+    "name": "batch_delete_api_groups",
+    "summary": "批量删除API分组",
+    "description": "批量删除API分组 v2版本\n\n使用标准化数据格式：{\"ids\": [1, 2, 3]}\n返回标准化响应格式，包含用户友好的错误提示",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}",
+    "method": "DELETE",
+    "name": "delete_api_group",
+    "summary": "删除API分组",
+    "description": "删除API分组",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}/apis",
+    "method": "GET",
+    "name": "get_group_apis",
+    "summary": "获取分组下的API列表",
+    "description": "获取指定分组下的API列表",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}/apis",
+    "method": "POST",
+    "name": "add_apis_to_group",
+    "summary": "批量添加API到分组",
+    "description": "批量添加API到指定分组",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-groups/{group_id}/apis/{api_id}",
+    "method": "DELETE",
+    "name": "remove_api_from_group",
+    "summary": "从分组移除API",
+    "description": "从指定分组移除单个API",
+    "tags": [
+      "API分组管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-classification/audit",
+    "method": "GET",
+    "name": "audit_api_classification",
+    "summary": "审计API分类匹配情况",
+    "description": "审计当前API分类与实际V2端点的匹配情况",
+    "tags": [
+      "API分类优化 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-classification/reorganize",
+    "method": "POST",
+    "name": "reorganize_api_groups",
+    "summary": "重新组织API分类结构",
+    "description": "重新组织API分类结构，确保逻辑分组与系统管理模块对应",
+    "tags": [
+      "API分类优化 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-classification/auto-map",
+    "method": "POST",
+    "name": "auto_map_endpoints_to_groups",
+    "summary": "自动映射API到分组",
+    "description": "实现API到分类的自动映射和同步机制",
+    "tags": [
+      "API分类优化 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-classification/sync-endpoints",
+    "method": "POST",
+    "name": "sync_v2_endpoints",
+    "summary": "同步V2端点",
+    "description": "从FastAPI应用同步V2端点到数据库",
+    "tags": [
+      "API分类优化 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-classification/report",
+    "method": "GET",
+    "name": "generate_classification_report",
+    "summary": "生成分类管理报告",
+    "description": "生成API分类管理报告",
+    "tags": [
+      "API分类优化 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/api-classification/optimize",
+    "method": "POST",
+    "name": "optimize_api_classification_system",
+    "summary": "一键优化API分类系统",
+    "description": "一键执行完整的API分类系统优化流程",
+    "tags": [
+      "API分类优化 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/audit-logs",
+    "method": "GET",
+    "name": "get_audit_logs",
+    "summary": "获取审计日志列表",
+    "description": "获取审计日志列表",
+    "tags": [
+      "审计日志 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/audit-logs/{log_id}",
+    "method": "GET",
+    "name": "get_audit_log",
+    "summary": "获取审计日志详情",
+    "description": "获取审计日志详情",
+    "tags": [
+      "审计日志 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types",
+    "method": "GET",
+    "name": "get_dict_types",
+    "summary": "获取字典类型列表",
+    "description": "获取字典类型列表",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types",
+    "method": "POST",
+    "name": "create_dict_type",
+    "summary": "创建字典类型",
+    "description": "创建字典类型",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/batch",
+    "method": "POST",
+    "name": "batch_create_dict_types",
+    "summary": "批量创建字典类型",
+    "description": "批量创建字典类型\n\n支持一次性创建多个字典类型。",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/batch",
+    "method": "PUT",
+    "name": "batch_update_dict_types",
+    "summary": "批量更新字典类型",
+    "description": "批量更新字典类型\n\n支持一次性更新多个字典类型。",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/batch",
+    "method": "DELETE",
+    "name": "batch_delete_dict_types",
+    "summary": "批量删除字典类型",
+    "description": "批量删除字典类型\n\n支持一次性删除多个字典类型，会检查关联的字典数据。\n\n请求格式:\n{\n    \"ids\": [1, 2, 3, 4, 5]\n}\n\n响应格式符合V2 API规范，包含详细的删除结果和失败信息。",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/{dict_type_id}",
+    "method": "GET",
+    "name": "get_dict_type",
+    "summary": "获取字典类型详情",
+    "description": "获取字典类型详情",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/{dict_type_id}",
+    "method": "PUT",
+    "name": "update_dict_type",
+    "summary": "更新字典类型",
+    "description": "更新字典类型",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/{dict_type_id}",
+    "method": "PATCH",
+    "name": "patch_dict_type",
+    "summary": "部分更新字典类型",
+    "description": "部分更新字典类型（PATCH方法）\n\n只更新提供的字段，未提供的字段保持不变。",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-types/{dict_type_id}",
+    "method": "DELETE",
+    "name": "delete_dict_type",
+    "summary": "删除字典类型",
+    "description": "删除字典类型",
+    "tags": [
+      "字典类型管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data",
+    "method": "GET",
+    "name": "get_dict_data",
+    "summary": "获取字典数据列表",
+    "description": "获取字典数据列表",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/batch",
+    "method": "POST",
+    "name": "batch_create_dict_data",
+    "summary": "批量创建字典数据",
+    "description": "批量创建字典数据\n\n支持一次性创建多个字典数据。",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/batch",
+    "method": "PUT",
+    "name": "batch_update_dict_data",
+    "summary": "批量更新字典数据",
+    "description": "批量更新字典数据\n\n支持一次性更新多个字典数据。",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/batch/status",
+    "method": "PATCH",
+    "name": "batch_toggle_dict_data_status",
+    "summary": "批量切换字典数据状态",
+    "description": "批量切换字典数据状态\n\n支持一次性启用或禁用多个字典数据。",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/{dict_data_id}",
+    "method": "GET",
+    "name": "get_dict_data_detail",
+    "summary": "获取字典数据详情",
+    "description": "获取字典数据详情",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data",
+    "method": "POST",
+    "name": "create_dict_data",
+    "summary": "创建字典数据",
+    "description": "创建字典数据",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/{dict_data_id}",
+    "method": "PUT",
+    "name": "update_dict_data",
+    "summary": "更新字典数据",
+    "description": "更新字典数据",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/{dict_data_id}",
+    "method": "PATCH",
+    "name": "patch_dict_data",
+    "summary": "部分更新字典数据",
+    "description": "部分更新字典数据（PATCH方法）\n\n只更新提供的字段，未提供的字段保持不变。",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/{data_id}/children",
+    "method": "GET",
+    "name": "get_dict_data_children",
+    "summary": "获取字典数据子节点",
+    "description": "获取字典数据的子节点\n\n注意：当前字典数据模型不支持树形结构，此接口返回空列表。\n如需树形结构支持，需要在SysDictData模型中添加parent_id字段。",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/batch",
+    "method": "DELETE",
+    "name": "batch_delete_dict_data",
+    "summary": "批量删除字典数据",
+    "description": "批量删除字典数据 v2版本\n\n使用标准化数据格式：{\"ids\": [1, 2, 3]}\n返回标准化响应格式，包含用户友好的错误提示",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/{dict_data_id}",
+    "method": "DELETE",
+    "name": "delete_dict_data",
+    "summary": "删除字典数据",
+    "description": "删除字典数据",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/dict-data/by-type/{type_code}",
+    "method": "GET",
+    "name": "get_dict_data_by_type",
+    "summary": "按字典类型编码获取字典数据",
+    "description": "按字典类型编码获取字典数据\n\n根据字典类型编码获取该类型下的所有字典数据。",
+    "tags": [
+      "字典数据管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params",
+    "method": "GET",
+    "name": "get_system_params",
+    "summary": "获取系统参数列表",
+    "description": "获取系统参数列表",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params/{param_id}",
+    "method": "GET",
+    "name": "get_system_param",
+    "summary": "获取系统参数详情",
+    "description": "获取系统参数详情",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params",
+    "method": "POST",
+    "name": "create_system_param",
+    "summary": "创建系统参数",
+    "description": "创建系统参数",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params/{param_id}",
+    "method": "PUT",
+    "name": "update_system_param",
+    "summary": "更新系统参数",
+    "description": "更新系统参数",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params/batch",
+    "method": "DELETE",
+    "name": "batch_delete_system_params",
+    "summary": "批量删除系统参数",
+    "description": "批量删除系统参数 v2版本\n\n使用标准化数据格式：{\"ids\": [1, 2, 3]}\n返回标准化响应格式，包含用户友好的错误提示",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params/{param_id}",
+    "method": "DELETE",
+    "name": "delete_system_param",
+    "summary": "删除系统参数",
+    "description": "删除系统参数",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system-params/cached/{param_key}",
+    "method": "GET",
+    "name": "get_cached_config_value",
+    "summary": "从缓存获取系统配置",
+    "description": "从缓存获取系统配置（无需认证）",
+    "tags": [
+      "系统参数管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config",
+    "method": "GET",
+    "name": "get_system_params",
+    "summary": "获取系统参数列表",
+    "description": "获取系统参数列表",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config/{param_id}",
+    "method": "GET",
+    "name": "get_system_param",
+    "summary": "获取系统参数详情",
+    "description": "获取系统参数详情",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config",
+    "method": "POST",
+    "name": "create_system_param",
+    "summary": "创建系统参数",
+    "description": "创建系统参数",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config/{param_id}",
+    "method": "PUT",
+    "name": "update_system_param",
+    "summary": "更新系统参数",
+    "description": "更新系统参数",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config/batch",
+    "method": "DELETE",
+    "name": "batch_delete_system_params",
+    "summary": "批量删除系统参数",
+    "description": "批量删除系统参数 v2版本\n\n使用标准化数据格式：{\"ids\": [1, 2, 3]}\n返回标准化响应格式，包含用户友好的错误提示",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config/{param_id}",
+    "method": "DELETE",
+    "name": "delete_system_param",
+    "summary": "删除系统参数",
+    "description": "删除系统参数",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/config/cached/{param_key}",
+    "method": "GET",
+    "name": "get_cached_config_value",
+    "summary": "从缓存获取系统配置",
+    "description": "从缓存获取系统配置（无需认证）",
+    "tags": [
+      "系统配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices",
+    "method": "GET",
+    "name": "get_devices",
+    "summary": "获取设备列表",
+    "description": "获取设备列表，支持多条件查询和分页\n\n- **page**: 页码，从1开始\n- **page_size**: 每页数量，最大100\n- **device_code**: 设备编号模糊搜索\n- **device_name**: 设备名称模糊搜索\n- **device_type**: 设备类型搜索\n- **manufacturer**: 制造商模糊搜索\n- **install_location**: 安装位置模糊搜索\n- **team_name**: 班组名称搜索\n- **is_locked**: 锁定状态筛选\n- **device_model**: 设备型号模糊搜索\n- **online_address**: 在线地址模糊搜索",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types",
+    "method": "GET",
+    "name": "get_device_types",
+    "summary": "获取设备类型列表",
+    "description": "获取设备类型列表\n\n- **is_active**: 激活状态筛选\n- **type_name**: 类型名称模糊搜索\n- **type_code**: 类型编码模糊搜索\n- **page**: 页码\n- **page_size**: 每页数量\n- **include_counts**: 是否包含设备数量统计",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}",
+    "method": "GET",
+    "name": "get_device_type_detail",
+    "summary": "获取设备类型详情",
+    "description": "获取设备类型详情，包含字段定义\n\n- **type_code**: 设备类型编码",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types",
+    "method": "POST",
+    "name": "create_device_type",
+    "summary": "创建设备类型",
+    "description": "创建新的设备类型\n\n- **type_name**: 设备类型名称\n- **type_code**: 设备类型编码，必须唯一\n- **tdengine_stable_name**: TDengine超级表名\n- **description**: 类型描述（可选）\n- **is_active**: 是否激活（默认true）",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}",
+    "method": "PUT",
+    "name": "update_device_type",
+    "summary": "更新设备类型",
+    "description": "更新设备类型信息\n\n- **type_code**: 设备类型编码\n- 其他字段与创建设备类型相同，均为可选",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}",
+    "method": "DELETE",
+    "name": "delete_device_type",
+    "summary": "删除设备类型",
+    "description": "删除设备类型（软删除，设置为非激活状态）\n\n- **type_code**: 设备类型编码",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/alarms",
+    "method": "GET",
+    "name": "get_device_alarms",
+    "summary": "获取设备报警信息",
+    "description": "获取设备报警信息\n\n- **device_code**: 设备编号筛选（可选）\n- **start_time**: 开始时间（可选）\n- **end_time**: 结束时间（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}",
+    "method": "GET",
+    "name": "get_device",
+    "summary": "获取设备详情",
+    "description": "根据设备ID获取设备详细信息\n\n- **device_id**: 设备ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices",
+    "method": "POST",
+    "name": "create_device",
+    "summary": "创建设备",
+    "description": "创建新设备\n\n- **device_code**: 设备编号，必须唯一\n- **device_name**: 设备名称\n- **device_model**: 设备型号（可选）\n- **device_type**: 设备类型（可选）\n- **manufacturer**: 制造商（可选）\n- **production_date**: 出厂日期（可选）\n- **install_date**: 安装日期（可选）\n- **install_location**: 安装位置（可选）\n- **online_address**: 在线地址（可选）\n- **team_name**: 所属班组（可选）\n- **is_locked**: 是否锁定（默认false）\n- **description**: 备注信息（可选）",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}",
+    "method": "PUT",
+    "name": "update_device",
+    "summary": "更新设备",
+    "description": "更新设备信息\n\n- **device_id**: 设备ID\n- 其他字段与创建设备相同，均为可选",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}",
+    "method": "DELETE",
+    "name": "delete_device",
+    "summary": "删除设备",
+    "description": "删除设备\n\n- **device_id**: 设备ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/batch",
+    "method": "POST",
+    "name": "batch_devices",
+    "summary": "批量操作设备",
+    "description": "批量导入设备信息\n\n- **devices**: 设备列表\n- **update_existing**: 是否更新已存在的设备\n  - false（默认）: 跳过已存在设备\n  - true: 更新已存在设备的数据",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/search",
+    "method": "GET",
+    "name": "search_devices",
+    "summary": "高级搜索设备",
+    "description": "多条件搜索设备\n\n- **keyword**: 关键词搜索，匹配设备编号、名称、型号\n- **device_type**: 设备类型筛选\n- **manufacturer**: 制造商筛选\n- **install_location**: 安装位置筛选\n- **team_name**: 班组名称筛选\n- **is_locked**: 锁定状态筛选\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics",
+    "method": "GET",
+    "name": "get_device_statistics",
+    "summary": "设备统计信息",
+    "description": "获取设备统计信息\n\n包括：\n- 设备总数\n- 锁定/未锁定设备数\n- 按类型统计\n- 按班组统计",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/dashboard/online-welding-rate",
+    "method": "GET",
+    "name": "get_online_welding_rate_statistics",
+    "summary": "获取在线率和焊接率统计数据",
+    "description": "获取在线率和焊接率统计数据 (V2版本)\n\nArgs:\n    start_time: 开始时间 (YYYY-MM-DD)\n    end_time: 结束时间 (YYYY-MM-DD)\n    \nReturns:\n    包含设备总数、焊接设备数、开机设备数、关机设备数、在线率、焊接率的数据\n    响应格式符合V2标准，包含success、code、message、data、meta等字段",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/dashboard/alarm-category-summary",
+    "method": "GET",
+    "name": "get_alarm_category_summary",
+    "summary": "获取报警类型分布统计",
+    "description": "获取报警类型分布统计数据\n\nArgs:\n    start_time: 开始时间\n    end_time: 结束时间\n\nReturns:\n    报警类型分布统计数据",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/dashboard/alarm-record-top",
+    "method": "GET",
+    "name": "get_alarm_record_top",
+    "summary": "获取报警记录Top排名",
+    "description": "获取报警记录Top排名统计数据\n\nArgs:\n    start_time: 开始时间\n    end_time: 结束时间\n    top: Top数量\n\nReturns:\n    报警记录Top排名统计数据",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/daily-report/summary",
+    "method": "GET",
+    "name": "get_welding_daily_report_summary",
+    "summary": "获取焊机日报汇总",
+    "description": "获取焊机日报汇总数据\n\nArgs:\n    report_date: 报告日期\n    device_type: 设备类型\n\nReturns:\n    焊机日报汇总数据",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/daily-report/detail",
+    "method": "GET",
+    "name": "get_welding_daily_report_detail",
+    "summary": "获取焊机日报详情",
+    "description": "获取焊机日报详情数据\n\nArgs:\n    report_date: 报告日期\n    page: 页码\n    page_size: 每页数量\n    prod_code: 设备编码（可选）\n    device_type: 设备类型\n\nReturns:\n    焊机日报详情数据列表",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/realtime/device-status",
+    "method": "GET",
+    "name": "get_realtime_device_status",
+    "summary": "获取设备实时状态统计",
+    "description": "获取设备实时状态统计数据\n\nArgs:\n    device_type: 设备类型\n\nReturns:\n    设备实时状态统计数据",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}/status",
+    "method": "GET",
+    "name": "get_device_status",
+    "summary": "获取设备状态",
+    "description": "获取设备状态信息\n\n- **device_id**: 设备ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}/toggle-lock",
+    "method": "POST",
+    "name": "toggle_device_lock",
+    "summary": "切换设备锁定状态",
+    "description": "切换设备锁定状态\n\n- **device_id**: 设备ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}/monitoring",
+    "method": "GET",
+    "name": "get_device_monitoring",
+    "summary": "获取设备监控数据",
+    "description": "获取设备监控数据\n\n- **device_id**: 设备ID\n- **start_time**: 开始时间（可选）\n- **end_time**: 结束时间（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/monitoring/realtime",
+    "method": "GET",
+    "name": "get_realtime_monitoring",
+    "summary": "获取实时监控数据",
+    "description": "获取实时监控数据\n\n- **device_codes**: 设备编号列表，逗号分隔（可选）\n- **device_type**: 设备类型筛选（可选）\n- **status**: 设备状态筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/monitoring/summary",
+    "method": "GET",
+    "name": "get_monitoring_summary",
+    "summary": "获取监控数据汇总",
+    "description": "获取监控数据汇总\n\n- **device_type**: 设备类型筛选（可选）\n- **team_name**: 班组筛选（可选）",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields",
+    "method": "GET",
+    "name": "get_device_type_fields",
+    "summary": "获取设备类型字段列表",
+    "description": "获取指定设备类型的字段定义列表\n\n- **type_code**: 设备类型编码",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields",
+    "method": "POST",
+    "name": "create_device_field",
+    "summary": "添加设备字段",
+    "description": "为指定设备类型添加字段定义\n\n- **type_code**: 设备类型编码\n- **field_name**: 字段名称\n- **field_type**: 字段类型\n- **field_description**: 字段描述（可选）\n- **is_required**: 是否必填（默认false）\n- **is_tag**: 是否为标签字段（默认false）\n- **sort_order**: 排序顺序（默认0）",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields/{field_id}",
+    "method": "PUT",
+    "name": "update_device_field",
+    "summary": "更新设备字段",
+    "description": "更新设备字段定义\n\n- **type_code**: 设备类型编码\n- **field_id**: 字段ID\n- 其他字段与创建设备字段相同，均为可选",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields/{field_id}",
+    "method": "DELETE",
+    "name": "delete_device_field",
+    "summary": "删除设备字段",
+    "description": "删除设备字段定义\n\n- **type_code**: 设备类型编码\n- **field_id**: 字段ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/maintenance/records",
+    "method": "GET",
+    "name": "get_maintenance_records",
+    "summary": "获取设备维护记录列表",
+    "description": "获取设备维护记录列表\n\n- **device_id**: 设备ID筛选（可选）\n- **device_code**: 设备编号筛选（可选）\n- **maintenance_type**: 维护类型筛选（可选）\n- **maintenance_status**: 维护状态筛选（可选）\n- **priority**: 优先级筛选（可选）\n- **assigned_to**: 负责人筛选（可选）\n- **maintenance_team**: 维护团队筛选（可选）\n- **start_time**: 开始时间筛选（可选）\n- **end_time**: 结束时间筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields",
+    "method": "GET",
+    "name": "get_device_type_fields",
+    "summary": "获取设备类型字段列表",
+    "description": "获取指定设备类型的字段定义列表\n\n- **type_code**: 设备类型编码",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields",
+    "method": "POST",
+    "name": "create_device_field",
+    "summary": "添加设备字段",
+    "description": "为指定设备类型添加字段定义\n\n- **type_code**: 设备类型编码\n- **field_name**: 字段名称\n- **field_type**: 字段类型\n- **field_description**: 字段描述（可选）\n- **is_required**: 是否必填（默认false）\n- **is_tag**: 是否为标签字段（默认false）\n- **sort_order**: 排序顺序（默认0）",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields/{field_id}",
+    "method": "PUT",
+    "name": "update_device_field",
+    "summary": "更新设备字段",
+    "description": "更新设备字段定义\n\n- **type_code**: 设备类型编码\n- **field_id**: 字段ID\n- 其他字段与创建设备字段相同，均为可选",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/types/{type_code}/fields/{field_id}",
+    "method": "DELETE",
+    "name": "delete_device_field",
+    "summary": "删除设备字段",
+    "description": "删除设备字段定义\n\n- **type_code**: 设备类型编码\n- **field_id**: 字段ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}/realtime",
+    "method": "GET",
+    "name": "get_device_realtime_data",
+    "summary": "获取设备实时数据",
+    "description": "获取设备实时数据\n\n- **device_id**: 设备ID",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/{device_id}/history",
+    "method": "GET",
+    "name": "get_device_history_data",
+    "summary": "获取设备历史数据",
+    "description": "获取设备历史数据\n\n- **device_id**: 设备ID\n- **start_time**: 开始时间（可选）\n- **end_time**: 结束时间（可选）\n- **status**: 设备状态筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/monitoring/overview",
+    "method": "GET",
+    "name": "get_monitoring_overview",
+    "summary": "设备监控概览",
+    "description": "获取设备监控概览信息\n\n- **device_type**: 设备类型筛选（可选）\n- **team_name**: 班组筛选（可选）",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/statistics/use-record/list",
+    "method": "GET",
+    "name": "get_device_use_records",
+    "summary": "获取设备使用记录列表",
+    "description": "获取设备使用记录列表（焊接记录）\n\n- **device_code**: 设备编号筛选（可选）\n- **device_type**: 设备类型（默认welding）\n- **start_time**: 开始时间\n- **end_time**: 结束时间\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/records",
+    "method": "GET",
+    "name": "get_maintenance_records",
+    "summary": "获取设备维护记录列表",
+    "description": "获取设备维护记录列表\n\n- **device_id**: 设备ID筛选（可选）\n- **device_code**: 设备编号筛选（可选）\n- **maintenance_type**: 维护类型筛选（可选）\n- **maintenance_status**: 维护状态筛选（可选）\n- **priority**: 优先级筛选（可选）\n- **assigned_to**: 负责人筛选（可选）\n- **maintenance_team**: 维护团队筛选（可选）\n- **start_time**: 开始时间筛选（可选）\n- **end_time**: 结束时间筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/records/{record_id}",
+    "method": "GET",
+    "name": "get_maintenance_record",
+    "summary": "获取维护记录详情",
+    "description": "获取维护记录详情\n\n- **record_id**: 维护记录ID",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/records",
+    "method": "POST",
+    "name": "create_maintenance_record",
+    "summary": "创建维护记录",
+    "description": "创建维护记录\n\n- **device_id**: 设备ID\n- **maintenance_type**: 维护类型\n- **maintenance_title**: 维护标题\n- **maintenance_description**: 维护描述（可选）\n- **priority**: 优先级（默认medium）\n- **planned_start_time**: 计划开始时间\n- **planned_end_time**: 计划结束时间\n- **assigned_to**: 负责人（可选）\n- **maintenance_team**: 维护团队（可选）\n- **estimated_cost**: 预估成本（可选）\n- **notes**: 备注信息（可选）",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/records/{record_id}",
+    "method": "PUT",
+    "name": "update_maintenance_record",
+    "summary": "更新维护记录",
+    "description": "更新维护记录\n\n- **record_id**: 维护记录ID\n- 其他字段与创建维护记录相同，均为可选",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/records/{record_id}",
+    "method": "DELETE",
+    "name": "delete_maintenance_record",
+    "summary": "删除维护记录",
+    "description": "删除维护记录\n\n- **record_id**: 维护记录ID",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/plans",
+    "method": "GET",
+    "name": "get_maintenance_plans",
+    "summary": "获取设备维护计划列表",
+    "description": "获取设备维护计划列表\n\n- **device_id**: 设备ID筛选（可选）\n- **device_code**: 设备编号筛选（可选）\n- **maintenance_type**: 维护类型筛选（可选）\n- **is_active**: 是否激活筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/plans",
+    "method": "POST",
+    "name": "create_maintenance_plan",
+    "summary": "创建维护计划",
+    "description": "创建维护计划\n\n- **device_id**: 设备ID\n- **plan_name**: 计划名称\n- **plan_description**: 计划描述（可选）\n- **maintenance_type**: 维护类型\n- **frequency_type**: 频率类型\n- **frequency_value**: 频率值\n- **frequency_unit**: 频率单位（可选）\n- **estimated_duration**: 预估持续时间（可选）\n- **assigned_team**: 指定团队（可选）\n- **maintenance_checklist**: 维护检查清单（可选）\n- **required_tools**: 所需工具（可选）\n- **required_parts**: 所需零件（可选）",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/reminders",
+    "method": "GET",
+    "name": "get_maintenance_reminders",
+    "summary": "获取维护提醒列表",
+    "description": "获取维护提醒列表\n\n- **device_id**: 设备ID筛选（可选）\n- **reminder_type**: 提醒类型筛选（可选）\n- **is_sent**: 是否已发送筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/statistics",
+    "method": "GET",
+    "name": "get_maintenance_statistics",
+    "summary": "获取维护统计信息",
+    "description": "获取维护统计信息\n\n- **device_type**: 设备类型筛选（可选）\n- **team_name**: 班组筛选（可选）\n- **start_date**: 开始日期（可选）\n- **end_date**: 结束日期（可选）",
+    "tags": [
+      "设备维护管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-records/statistics",
+    "method": "GET",
+    "name": "get_repair_records_statistics",
+    "summary": "获取维修记录统计信息",
+    "description": "获取维修记录统计信息",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-records",
+    "method": "GET",
+    "name": "get_repair_records",
+    "summary": "获取设备维修记录列表",
+    "description": "获取设备维修记录列表",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-codes/generate",
+    "method": "POST",
+    "name": "generate_repair_code_endpoint",
+    "summary": "生成维修单号",
+    "description": "生成维修单号",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-records/{record_id}",
+    "method": "GET",
+    "name": "get_repair_record_detail",
+    "summary": "获取设备维修记录详情",
+    "description": "获取设备维修记录详情",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-records",
+    "method": "POST",
+    "name": "create_repair_record",
+    "summary": "创建设备维修记录",
+    "description": "创建设备维修记录",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-records/{record_id}",
+    "method": "PUT",
+    "name": "update_repair_record",
+    "summary": "更新设备维修记录",
+    "description": "更新设备维修记录",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/maintenance/repair-records/{record_id}",
+    "method": "DELETE",
+    "name": "delete_repair_record",
+    "summary": "删除设备维修记录",
+    "description": "删除设备维修记录",
+    "tags": [
+      "设备维修记录管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields/{device_type_code}",
+    "method": "GET",
+    "name": "get_device_field_config",
+    "summary": "获取设备类型字段配置",
+    "description": "获取指定设备类型的字段配置，包含数据字典选项\n\n- **device_type_code**: 设备类型代码\n- **field_category**: 字段分类筛选（可选）\n- **include_options**: 是否包含选项值\n- **use_cache**: 是否使用缓存",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields",
+    "method": "GET",
+    "name": "get_all_device_field_configs",
+    "summary": "获取所有设备类型字段配置",
+    "description": "获取所有设备类型的字段配置\n\n- **field_category**: 字段分类筛选（可选）\n- **include_options**: 是否包含选项值\n- **use_cache**: 是否使用缓存",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields",
+    "method": "POST",
+    "name": "create_device_field_config",
+    "summary": "创建设备字段配置",
+    "description": "创建设备字段配置\n\n- **field_data**: 字段配置数据",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields/{field_id}",
+    "method": "PUT",
+    "name": "update_device_field_config",
+    "summary": "更新设备字段配置",
+    "description": "更新设备字段配置\n\n- **field_id**: 字段配置ID\n- **field_data**: 更新的字段配置数据",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields/{field_id}",
+    "method": "DELETE",
+    "name": "delete_device_field_config",
+    "summary": "删除设备字段配置",
+    "description": "删除设备字段配置\n\n- **field_id**: 字段配置ID",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields/cache/clear",
+    "method": "POST",
+    "name": "clear_field_config_cache",
+    "summary": "清除字段配置缓存",
+    "description": "清除字段配置缓存\n\n- **device_type_code**: 设备类型代码（可选）",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/device/config/device-fields/cache/status",
+    "method": "GET",
+    "name": "get_cache_status",
+    "summary": "获取缓存状态",
+    "description": "获取字段配置缓存状态",
+    "tags": [
+      "设备字段配置管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes",
+    "method": "GET",
+    "name": "get_device_processes",
+    "summary": "获取设备工艺列表",
+    "description": "获取设备工艺列表\n\n- **device_id**: 设备ID筛选（可选）\n- **device_code**: 设备编号筛选（可选）\n- **process_type**: 工艺类型筛选（可选）\n- **process_status**: 工艺状态筛选（可选）\n- **approval_status**: 审批状态筛选（可选）\n- **difficulty_level**: 难度等级筛选（可选）\n- **created_by**: 创建人筛选（可选）\n- **assigned_team**: 指定团队筛选（可选）\n- **is_template**: 是否为模板筛选（可选）\n- **is_active**: 是否激活筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/{process_id}",
+    "method": "GET",
+    "name": "get_device_process",
+    "summary": "获取工艺详情",
+    "description": "获取工艺详情\n\n- **process_id**: 工艺ID",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes",
+    "method": "POST",
+    "name": "create_device_process",
+    "summary": "创建工艺",
+    "description": "创建工艺\n\n- **device_id**: 设备ID\n- **process_name**: 工艺名称\n- **process_code**: 工艺编码\n- **process_version**: 工艺版本（默认1.0）\n- **process_description**: 工艺描述（可选）\n- **process_type**: 工艺类型\n- **process_category**: 工艺分类（可选）\n- **process_parameters**: 工艺参数（可选）\n- **quality_standards**: 质量标准（可选）\n- **safety_requirements**: 安全要求（可选）\n- **estimated_duration**: 预估执行时间（可选）\n- **difficulty_level**: 难度等级（默认medium）\n- **required_skills**: 所需技能（可选）\n- **created_by**: 创建人（可选）\n- **assigned_team**: 指定团队（可选）\n- **is_template**: 是否为模板（默认false）",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/{process_id}",
+    "method": "PUT",
+    "name": "update_device_process",
+    "summary": "更新工艺",
+    "description": "更新工艺\n\n- **process_id**: 工艺ID\n- 其他字段与创建工艺相同，均为可选",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/{process_id}",
+    "method": "DELETE",
+    "name": "delete_device_process",
+    "summary": "删除工艺",
+    "description": "删除工艺\n\n- **process_id**: 工艺ID",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/executions",
+    "method": "GET",
+    "name": "get_process_executions",
+    "summary": "获取工艺执行记录列表",
+    "description": "获取工艺执行记录列表\n\n- **device_id**: 设备ID筛选（可选）\n- **process_id**: 工艺ID筛选（可选）\n- **execution_status**: 执行状态筛选（可选）\n- **operator**: 操作员筛选（可选）\n- **execution_team**: 执行团队筛选（可选）\n- **quality_result**: 质量结果筛选（可选）\n- **start_time**: 开始时间筛选（可选）\n- **end_time**: 结束时间筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/executions",
+    "method": "POST",
+    "name": "create_process_execution",
+    "summary": "创建工艺执行记录",
+    "description": "创建工艺执行记录\n\n- **device_id**: 设备ID\n- **process_id**: 工艺ID\n- **execution_code**: 执行编号\n- **execution_name**: 执行名称\n- **execution_description**: 执行描述（可选）\n- **planned_start_time**: 计划开始时间（可选）\n- **planned_end_time**: 计划结束时间（可选）\n- **operator**: 操作员（可选）\n- **supervisor**: 监督员（可选）\n- **execution_team**: 执行团队（可选）\n- **estimated_cost**: 预估成本（可选）\n- **notes**: 备注信息（可选）",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/templates",
+    "method": "GET",
+    "name": "get_process_templates",
+    "summary": "获取工艺模板列表",
+    "description": "获取工艺模板列表\n\n- **template_category**: 模板分类筛选（可选）\n- **device_type**: 适用设备类型筛选（可选）\n- **process_type**: 工艺类型筛选（可选）\n- **is_active**: 是否激活筛选（可选）\n- **is_public**: 是否公开筛选（可选）\n- **created_by**: 创建人筛选（可选）\n- **page**: 页码\n- **page_size**: 每页数量",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/templates",
+    "method": "POST",
+    "name": "create_process_template",
+    "summary": "创建工艺模板",
+    "description": "创建工艺模板\n\n- **template_name**: 模板名称\n- **template_code**: 模板编码\n- **template_description**: 模板描述（可选）\n- **template_category**: 模板分类\n- **device_type**: 适用设备类型（可选）\n- **process_type**: 工艺类型\n- **template_content**: 模板内容\n- **default_parameters**: 默认参数（可选）\n- **parameter_constraints**: 参数约束（可选）\n- **is_public**: 是否公开（默认false）\n- **created_by**: 创建人（可选）",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/devices/processes/statistics",
+    "method": "GET",
+    "name": "get_process_statistics",
+    "summary": "获取工艺统计信息",
+    "description": "获取工艺统计信息\n\n- **device_type**: 设备类型筛选（可选）\n- **process_type**: 工艺类型筛选（可选）\n- **team_name**: 团队筛选（可选）\n- **start_date**: 开始日期（可选）\n- **end_date**: 结束日期（可选）",
+    "tags": [
+      "设备工艺管理 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/alarms",
+    "method": "GET",
+    "name": "get_alarms",
+    "summary": null,
+    "description": "获取报警列表\n\n支持按级别、状态、类型、来源等条件过滤，支持关键词搜索\n从数据库查询真实的焊接报警历史数据",
+    "tags": [
+      "报警管理 v2",
+      "报警管理"
+    ]
+  },
+  {
+    "path": "/api/v2/alarms/{alarm_id}",
+    "method": "GET",
+    "name": "get_alarm",
+    "summary": null,
+    "description": "获取报警详情",
+    "tags": [
+      "报警管理 v2",
+      "报警管理"
+    ]
+  },
+  {
+    "path": "/api/v2/alarms/{alarm_id}/handle",
+    "method": "PUT",
+    "name": "handle_alarm",
+    "summary": null,
+    "description": "处理报警",
+    "tags": [
+      "报警管理 v2",
+      "报警管理"
+    ]
+  },
+  {
+    "path": "/api/v2/alarms/batch-handle",
+    "method": "PUT",
+    "name": "batch_handle_alarms",
+    "summary": null,
+    "description": "批量处理报警",
+    "tags": [
+      "报警管理 v2",
+      "报警管理"
+    ]
+  },
+  {
+    "path": "/api/v2/alarms/{alarm_id}/acknowledge",
+    "method": "POST",
+    "name": "acknowledge_alarm",
+    "summary": null,
+    "description": "确认报警",
+    "tags": [
+      "报警管理 v2",
+      "报警管理"
+    ]
+  },
+  {
+    "path": "/api/v2/alarms/statistics",
+    "method": "GET",
+    "name": "get_alarm_statistics",
+    "summary": null,
+    "description": "获取报警统计",
+    "tags": [
+      "报警管理 v2",
+      "报警管理"
+    ]
+  },
+  {
+    "path": "/api/v2/health/",
+    "method": "GET",
+    "name": "wrapper",
+    "summary": "健康检查 v2",
+    "description": "获取系统健康状态 - v2版本",
+    "tags": [
+      "健康检查 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/health/version",
+    "method": "GET",
+    "name": "get_version_info",
+    "summary": "获取API版本信息",
+    "description": "获取当前API版本详细信息",
+    "tags": [
+      "健康检查 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/changelog",
+    "method": "GET",
+    "name": "get_api_changelog",
+    "summary": "获取API变更日志",
+    "description": "获取API变更历史记录",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/changelog/breaking",
+    "method": "GET",
+    "name": "get_breaking_changes",
+    "summary": "获取破坏性变更",
+    "description": "获取破坏性变更记录",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/versions",
+    "method": "GET",
+    "name": "get_api_versions",
+    "summary": "获取API版本信息",
+    "description": "获取支持的API版本列表",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/schema",
+    "method": "GET",
+    "name": "get_api_schema",
+    "summary": "获取API Schema",
+    "description": "获取OpenAPI规范文档",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/examples",
+    "method": "GET",
+    "name": "get_api_examples",
+    "summary": "获取API使用示例",
+    "description": "获取常用API的使用示例",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/swagger/generate",
+    "method": "GET",
+    "name": "generate_swagger_docs",
+    "summary": "生成Swagger文档",
+    "description": "手动触发Swagger文档生成",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/swagger/download",
+    "method": "GET",
+    "name": "download_swagger_docs",
+    "summary": "下载Swagger文档",
+    "description": "下载生成的Swagger文档文件",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/swagger/modules",
+    "method": "GET",
+    "name": "get_swagger_modules",
+    "summary": "获取可用模块列表",
+    "description": "获取支持文档生成的模块列表",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/sync",
+    "method": "POST",
+    "name": "sync_documentation",
+    "summary": "同步文档",
+    "description": "手动触发文档同步",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/sync/status",
+    "method": "GET",
+    "name": "get_sync_status",
+    "summary": "获取同步状态",
+    "description": "获取文档同步状态和历史",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/versions",
+    "method": "GET",
+    "name": "get_documentation_versions",
+    "summary": "获取文档版本列表",
+    "description": "获取所有文档版本历史",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/versions/{version}",
+    "method": "GET",
+    "name": "get_version_info",
+    "summary": "获取指定版本信息",
+    "description": "获取指定版本的详细信息",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/changes",
+    "method": "GET",
+    "name": "get_documentation_changes",
+    "summary": "获取变更记录",
+    "description": "获取API变更历史记录",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/docs/changelog",
+    "method": "GET",
+    "name": "get_changelog_markdown",
+    "summary": "获取变更日志",
+    "description": "获取Markdown格式的变更日志",
+    "tags": [
+      "API文档 v2"
+    ]
+  },
+  {
+    "path": "/api/v2/system/init-button-permissions",
+    "method": "POST",
+    "name": "init_button_permissions",
+    "summary": "初始化按钮权限",
+    "description": "初始化按钮权限数据\n仅供超级管理员使用",
+    "tags": [
+      "系统初始化 v2",
+      "系统初始化"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data",
+    "method": "GET",
+    "name": "get_mock_data_list",
+    "summary": "获取Mock数据列表",
+    "description": "获取Mock数据列表，支持分页和筛选",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/{mock_id}",
+    "method": "GET",
+    "name": "get_mock_data_detail",
+    "summary": "获取Mock数据详情",
+    "description": "获取指定Mock数据的详细信息",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data",
+    "method": "POST",
+    "name": "create_mock_data",
+    "summary": "创建Mock数据",
+    "description": "创建新的Mock数据规则",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/{mock_id}",
+    "method": "PUT",
+    "name": "update_mock_data",
+    "summary": "更新Mock数据",
+    "description": "更新指定的Mock数据规则",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/{mock_id}",
+    "method": "DELETE",
+    "name": "delete_mock_data",
+    "summary": "删除Mock数据",
+    "description": "删除指定的Mock数据规则",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/batch-delete",
+    "method": "POST",
+    "name": "batch_delete_mock_data",
+    "summary": "批量删除Mock数据",
+    "description": "批量删除Mock数据规则",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/{mock_id}/toggle",
+    "method": "POST",
+    "name": "toggle_mock_data",
+    "summary": "切换Mock启用状态",
+    "description": "切换Mock数据的启用/禁用状态",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/active/list",
+    "method": "GET",
+    "name": "get_active_mock_rules",
+    "summary": "获取所有启用的Mock规则",
+    "description": "获取所有启用的Mock规则（不需要认证，供前端Mock拦截器使用）",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  },
+  {
+    "path": "/api/v2/mock-data/{mock_id}/hit",
+    "method": "POST",
+    "name": "record_mock_hit",
+    "summary": "记录Mock命中",
+    "description": "记录Mock规则被命中（供前端Mock拦截器调用）",
+    "tags": [
+      "Mock数据管理 v2",
+      "Mock数据管理"
+    ]
+  }
+]

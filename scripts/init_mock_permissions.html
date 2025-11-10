@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock功能 - 权限初始化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .step {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .step-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .step-content {
+            color: #666;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            display: none;
+        }
+        .log.show {
+            display: block;
+        }
+        .log-line {
+            margin: 5px 0;
+        }
+        .log-line.success {
+            color: #4ade80;
+        }
+        .log-line.error {
+            color: #f87171;
+        }
+        .log-line.info {
+            color: #60a5fa;
+        }
+        .log-line.warning {
+            color: #fbbf24;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert.show {
+            display: block;
+        }
+        .alert.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .alert.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .alert.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 Mock功能权限初始化</h1>
+        <p class="subtitle">为Mock数据管理功能配置按钮权限</p>
+
+        <div id="alert" class="alert"></div>
+
+        <div class="step">
+            <div class="step-title">📋 前置条件检查</div>
+            <div class="step-content">
+                ✅ 数据库表已创建<br>
+                ✅ 后端服务已启动<br>
+                ✅ 已登录系统（<span id="loginStatus" style="color: #f87171;">待检查...</span>）
+            </div>
+        </div>
+
+        <button id="initBtn" onclick="initPermissions()">🚀 开始初始化权限</button>
+
+        <div id="log" class="log"></div>
+
+        <div class="step" style="margin-top: 20px; border-left-color: #22c55e;">
+            <div class="step-title">✨ 完成后的操作</div>
+            <div class="step-content">
+                1. 关闭此页面<br>
+                2. 返回系统页面，按 F5 刷新<br>
+                3. 在左侧菜单找到"Mock数据管理"<br>
+                4. 开始使用Mock功能！
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const logEl = document.getElementById('log');
+        const alertEl = document.getElementById('alert');
+        const initBtn = document.getElementById('initBtn');
+        const loginStatus = document.getElementById('loginStatus');
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+            logEl.classList.add('show');
+        }
+
+        function showAlert(message, type = 'info') {
+            alertEl.textContent = message;
+            alertEl.className = `alert ${type} show`;
+        }
+
+        function checkLogin() {
+            const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+            if (token) {
+                loginStatus.textContent = '✅ 已登录';
+                loginStatus.style.color = '#22c55e';
+                return token;
+            } else {
+                loginStatus.textContent = '❌ 未登录';
+                loginStatus.style.color = '#f87171';
+                return null;
+            }
+        }
+
+        async function initPermissions() {
+            log('='.repeat(60), 'info');
+            log('🚀 开始初始化Mock功能权限', 'info');
+            log('='.repeat(60), 'info');
+
+            // 检查登录
+            const token = checkLogin();
+            if (!token) {
+                log('❌ 未登录，无法执行初始化', 'error');
+                showAlert('❌ 请先登录系统后再执行初始化！', 'error');
+                return;
+            }
+
+            log('✅ Token检查通过', 'success');
+            log('Token: ' + token.substring(0, 20) + '...', 'info');
+
+            initBtn.disabled = true;
+            initBtn.textContent = '⏳ 正在初始化...';
+
+            try {
+                log('', 'info');
+                log('📡 正在调用初始化API...', 'info');
+                log('URL: /api/v2/system/init-button-permissions', 'info');
+
+                const response = await fetch('/api/v2/system/init-button-permissions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log('HTTP状态码: ' + response.status, response.ok ? 'success' : 'error');
+
+                const data = await response.json();
+                log('', 'info');
+                log('📊 服务器响应:', 'info');
+                log(JSON.stringify(data, null, 2), 'info');
+
+                if (data.code === 200) {
+                    log('', 'success');
+                    log('='.repeat(60), 'success');
+                    log('✅ 初始化成功！', 'success');
+                    log('='.repeat(60), 'success');
+                    log(`📈 新创建: ${data.data.created} 个按钮权限`, 'success');
+                    log(`⏭️  已跳过: ${data.data.skipped} 个（已存在）`, 'info');
+                    log(`📋 总按钮数: ${data.data.total_buttons} 个`, 'success');
+                    
+                    if (data.data.details && data.data.details.length > 0) {
+                        log('', 'info');
+                        log('📝 详细信息:', 'info');
+                        data.data.details.forEach((detail, index) => {
+                            log(`  ${index + 1}. ${detail.menu} - ${detail.buttons ? detail.buttons.length + '个按钮' : detail.status}`, 'info');
+                        });
+                    }
+
+                    showAlert('🎉 权限初始化完成！请刷新页面后查看"Mock数据管理"菜单。', 'success');
+                    
+                    initBtn.textContent = '✅ 初始化完成';
+                    initBtn.style.background = '#22c55e';
+
+                    // 3秒后提示刷新
+                    setTimeout(() => {
+                        if (confirm('初始化完成！\n\n是否立即返回系统并刷新页面？')) {
+                            window.close();
+                            if (!window.closed) {
+                                window.location.href = '/';
+                            }
+                        }
+                    }, 2000);
+
+                } else {
+                    log('❌ 初始化失败: ' + data.message, 'error');
+                    showAlert('❌ 初始化失败: ' + data.message, 'error');
+                    initBtn.disabled = false;
+                    initBtn.textContent = '🔄 重试';
+                }
+
+            } catch (error) {
+                log('', 'error');
+                log('❌ 请求失败: ' + error.message, 'error');
+                log('', 'error');
+                log('可能的原因:', 'warning');
+                log('1. 后端服务未启动', 'warning');
+                log('2. 网络连接问题', 'warning');
+                log('3. Token已过期', 'warning');
+                
+                showAlert('❌ 请求失败: ' + error.message + '\n\n请确保后端服务已启动！', 'error');
+                
+                initBtn.disabled = false;
+                initBtn.textContent = '🔄 重试';
+            }
+        }
+
+        // 页面加载时检查登录状态
+        window.onload = function() {
+            checkLogin();
+            log('✅ 页面加载完成，准备就绪', 'success');
+            
+            if (!checkLogin()) {
+                showAlert('⚠️ 请先登录系统后再执行初始化！\n\n打开系统 → 登录 → 再运行此页面', 'warning');
+            }
+        };
+    </script>
+</body>
+</html>
+
