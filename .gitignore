@@ -75,6 +75,11 @@ web/.nuxt/
 web/.next/
 web/.vite/
 
+# Vite temporary files
+*.timestamp-*
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
 # Environment variables (keep specific ones, ignore generic)
 .env
 .env.local
