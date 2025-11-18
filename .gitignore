@@ -184,6 +184,9 @@ temp/
 # Documentation (local only, not pushed to GitHub)
 docs/
 
+# Scripts directory (development tools, not required for project runtime)
+scripts/
+
 # AI context and memory files
 memory-bank/
 
@@ -211,5 +214,6 @@ cleanup_report_*.txt
 *_report_*.json
 *_report_*.html
 
-# Offline deployment package
+# Offline deployment packages
 offline_deploy_complete/
+releases/
