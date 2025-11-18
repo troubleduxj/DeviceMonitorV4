@@ -184,8 +184,9 @@ temp/
 # Documentation (local only, not pushed to GitHub)
 docs/
 
-# Scripts directory (development tools, not required for project runtime)
-scripts/
+# Scripts directory - only keep deployment scripts
+scripts/*
+!scripts/deployment/
 
 # AI context and memory files
 memory-bank/
