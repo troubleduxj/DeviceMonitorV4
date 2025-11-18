@@ -178,9 +178,11 @@ temp/
 *~
 
 # Project specific - should be committed
-# migrations/ - REMOVED: Database migrations should be version controlled
-# docs/ - REMOVED: Documentation should be version controlled  
-# database/ - REMOVED: Database scripts should be version controlled
+# migrations/ - Database migrations should be version controlled
+# database/ - Database scripts should be version controlled
+
+# Documentation (local only, not pushed to GitHub)
+docs/
 
 # AI context and memory files
 memory-bank/
