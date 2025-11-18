@@ -202,6 +202,7 @@ async def get_device_types(
                 "type_code": device_type.type_code,
                 "tdengine_stable_name": device_type.tdengine_stable_name,
                 "description": device_type.description,
+                "icon": device_type.icon,
                 "is_active": device_type.is_active,
                 "created_at": device_type.created_at.isoformat() if device_type.created_at else None,
                 "updated_at": device_type.updated_at.isoformat() if device_type.updated_at else None
@@ -292,6 +293,7 @@ async def get_device_type_detail(
             "type_code": device_type.type_code,
             "tdengine_stable_name": device_type.tdengine_stable_name,
             "description": device_type.description,
+            "icon": device_type.icon,
             "is_active": device_type.is_active,
             "device_count": device_type.device_count,
             "field_count": len(field_list),

@@ -203,3 +203,6 @@ cleanup_report_*.txt
 *_report_*.txt
 *_report_*.json
 *_report_*.html
+
+# Offline deployment package
+offline_deploy_complete/

@@ -14,6 +14,7 @@ import api from '@/api'
 // ✅ Shared API 迁移 (2025-10-25)
 import { deviceTypeApi } from '@/api/device-shared'
 import TheIcon from '@/components/icon/TheIcon.vue'
+import IconPicker from '@/components/icon/IconPicker.vue'
 import { useRouter } from 'vue-router'
 
 defineOptions({ name: '设备类型管理' })
@@ -46,6 +47,7 @@ const {
     type_code: '',
     tdengine_stable_name: '',
     description: '',
+    icon: 'material-symbols:precision-manufacturing',
     is_active: true,
   },
   // ✅ Shared API 迁移
@@ -61,6 +63,19 @@ onMounted(() => {
 
 const columns = [
   {
+    title: '图标',
+    key: 'icon',
+    width: 80,
+    align: 'center',
+    render(row) {
+      return h(TheIcon, { 
+        icon: row.icon || 'material-symbols:precision-manufacturing', 
+        size: 24,
+        class: 'text-primary'
+      })
+    },
+  },
+  {
     title: '类型名称',
     key: 'type_name',
     width: 150,
@@ -70,7 +85,7 @@ const columns = [
   {
     title: '类型编码',
     key: 'type_code',
-    width: 120,
+    width: 200,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
@@ -78,9 +93,9 @@ const columns = [
     },
   },
   {
-    title: 'stable对照',
+    title: 'TDengine超级表',
     key: 'tdengine_stable_name',
-    width: 180,
+    width: 200,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
@@ -103,8 +118,8 @@ const columns = [
   {
     title: '描述',
     key: 'description',
-    width: 200,
-    align: 'center',
+    minWidth: 200,
+    align: 'left',
     ellipsis: { tooltip: true },
   },
   {
@@ -290,6 +305,9 @@ const columns = [
             v-model:value="modalForm.tdengine_stable_name"
             placeholder="请输入TDengine超级表名"
           />
+        </NFormItem>
+        <NFormItem label="设备图标" path="icon">
+          <IconPicker v-model:value="modalForm.icon" />
         </NFormItem>
         <NFormItem label="状态" path="is_active">
           <NSwitch v-model:value="modalForm.is_active">

@@ -54,6 +54,7 @@ class AIModuleSettings(BaseSettings):
     class Config:
         env_file = '.env'
         env_file_encoding = 'utf-8'
+        extra = 'ignore'  # 忽略额外的环境变量字段
 
 
 # 全局实例

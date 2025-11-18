@@ -245,6 +245,7 @@ class DeviceType(BaseModel):
     type_code: str = Field(..., description="设备类型代码", example="welding")
     tdengine_stable_name: str = Field(..., description="TDengine超级表名", example="welding_real_data")
     description: Optional[str] = Field(None, description="类型描述")
+    icon: Optional[str] = Field(None, description="设备类型图标（Iconify图标名称）", example="material-symbols:precision-manufacturing")
     is_active: bool = Field(True, description="是否激活")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -257,6 +258,7 @@ class DeviceTypeCreate(BaseModel):
     type_code: str = Field(..., description="设备类型代码")
     tdengine_stable_name: str = Field(..., description="TDengine超级表名")
     description: Optional[str] = Field(None, description="类型描述")
+    icon: Optional[str] = Field(None, description="设备类型图标（Iconify图标名称）", example="material-symbols:precision-manufacturing")
     is_active: bool = Field(True, description="是否激活")
 
 
@@ -267,6 +269,7 @@ class DeviceTypeUpdate(BaseModel):
     type_code: Optional[str] = Field(None, description="设备类型代码")
     tdengine_stable_name: Optional[str] = Field(None, description="TDengine超级表名")
     description: Optional[str] = Field(None, description="类型描述")
+    icon: Optional[str] = Field(None, description="设备类型图标（Iconify图标名称）")
     is_active: Optional[bool] = Field(None, description="是否激活")
 
 
@@ -278,6 +281,7 @@ class DeviceTypeResponse(BaseModel):
     type_code: str = Field(..., description="设备类型代码")
     tdengine_stable_name: str = Field(..., description="TDengine超级表名")
     description: Optional[str] = Field(None, description="类型描述")
+    icon: Optional[str] = Field(None, description="设备类型图标（Iconify图标名称）")
     is_active: bool = Field(..., description="是否激活")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")

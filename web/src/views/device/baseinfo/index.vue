@@ -328,6 +328,30 @@ const getDeviceTypeName = (typeCode) => {
   return defaultTypeMap[typeCode] || typeCode
 }
 
+// 获取设备类型图标
+const getDeviceTypeIcon = (typeCode) => {
+  if (deviceTypes.value && deviceTypes.value.length > 0) {
+    const deviceType = deviceTypes.value.find((type) => type.type_code === typeCode)
+    if (deviceType && deviceType.icon) {
+      return deviceType.icon
+    }
+  }
+
+  // 降级处理：使用默认图标映射
+  const defaultIconMap = {
+    welding: 'material-symbols:precision-manufacturing',
+    cutting: 'material-symbols:content-cut',
+    assembly: 'material-symbols:build',
+    server: 'material-symbols:dns',
+    network: 'material-symbols:router',
+    storage: 'material-symbols:storage',
+    security: 'material-symbols:security',
+    other: 'material-symbols:devices',
+  }
+
+  return defaultIconMap[typeCode] || 'material-symbols:precision-manufacturing'
+}
+
 // 权限相关处理
 const handleContactAdmin = () => {
   $message.info('请联系系统管理员获取设备信息查看权限')
@@ -679,38 +703,34 @@ const deviceRules = {
           <div class="device-header">
             <div class="device-info">
               <div class="device-name-row">
-                <TheIcon icon="material-symbols:precision-manufacturing" :size="20" class="welding-icon mr-8" />
-                <h3 class="device-name">{{ device.device_name }}</h3>
+                <TheIcon :icon="getDeviceTypeIcon(device.device_type)" :size="20" class="device-type-icon mr-8" />
+                <h3 class="device-name" :title="device.device_name">{{ device.device_name }}</h3>
               </div>
               <p class="device-id">{{ device.device_code }}</p>
             </div>
-            <div class="device-type">
-              <NTag type="info" size="small">
+            <div class="device-type-status-row">
+              <NTag type="info" size="small" class="device-type-tag">
                 {{ getDeviceTypeName(device.device_type) }}
               </NTag>
+              <NTag :type="getStatusTagType(device.status)" size="small" class="device-status-tag">
+                {{ getStatusText(device.status) }}
+              </NTag>
             </div>
-          </div>
-
-          <!-- 设备状态 -->
-          <div class="device-status">
-            <NTag :type="getStatusTagType(device.status)" size="small">
-              {{ getStatusText(device.status) }}
-            </NTag>
           </div>
 
           <!-- 监控数据 -->
           <div class="monitoring-data">
             <div class="data-row">
               <span class="data-label">🏭 设备厂家:</span>
-              <span class="data-value">{{ device.manufacturer || '--' }}</span>
+              <span class="data-value" :title="device.manufacturer || '--'">{{ device.manufacturer || '--' }}</span>
             </div>
             <div class="data-row">
               <span class="data-label">📦 设备型号:</span>
-              <span class="data-value">{{ device.device_model || '--' }}</span>
+              <span class="data-value" :title="device.device_model || '--'">{{ device.device_model || '--' }}</span>
             </div>
             <div class="data-row">
               <span class="data-label">🌐 在线地址:</span>
-              <span class="data-value">{{ device.online_address || '--' }}</span>
+              <span class="data-value" :title="device.online_address || '--'">{{ device.online_address || '--' }}</span>
             </div>
           </div>
 
@@ -834,22 +854,25 @@ const deviceRules = {
 /* 设备网格布局 */
 .device-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
   padding: 16px 0;
 }
 
 /* 设备卡片样式 */
 .device-card {
   position: relative;
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 18px;
   border: 1px solid var(--n-color-primary);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   cursor: pointer;
   overflow: hidden;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
 }
 
 .device-card::before {
@@ -865,8 +888,9 @@ const deviceRules = {
 }
 
 .device-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px var(--n-box-shadow-color);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  border-color: var(--n-primary-color-hover);
 }
 
 .device-card--active {
@@ -897,11 +921,12 @@ const deviceRules = {
 /* 状态指示器 */
 .status-indicator {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  width: 12px;
-  height: 12px;
+  top: 18px;
+  right: 18px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
+  z-index: 1;
 }
 
 .status-indicator--active {
@@ -933,74 +958,110 @@ const deviceRules = {
 /* 设备头部信息 */
 .device-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 15px;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
   padding-right: 30px;
 }
 
 .device-info {
   flex: 1;
+  min-width: 0;
 }
 
 .device-name-row {
   display: flex;
-  align-items: center;
-  margin-bottom: 4px;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.welding-icon {
+.device-type-icon {
   color: var(--n-primary-color);
   flex-shrink: 0;
+  margin-top: 3px;
 }
 
 .device-name {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--n-title-text-color);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.5;
+  flex: 1;
+  min-width: 0;
+  letter-spacing: 0.3px;
+  /* 限制显示长度 */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .device-id {
   font-size: 13px;
   color: var(--n-secondary-text-color);
   margin: 0;
+  padding-left: 28px;
   font-family: 'Monaco', 'Menlo', monospace;
+  word-break: break-all;
+  opacity: 0.85;
 }
 
-.device-type {
-  margin-left: 10px;
+.device-type-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 28px;
+  flex-wrap: wrap;
 }
 
-/* 设备状态 */
-.device-status {
-  margin-bottom: 15px;
+.device-type-tag {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-status-tag {
+  flex-shrink: 0;
 }
 
 /* 监控数据 */
 .monitoring-data {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  flex: 1;
 }
 
 .data-row {
   display: flex;
-  align-items: center;
-  margin-bottom: 6px;
+  align-items: flex-start;
+  margin-bottom: 10px;
   font-size: 13px;
+  gap: 6px;
+}
+
+.data-row:last-child {
+  margin-bottom: 0;
 }
 
 .data-label {
   color: var(--n-secondary-text-color);
-  margin-right: 8px;
-  min-width: 80px;
+  min-width: 90px;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .data-value {
   color: var(--n-text-color);
   font-weight: 600;
   font-family: 'Monaco', 'Menlo', monospace;
+  flex: 1;
+  min-width: 0;
+  /* 限制显示长度 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 设备位置 */
@@ -1020,48 +1081,77 @@ const deviceRules = {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding-top: 15px;
+  padding-top: 12px;
+  margin-top: auto;
   border-top: 1px solid var(--n-divider-color);
+  flex-wrap: wrap;
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+  .device-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .device-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-    padding: 15px 0;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    padding: 16px 0;
   }
 
   .device-card {
-    padding: 15px;
+    padding: 16px;
+    min-height: 260px;
   }
 
   .device-name {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .data-row {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .data-label {
-    min-width: 70px;
+    min-width: 85px;
   }
 }
 
 @media (max-width: 480px) {
-  .device-header {
-    flex-direction: column;
-    gap: 10px;
-    padding-right: 20px;
+  .device-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
-  .device-type {
-    margin-left: 0;
+  .device-card {
+    min-height: auto;
+  }
+
+  .device-header {
+    padding-right: 25px;
+  }
+
+  .device-id {
+    padding-left: 30px;
+  }
+
+  .device-type-status-row {
+    padding-left: 30px;
+  }
+
+  .data-label {
+    min-width: 80px;
+    font-size: 12px;
+  }
+
+  .data-value {
+    font-size: 12px;
   }
 
   .device-actions {
-    flex-direction: column;
+    gap: 6px;
   }
 }
 </style>

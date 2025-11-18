@@ -64,6 +64,7 @@ class SecuritySettings(BaseSettings):
     class Config:
         env_file = ".env"
         env_prefix = "SECURITY_"
+        extra = 'ignore'  # 忽略额外的环境变量字段
 
 
 class SecurityConfigManager:

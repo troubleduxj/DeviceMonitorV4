@@ -326,8 +326,9 @@
       </div>
     </NModal>
   </div>
-</template><scr
-ipt setup>
+</template>
+
+<script setup>
 import { ref, computed, onMounted, h, watch } from 'vue'
 import {
   NButton,

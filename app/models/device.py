@@ -75,6 +75,7 @@ class DeviceType(TimestampMixin, BaseModel):
     type_code = fields.CharField(max_length=50, unique=True, description="设备类型代码", index=True)
     tdengine_stable_name = fields.CharField(max_length=100, description="TDengine超级表名")
     description = fields.TextField(null=True, description="设备类型描述")
+    icon = fields.CharField(max_length=100, null=True, description="设备类型图标（Iconify图标名称）")
     is_active = fields.BooleanField(default=True, description="是否激活", index=True)
     device_count = fields.IntField(default=0, description="该类型下的设备数量")
     
