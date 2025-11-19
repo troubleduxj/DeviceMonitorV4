@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Optional
 from tortoise import Tortoise
 from tortoise.models import Model
 
-from app.models.admin import User, Role, SysApiEndpoint, Menu, Dept, AuditLog
+from app.models.admin import User, Role, SysApiEndpoint, Menu, Dept, HttpAuditLog
 from app.models.device import DeviceInfo, DeviceType, DeviceRealTimeData, DeviceHistoryData
 from app.log import logger
 

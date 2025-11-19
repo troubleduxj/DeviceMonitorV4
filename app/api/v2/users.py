@@ -302,7 +302,7 @@ async def batch_delete_users_v2(
                 )]
             )
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 使用标准化批量删除服务
             result = await user_batch_delete_service.batch_delete(
                 ids=user_ids,
@@ -465,7 +465,7 @@ async def update_user_v2(
         # 更新用户基本信息
         if update_data:
             from tortoise.transactions import in_transaction
-            async with in_transaction():
+            async with in_transaction("default"):
                 await user.update_from_dict(update_data)
                 await user.save()
                 logger.info(f"✅ 用户基本信息已保存")

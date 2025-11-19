@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 
 from app.core.permission_cache import permission_cache_manager
-from app.models.admin import User, Role, SysApiEndpoint, AuditLog
+from app.models.admin import User, Role, SysApiEndpoint, HttpAuditLog
 
 logger = logging.getLogger(__name__)
 

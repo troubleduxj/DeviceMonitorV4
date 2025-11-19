@@ -385,7 +385,8 @@ class SysApiEndpoint(BaseModel):
 # 不需要单独的RoleApiThrough模型定义
 
 
-class AuditLog(TimestampMixin, BaseModel):
+class HttpAuditLog(TimestampMixin, BaseModel):
+    """HTTP请求审计日志模型（用于记录API请求）"""
     user_id = fields.IntField(description="用户ID", index=True)
     username = fields.CharField(max_length=64, default="", description="用户名称", index=True)
     module = fields.CharField(max_length=64, default="", description="功能模块", index=True)

@@ -107,7 +107,7 @@ async def create_dict_type(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             # 检查字典类型编码是否已存在
             existing_dict_type = await DictType.get_or_none(type_code=dict_type_data.type_code)
             if existing_dict_type:
@@ -165,7 +165,7 @@ async def batch_create_dict_types(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             created_data = []
             errors = []
             
@@ -262,7 +262,7 @@ async def batch_update_dict_types(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             updated_data = []
             errors = []
             
@@ -387,7 +387,7 @@ async def batch_delete_dict_types(
                 )]
             )
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 使用标准化批量删除服务
             result = await dict_type_batch_delete_service.batch_delete(ids=ids)
             
@@ -458,7 +458,7 @@ async def update_dict_type(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             existing_dict_type = await DictType.get_or_none(id=dict_type_id)
             if not existing_dict_type:
                 return formatter.not_found("字典类型不存在", "dict_type")
@@ -523,7 +523,7 @@ async def patch_dict_type(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             existing_dict_type = await DictType.get_or_none(id=dict_type_id)
             if not existing_dict_type:
                 return formatter.not_found("字典类型不存在", "dict_type")
@@ -596,7 +596,7 @@ async def delete_dict_type(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             dict_type = await DictType.get_or_none(id=dict_type_id)
             if not dict_type:
                 return formatter.not_found("字典类型不存在", "dict_type")

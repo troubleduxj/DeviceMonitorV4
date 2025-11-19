@@ -197,7 +197,7 @@ async def create_role(
                 )
         
         # 创建角色
-        async with in_transaction():
+        async with in_transaction("default"):
             # 如果role_key为空，自动生成
             if not role_in.role_key:
                 role_in.role_key = role_in.role_name.lower().replace(" ", "_").replace("-", "_")
@@ -277,7 +277,7 @@ async def batch_delete_roles(
                 )]
             )
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 使用标准化批量删除服务
             result = await role_batch_delete_service.batch_delete(ids=role_ids)
             
@@ -367,7 +367,7 @@ async def batch_create_roles(
         created_roles = []
         failed_roles = []
         
-        async with in_transaction():
+        async with in_transaction("default"):
             for i, role_data in enumerate(roles_data):
                 try:
                     # 验证必需字段
@@ -465,7 +465,7 @@ async def batch_update_roles(
         
         allowed_fields = {'name', 'desc', 'is_active'}
         
-        async with in_transaction():
+        async with in_transaction("default"):
             for i, update_data in enumerate(updates_data):
                 try:
                     # 验证必需字段
@@ -681,7 +681,7 @@ async def add_role_users(
             )
         
         # 添加用户到角色
-        async with in_transaction():
+        async with in_transaction("default"):
             added_users = []
             for user in users:
                 # 检查用户是否已经有此角色
@@ -851,7 +851,7 @@ async def create_role_child(
         role_in.parent_id = role_id
         
         # 创建子角色
-        async with in_transaction():
+        async with in_transaction("default"):
             new_role = await role_controller.create(obj_in=role_in)
             
             # V1 API权限已完全弃用，不再支持
@@ -933,7 +933,7 @@ async def update_role(
                 )
         
         # 更新角色
-        async with in_transaction():
+        async with in_transaction("default"):
             role_in.id = role_id  # 确保ID正确
             updated_role = await role_controller.update(id=role_id, obj_in=role_in)
             
@@ -1101,7 +1101,7 @@ async def add_role_permissions(
         if not role:
             return formatter.not_found(f"Role with id {role_id} not found", "role")
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 优先处理V2系统API权限（推荐使用）
             if hasattr(permissions_in, 'sys_api_ids') and permissions_in.sys_api_ids:
                 # 验证API是否存在
@@ -1175,7 +1175,7 @@ async def update_role_permissions(
         if not role:
             return formatter.not_found(f"Role with id {role_id} not found", "role")
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 清除现有权限
             await role.apis.clear()
             await role.menus.clear()
@@ -1290,7 +1290,7 @@ async def delete_role_permissions(
         if not api_id_list and not menu_id_list:
             return formatter.bad_request("No permission IDs provided for deletion")
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # V1 API权限删除已弃用，不再支持
             if api_id_list:
                 logger.warning(f"尝试删除V1 API权限，已弃用: {api_id_list}")

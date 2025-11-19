@@ -153,7 +153,7 @@ async def create_system_param(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             # 检查参数键是否已存在
             existing_param = await SystemParam.get_or_none(param_key=config_data.param_key)
             if existing_param:
@@ -232,7 +232,7 @@ async def update_system_param(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             system_param = await SystemParam.get_or_none(id=param_id)
             if not system_param:
                 return formatter.not_found("系统参数不存在", "system_param")
@@ -308,7 +308,7 @@ async def delete_system_param(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             system_param = await SystemParam.get_or_none(id=param_id)
             if not system_param:
                 return formatter.not_found("系统参数不存在", "system_param")
@@ -381,7 +381,7 @@ async def batch_delete_system_params(
         # if not current_user.has_permission("system_param:batch_delete"):
         #     return formatter.forbidden("批量删除系统参数权限不足")
         
-        async with in_transaction():
+        async with in_transaction("default"):
             deleted_count = 0
             failed_items = []
             skipped_items = []

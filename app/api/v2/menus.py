@@ -268,7 +268,7 @@ async def batch_create_menus(
         created_menus = []
         failed_menus = []
         
-        async with in_transaction():
+        async with in_transaction("default"):
             for index, menu_data in enumerate(menus_data):
                 try:
                     # 检查菜单名是否已存在
@@ -396,7 +396,7 @@ async def batch_update_menus(
         updated_menus = []
         failed_updates = []
         
-        async with in_transaction():
+        async with in_transaction("default"):
             for index, update_data in enumerate(updates):
                 try:
                     menu_id = update_data.get('id')
@@ -552,7 +552,7 @@ async def batch_delete_menus(
                 )]
             )
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 使用标准化批量删除服务
             result = await menu_batch_delete_service.batch_delete(
                 ids=menu_ids,

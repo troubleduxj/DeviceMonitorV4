@@ -153,11 +153,19 @@ async def get_user_apis(request: Request, current_user=DependAuth):
             api_permissions = []
             
             for role in roles:
+                # 1. 获取角色的API权限（通过t_sys_role_api表）
                 role_apis = await role.apis.all()
                 for api in role_apis:
                     permission = f"{api.http_method} {api.api_path}"
                     if permission not in api_permissions:
                         api_permissions.append(permission)
+                
+                # 2. 获取角色的按钮权限（通过t_sys_role_menu表）
+                # 按钮权限的perms字段包含API权限标识
+                role_menus = await role.menus.filter(menu_type='button').all()
+                for menu in role_menus:
+                    if menu.perms and menu.perms not in api_permissions:
+                        api_permissions.append(menu.perms)
         
         return formatter.success(
             data=api_permissions,

@@ -22,7 +22,7 @@ from app.schemas.devices import (
     RepairCodeGenerateRequest
 )
 from app.models.device import DeviceInfo, DeviceRepairRecord
-from app.models.admin import User, AuditLog
+from app.models.admin import User, HttpAuditLog
 from app.core.device_maintenance_permissions import (
     require_repair_record_read_permission,
     require_repair_record_create_permission,

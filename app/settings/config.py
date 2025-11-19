@@ -95,7 +95,7 @@ class Connections(BaseSettings):
 
 class AppsModels(BaseSettings):
     models: typing.List[str] = ["app.models.admin", "app.models.system", "app.models.device", "app.models.ai_monitoring", "app.models.audit_log", "aerich.models"]
-    default_connection: str = "postgres"
+    default_connection: str = "default"  # 使用"default"作为默认连接，与aerich_config.py保持一致
 
 
 class Apps(BaseSettings):
@@ -133,7 +133,8 @@ class TortoiseORMConfig(BaseSettings):
         }
         
         config["connections"] = {
-            "postgres": postgres_connection,
+            "default": postgres_connection,  # 使用"default"作为连接名称，与aerich_config.py保持一致
+            "postgres": postgres_connection,  # 保留"postgres"别名以兼容现有代码
             # 暂时禁用TDengine连接
             # 'tdengine': {
             #     'engine': 'tortoise.backends.mysql',
@@ -151,7 +152,7 @@ class TortoiseORMConfig(BaseSettings):
         config["apps"] = {
             "models": {
                 "models": self.apps.models.models,
-                "default_connection": self.apps.models.default_connection
+                "default_connection": "default"  # 使用"default"作为默认连接
             }
         }
         

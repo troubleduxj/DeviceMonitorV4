@@ -382,19 +382,51 @@ const columns = [
             onClick: async () => {
                   try {
                     console.log('加载角色权限数据，角色ID:', row.id)
-                    // 使用 Promise.all 来同时发送所有请求
-                    console.log('开始发送Promise.all请求...')
-                    const [menusResponse, apisResponse, roleAuthorizedResponse] = await Promise.all([
-                      systemV2Api.getMenus({ page: 1, page_size: 100 }), // 获取所有菜单数据
-                      systemV2Api.getApis({ page: 1, page_size: 100 }),
+                    
+                    // 分页加载所有API（后端限制page_size最大100）
+                    console.log('开始加载API列表...')
+                    let allApis = []
+                    let currentPage = 1
+                    let hasMore = true
+                    
+                    while (hasMore) {
+                      const apiResponse = await systemV2Api.getApis({ 
+                        page: currentPage, 
+                        page_size: 100 
+                      })
+                      
+                      const apis = apiResponse.data || []
+                      allApis = allApis.concat(apis)
+                      
+                      // 检查是否还有更多数据
+                      const total = apiResponse.total || apiResponse.meta?.total || 0
+                      hasMore = allApis.length < total
+                      currentPage++
+                      
+                      console.log(`加载第${currentPage-1}页，当前总数: ${allApis.length}/${total}`)
+                      
+                      // 安全限制：最多加载10页
+                      if (currentPage > 10) {
+                        console.warn('已达到最大页数限制(10页)')
+                        break
+                      }
+                    }
+                    
+                    console.log(`API加载完成，总数: ${allApis.length}`)
+                    
+                    // 使用 Promise.all 来同时发送其他请求
+                    console.log('开始发送其他请求...')
+                    const [menusResponse, roleAuthorizedResponse] = await Promise.all([
+                      systemV2Api.menus.getTree({ include_hidden: false }), // 使用树形视图获取所有菜单数据（不受分页限制）
                       systemV2Api.getRoleAuthorized({ id: row.id }),
                     ])
-                    console.log('Promise.all请求完成，开始处理响应...')
+                    console.log('请求完成，开始处理响应...')
                     console.log('角色权限API原始响应:', roleAuthorizedResponse)
 
                     // 处理每个请求的响应
-                    menuOption.value = menusResponse.data || []
-                    apiOption.value = buildApiTree(apisResponse.data || [])
+                    // 树形视图返回的数据结构: { tree: [...], total: ..., tree_depth: ... }
+                    menuOption.value = menusResponse.data?.tree || menusResponse.data || []
+                    apiOption.value = buildApiTree(allApis)
                     
                     // 处理菜单权限数据 - 使用正确的字段名menu_permissions
                     menu_ids.value = (roleAuthorizedResponse.data?.menu_permissions || []).map((v) => v.id)
@@ -502,28 +534,43 @@ async function updateRoleAuthorized() {
         console.log('api_ids.value:', api_ids.value)
         console.log('apiOption.value长度:', apiOption.value?.length)
         
-        apiOption.value.forEach((item) => {
-          console.log('检查API项:', item.unique_id, '是否在选中列表中:', api_ids.value.includes(item.unique_id))
-          if (item.unique_id && api_ids.value.includes(item.unique_id)) {
-            console.log('添加API ID:', item.id, '对应unique_id:', item.unique_id)
-            const apiId = parseInt(item.id, 10)
+        // 递归遍历树形结构，提取所有叶子节点（实际API）的ID
+        const extractApiIds = (nodes) => {
+          nodes.forEach((node) => {
+            // 如果有children，说明是分组节点，递归处理
+            if (node.children && node.children.length > 0) {
+              extractApiIds(node.children)
+            } else {
+              // 叶子节点，检查是否被选中
+              if (node.unique_id && api_ids.value.includes(node.unique_id)) {
+                console.log('添加API ID:', node.id, '对应unique_id:', node.unique_id)
+                const apiId = parseInt(node.id, 10)
+                if (!isNaN(apiId)) {
+                  sysApiIds.push(apiId)
+                }
+              }
+            }
+          })
+        }
+        
+        extractApiIds(apiOption.value)
+      }
+    } catch (methodError) {
+      console.error('调用getCheckedData方法时出错:', methodError)
+      // 使用降级方法 - 递归遍历树形结构
+      const extractApiIds = (nodes) => {
+        nodes.forEach((node) => {
+          if (node.children && node.children.length > 0) {
+            extractApiIds(node.children)
+          } else if (node.unique_id && api_ids.value.includes(node.unique_id)) {
+            const apiId = parseInt(node.id, 10)
             if (!isNaN(apiId)) {
               sysApiIds.push(apiId)
             }
           }
         })
       }
-    } catch (methodError) {
-      console.error('调用getCheckedData方法时出错:', methodError)
-      // 使用降级方法
-      apiOption.value.forEach((item) => {
-        if (item.unique_id && api_ids.value.includes(item.unique_id)) {
-          const apiId = parseInt(item.id, 10)
-          if (!isNaN(apiId)) {
-            sysApiIds.push(apiId)
-          }
-        }
-      })
+      extractApiIds(apiOption.value)
     }
 
     console.log('提取的API权限ID:', sysApiIds)
@@ -675,50 +722,61 @@ function handleChecked(rowKeys, rows) {
       </NForm>
     </CrudModal>
 
-    <NDrawer v-model:show="active" placement="right" :width="500"
-      ><NDrawerContent>
-        <NGrid x-gap="24" cols="12">
-          <NGi span="8">
-            <NInput
-              v-model:value="pattern"
-              type="text"
-              placeholder="筛选"
-              style="flex-grow: 1"
-            ></NInput>
-          </NGi>
-          <NGi offset="2">
+    <NDrawer 
+      v-model:show="active" 
+      placement="right" 
+      :width="600"
+      :height="'100%'"
+      class="permission-drawer"
+    >
+      <NDrawerContent class="permission-drawer-content">
+        <template #header>
+          <div class="drawer-header">
+            <span class="drawer-title">设置权限</span>
+          </div>
+        </template>
+        
+        <div class="drawer-body">
+          <div class="action-bar">
             <PermissionButton
               permission="PUT /api/v2/roles/{id}/permissions"
-              type="info"
+              type="primary"
+              block
               @click="updateRoleAuthorized"
-              >确定</PermissionButton
             >
-          </NGi>
-        </NGrid>
-        <NTabs>
-          <NTabPane name="menu" tab="菜单权限" display-directive="show">
-            <MenuPermissionTree
-              :menu-data="menuOption"
-              :selectedMenus="menu_ids"
-              :show-route-path="true"
-              :show-component="true"
-              @update:selectedMenus="(v) => (menu_ids = v)"
-              @menu-selection-change="handleMenuSelectionChange"
-            />
-          </NTabPane>
-          <NTabPane name="resource" tab="接口权限" display-directive="show">
-            <ApiPermissionTree
-              ref="apiTreeRef"
-              :api-data="apiOption"
-              :selected-apis="api_ids"
-              :show-method="true"
-              :show-path="true"
-              @update:selected-apis="(v) => (api_ids = v)"
-              @api-selection-change="handleApiSelectionChange"
-            />
-          </NTabPane>
-        </NTabs>
-        <template #header> 设置权限 </template>
+              <TheIcon icon="material-symbols:check" :size="16" class="mr-1" />
+              确定
+            </PermissionButton>
+          </div>
+          
+          <NTabs class="permission-tabs" type="line" animated>
+            <NTabPane name="menu" tab="菜单权限" display-directive="show">
+              <div class="tab-content">
+                <MenuPermissionTree
+                  :menu-data="menuOption"
+                  :selectedMenus="menu_ids"
+                  :show-route-path="true"
+                  :show-component="true"
+                  @update:selectedMenus="(v) => (menu_ids = v)"
+                  @menu-selection-change="handleMenuSelectionChange"
+                />
+              </div>
+            </NTabPane>
+            <NTabPane name="resource" tab="接口权限" display-directive="show">
+              <div class="tab-content">
+                <ApiPermissionTree
+                  ref="apiTreeRef"
+                  :api-data="apiOption"
+                  :selected-apis="api_ids"
+                  :show-method="true"
+                  :show-path="true"
+                  @update:selected-apis="(v) => (api_ids = v)"
+                  @api-selection-change="handleApiSelectionChange"
+                />
+              </div>
+            </NTabPane>
+          </NTabs>
+        </div>
       </NDrawerContent>
     </NDrawer>
   </CommonPage>
@@ -768,5 +826,85 @@ function handleChecked(rowKeys, rows) {
 :deep(.n-data-table .n-checkbox::after),
 :deep(.n-data-table .n-checkbox::before) {
   display: none !important;
+}
+
+/* 权限抽屉样式优化 */
+.permission-drawer :deep(.n-drawer-body-content-wrapper) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.permission-drawer-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.drawer-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color-1);
+}
+
+.drawer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.action-bar {
+  flex-shrink: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+
+.permission-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.permission-tabs :deep(.n-tabs-nav) {
+  flex-shrink: 0;
+}
+
+.permission-tabs :deep(.n-tabs-content) {
+  flex: 1;
+  overflow: hidden;
+}
+
+.permission-tabs :deep(.n-tab-pane) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.tab-content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 优化权限树在抽屉中的显示 */
+.permission-drawer :deep(.api-permission-tree),
+.permission-drawer :deep(.menu-permission-tree) {
+  height: 100%;
+  max-height: calc(100vh - 250px);
+}
+
+.permission-drawer :deep(.tree-section) {
+  max-height: calc(100vh - 400px);
 }
 </style>

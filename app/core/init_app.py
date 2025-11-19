@@ -421,15 +421,19 @@ async def init_db():
         if not Tortoise._inited:
             # 修改配置，增加连接超时时间
             config = settings.tortoise_orm.model_dump()
-            if 'postgres' in config['connections']:
-                config['connections']['postgres']['credentials']['timeout'] = 60  # 增加到60秒
-                config['connections']['postgres']['credentials']['command_timeout'] = 60  # 命令超时
-                config['connections']['postgres']['credentials']['server_settings'] = {
-                    'application_name': 'DeviceMonitor',
-                    'jit': 'off'  # 禁用JIT以提高连接速度
-                }
+            # 更新default和postgres连接的超时设置
+            for conn_name in ['default', 'postgres']:
+                if conn_name in config['connections']:
+                    config['connections'][conn_name]['credentials']['timeout'] = 60  # 增加到60秒
+                    config['connections'][conn_name]['credentials']['command_timeout'] = 60  # 命令超时
+                    config['connections'][conn_name]['credentials']['server_settings'] = {
+                        'application_name': 'DeviceMonitor',
+                        'jit': 'off'  # 禁用JIT以提高连接速度
+                    }
             
             logger.info("正在初始化Tortoise ORM...")
+            logger.info(f"配置的连接: {list(config['connections'].keys())}")
+            logger.info(f"默认连接: {config['apps']['models']['default_connection']}")
             await asyncio.wait_for(Tortoise.init(config=config), timeout=60)
             
             # 临时跳过schema生成，避免字段映射冲突

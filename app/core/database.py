@@ -93,7 +93,7 @@ class DatabaseManager:
         """获取Tortoise ORM连接
         
         Args:
-            connection_name: 连接名称
+            connection_name: 连接名称，默认为"default"
             
         Returns:
             Tortoise连接对象

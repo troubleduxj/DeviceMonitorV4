@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from app.core.response_formatter_v2 import APIv2Response, APIv2ErrorResponse
-from app.models.admin import User, Role, SysApiEndpoint, Menu, Dept, SysApiGroup, AuditLog
+from app.models.admin import User, Role, SysApiEndpoint, Menu, Dept, SysApiGroup, HttpAuditLog
 from app.models.system import SysDictType, SysDictData
 
 

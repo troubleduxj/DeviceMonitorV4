@@ -51,6 +51,7 @@
         :block-line="true"
         :selectable="false"
         :render-label="renderMenuLabel"
+        :virtual-scroll="true"
         @update:checked-keys="handleCheckedKeysChange"
         @update:indeterminate-keys="handleIndeterminateKeysChange"
         @update:expanded-keys="handleExpandedKeysChange"
@@ -558,8 +559,43 @@ onMounted(() => {
 
 .tree-section {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 300px;
+  max-height: calc(100vh - 400px); /* 根据抽屉高度动态调整 */
+  
+  /* 自定义滚动条样式 - 默认隐藏 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.tree-section::-webkit-scrollbar {
+  width: 0; /* Chrome, Safari, Opera - 默认隐藏 */
+  height: 0;
+}
+
+/* 鼠标悬浮时显示滚动条 */
+.tree-section:hover {
+  scrollbar-width: thin; /* Firefox */
+  -ms-overflow-style: auto; /* IE and Edge */
+}
+
+.tree-section:hover::-webkit-scrollbar {
+  width: 6px; /* Chrome, Safari, Opera - 悬浮时显示 */
+}
+
+.tree-section:hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tree-section:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.tree-section:hover::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .menu-label-wrapper {

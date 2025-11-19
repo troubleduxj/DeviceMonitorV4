@@ -126,7 +126,7 @@ async def batch_create_dict_data(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             created_data = []
             errors = []
             
@@ -235,7 +235,7 @@ async def batch_update_dict_data(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             updated_data = []
             errors = []
             
@@ -359,7 +359,7 @@ async def batch_toggle_dict_data_status(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             updated_ids = []
             errors = []
             
@@ -463,7 +463,7 @@ async def create_dict_data(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             # 检查字典类型是否存在
             dict_type = await DictType.get_or_none(id=dict_data.dict_type_id)
             if not dict_type:
@@ -542,7 +542,7 @@ async def update_dict_data(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             existing_dict_data = await DictData.get_or_none(id=dict_data_id)
             if not existing_dict_data:
                 return formatter.not_found("字典数据不存在", "dict_data")
@@ -639,7 +639,7 @@ async def patch_dict_data(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             existing_dict_data = await DictData.get_or_none(id=dict_data_id)
             if not existing_dict_data:
                 return formatter.not_found("字典数据不存在", "dict_data")
@@ -805,7 +805,7 @@ async def batch_delete_dict_data(
                 )]
             )
         
-        async with in_transaction():
+        async with in_transaction("default"):
             # 使用标准化批量删除服务
             result = await dict_data_batch_delete_service.batch_delete(ids=ids)
             
@@ -838,7 +838,7 @@ async def delete_dict_data(
     formatter = ResponseFormatterV2(request)
     
     try:
-        async with in_transaction():
+        async with in_transaction("default"):
             dict_data = await DictData.get_or_none(id=dict_data_id)
             if not dict_data:
                 return formatter.not_found("字典数据不存在", "dict_data")

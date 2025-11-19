@@ -14,7 +14,7 @@ import json
 from fastapi import Request
 from tortoise.transactions import in_transaction
 
-from app.models.admin import User, Role, SysApiEndpoint, AuditLog
+from app.models.admin import User, Role, SysApiEndpoint, HttpAuditLog
 from app.models.device import DeviceRepairRecord, DeviceInfo
 from app.core.cache import permission_cache
 

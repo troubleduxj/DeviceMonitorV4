@@ -51,6 +51,7 @@
         :block-line="true"
         :selectable="false"
         :render-label="renderApiLabel"
+        :virtual-scroll="true"
         @update:checked-keys="handleCheckedKeysChange"
         @update:indeterminate-keys="handleIndeterminateKeysChange"
         @update:expanded-keys="handleExpandedKeysChange"
@@ -206,13 +207,15 @@ function renderApiLabel(info) {
         {
           style: {
             display: 'inline-block',
-            padding: '2px 6px',
-            marginRight: '8px',
+            padding: '4px 10px',
+            marginRight: '12px',
             backgroundColor: methodColors[option.method] || '#666',
             color: 'white',
-            fontSize: '10px',
-            borderRadius: '2px',
+            fontSize: '11px',
+            borderRadius: '3px',
             fontWeight: 'bold',
+            minWidth: '60px',
+            textAlign: 'center',
           },
         },
         option.method
@@ -220,35 +223,46 @@ function renderApiLabel(info) {
     )
   }
 
-  // 接口名称
+  // 接口名称 - 提取中文部分显示，完整内容作为tooltip
+  const fullText = option.summary || option.label
+  // 提取括号前的中文部分
+  const displayText = fullText.split('(')[0].trim()
+  // 提取括号内的内容作为tooltip
+  const tooltipText = fullText.match(/\(([^)]+)\)/)?.[1] || fullText
+
   elements.push(
     h(
       'span',
       {
         style: {
-          marginRight: '8px',
+          flex: '1',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          cursor: 'help',
         },
+        title: tooltipText, // 鼠标悬浮时显示完整路径
       },
-      option.summary || option.label
+      displayText
     )
   )
 
-  // 接口路径
-  if (props.showPath && option.path) {
-    elements.push(
-      h(
-        'span',
-        {
-          style: {
-            color: '#666',
-            fontSize: '12px',
-            fontStyle: 'italic',
-          },
-        },
-        `(${option.path})`
-      )
-    )
-  }
+  // 接口路径 - 已隐藏，只显示请求方法和接口名称
+  // if (props.showPath && option.path) {
+  //   elements.push(
+  //     h(
+  //       'span',
+  //       {
+  //         style: {
+  //           color: '#666',
+  //           fontSize: '12px',
+  //           fontStyle: 'italic',
+  //         },
+  //       },
+  //       `(${option.path})`
+  //     )
+  //   )
+  // }
 
   return h(
     'div',
@@ -506,8 +520,43 @@ onMounted(() => {
 
 .tree-section {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 300px;
+  max-height: calc(100vh - 400px); /* 根据抽屉高度动态调整 */
+  
+  /* 自定义滚动条样式 - 默认隐藏 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.tree-section::-webkit-scrollbar {
+  width: 0; /* Chrome, Safari, Opera - 默认隐藏 */
+  height: 0;
+}
+
+/* 鼠标悬浮时显示滚动条 */
+.tree-section:hover {
+  scrollbar-width: thin; /* Firefox */
+  -ms-overflow-style: auto; /* IE and Edge */
+}
+
+.tree-section:hover::-webkit-scrollbar {
+  width: 6px; /* Chrome, Safari, Opera - 悬浮时显示 */
+}
+
+.tree-section:hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tree-section:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.tree-section:hover::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 /* 树组件样式优化 */

@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request, Depends, Query
 from tortoise.expressions import Q
 
-from app.models.admin import AuditLog, User
+from app.models.admin import HttpAuditLog, User
 from app.core.auth_dependencies import get_current_active_user
 from app.core.response_formatter_v2 import ResponseFormatterV2
 
@@ -47,10 +47,10 @@ async def get_audit_logs(
         offset = (page - 1) * page_size
         
         # 查询总数
-        total = await AuditLog.filter(q).count()
+        total = await HttpAuditLog.filter(q).count()
         
         # 查询数据
-        audit_logs = await AuditLog.filter(q).order_by("-created_at").offset(offset).limit(page_size).all()
+        audit_logs = await HttpAuditLog.filter(q).order_by("-created_at").offset(offset).limit(page_size).all()
         
         # 转换数据格式
         log_list = []
@@ -109,7 +109,7 @@ async def get_audit_log(
     formatter = ResponseFormatterV2(request)
     
     try:
-        log = await AuditLog.get_or_none(id=log_id)
+        log = await HttpAuditLog.get_or_none(id=log_id)
         if not log:
             return formatter.not_found("审计日志不存在", "audit_log")
         

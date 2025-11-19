@@ -12,7 +12,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from loguru import logger
 
 from app.core.dependency import AuthControl
-from app.models.admin import AuditLog, User
+from app.models.admin import HttpAuditLog, User
 
 from .bgtask import BgTasks
 
@@ -236,18 +236,39 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
             
             # 创建AuditLog对象
             try:
-                audit_log = AuditLog(**data)
+                # 检查数据库连接是否可用
+                from tortoise import Tortoise
+                from tortoise.connection import connections
+                
+                if not Tortoise._inited:
+                    logger.warning("Tortoise ORM未初始化，跳过审计日志记录")
+                    return response
+                
+                # 检查default连接是否存在
+                try:
+                    conn = connections.get("default")
+                    if conn is None:
+                        logger.warning("数据库连接不可用，跳过审计日志记录")
+                        return response
+                except KeyError:
+                    logger.warning("default连接未配置，跳过审计日志记录")
+                    return response
+                
+                audit_log = HttpAuditLog(**data)
                 # 手动设置初始时间戳，确保字段不为None
                 now = datetime.now()
                 if now.tzinfo is not None:
                     now = now.replace(tzinfo=None)
                 audit_log.created_at = now
                 audit_log.updated_at = now
+                
                 # 保存到数据库
                 await audit_log.save()
                 logger.debug(f"审计日志已记录: {data.get('summary', 'N/A')}")
             except Exception as e:
                 logger.error(f"记录审计日志失败: {e}")
+                import traceback
+                logger.debug(f"详细错误信息: {traceback.format_exc()}")
                 # 不抛出异常，避免影响正常请求
 
         return response
