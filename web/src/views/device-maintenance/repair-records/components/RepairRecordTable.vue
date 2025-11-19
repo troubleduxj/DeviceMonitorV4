@@ -10,8 +10,6 @@
         <PermissionButton 
           permission="GET /api/v2/device/maintenance/repair-records"
           @click="refreshData"
-          :hide-when-no-permission="false"
-          :disable-when-no-permission="true"
           no-permission-text="您没有权限刷新维修记录数据"
         >
           <TheIcon icon="material-symbols:refresh" :size="16" class="mr-1" />
@@ -313,8 +311,6 @@ const allColumns = [
           type: 'primary',
           secondary: true,
           style: 'margin-right: 6px;',
-          hideWhenNoPermission: false,
-          disableWhenNoPermission: true,
           noPermissionText: '您没有权限编辑维修记录',
           onClick: () => emit('edit', row)
         }, { default: () => '编辑' }),
@@ -326,8 +322,6 @@ const allColumns = [
           needConfirm: true,
           confirmTitle: '删除确认',
           confirmContent: '确定删除这条维修记录吗？此操作不可恢复。',
-          hideWhenNoPermission: false,
-          disableWhenNoPermission: true,
           noPermissionText: '您没有权限删除维修记录',
           onConfirm: () => emit('delete', row)
         }, { default: () => '删除' })

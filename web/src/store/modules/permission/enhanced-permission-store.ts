@@ -774,29 +774,53 @@ export const useEnhancedPermissionStore = defineStore('enhancedPermission', () =
       return true
     }
 
-    // 3. 基础路径匹配
-    const basePathPattern = apiPath.replace(/\/\{[^}]+\}.*$/, '')
-    const baseApiKey = `${method.toUpperCase()} ${basePathPattern}`
-    console.log(`3️⃣ 基础路径匹配模式: "${baseApiKey}*"`)
-    
-    // 检查是否有匹配的基础路径权限
+    // 3. 精确的路径段匹配 - 只匹配相同路径深度的权限
+    // 例如: /api/v2/devices/{id} 只匹配 /api/v2/devices/{id} 或 /api/v2/devices/*
+    // 不匹配 /api/v2/devices/types/{id}
+    const pathSegments = apiPath.split('/').filter(s => s)
     const matchingPermissions = accessApis.value.filter(permission => {
-      if (typeof permission === 'string') {
-        return permission.startsWith(baseApiKey) ||
-               permission === `${baseApiKey}/*` ||
-               permission === `${baseApiKey}/**`
+      if (typeof permission !== 'string') return false
+      
+      // 提取权限中的路径部分
+      const permParts = permission.split(' ')
+      if (permParts.length !== 2 || permParts[0] !== method.toUpperCase()) return false
+      
+      const permPath = permParts[1]
+      const permSegments = permPath.split('/').filter(s => s)
+      
+      // 路径段数量必须相同
+      if (pathSegments.length !== permSegments.length) return false
+      
+      // 逐段比较
+      for (let i = 0; i < pathSegments.length; i++) {
+        const apiSeg = pathSegments[i]
+        const permSeg = permSegments[i]
+        
+        // 如果权限段是通配符，匹配任何内容
+        if (permSeg === '*' || permSeg === '**') continue
+        
+        // 如果API段是参数（{xxx}），权限段也必须是参数或通配符
+        if (apiSeg.startsWith('{') && apiSeg.endsWith('}')) {
+          if (permSeg.startsWith('{') && permSeg.endsWith('}')) continue
+          if (permSeg === '*' || permSeg === '**') continue
+          return false
+        }
+        
+        // 普通段必须完全匹配
+        if (apiSeg !== permSeg) return false
       }
-      return false
+      
+      return true
     })
     
-    console.log(`3️⃣ 匹配的基础路径权限:`, matchingPermissions)
-    const basePathMatch = matchingPermissions.length > 0
-    console.log(`3️⃣ 基础路径匹配结果: ${basePathMatch}`)
+    console.log(`3️⃣ 精确路径段匹配结果:`, matchingPermissions)
+    const pathSegmentMatch = matchingPermissions.length > 0
+    console.log(`3️⃣ 路径段匹配结果: ${pathSegmentMatch}`)
 
-    console.log(`\n🎉 API权限检查最终结果: ${basePathMatch ? '✅ 有权限' : '❌ 无权限'}`)
+    console.log(`\n🎉 API权限检查最终结果: ${pathSegmentMatch ? '✅ 有权限' : '❌ 无权限'}`)
     console.groupEnd()
     
-    return basePathMatch
+    return pathSegmentMatch
   }
 
   /**

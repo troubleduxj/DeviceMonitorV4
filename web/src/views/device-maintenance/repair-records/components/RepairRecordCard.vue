@@ -114,8 +114,6 @@
             size="small"
             type="primary"
             class="mr-8"
-            :hide-when-no-permission="false"
-            :disable-when-no-permission="true"
             no-permission-text="您没有权限编辑维修记录"
             @click="emit('edit', record)"
           >
@@ -129,8 +127,6 @@
             :need-confirm="true"
             confirm-title="删除确认"
             confirm-content="确定删除该维修记录吗？此操作不可恢复。"
-            :hide-when-no-permission="false"
-            :disable-when-no-permission="true"
             no-permission-text="您没有权限删除维修记录"
             @confirm="() => emit('delete', [record.id])"
           >

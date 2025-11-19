@@ -419,8 +419,6 @@ const columns = [
           type: 'default',
           size: 'small',
           style: 'padding: 0; border: none; background: transparent;',
-          disableWhenNoPermission: true,
-          hideWhenNoPermission: false,
           onClick: () => handleUpdateDisable(row)
         }, {
           default: () => h(NSwitch, {

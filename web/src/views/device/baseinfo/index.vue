@@ -499,7 +499,8 @@ const columns = [
           default: () => '维修记录',
           icon: renderIcon('mdi:clipboard-text-outline', { size: 14 }),
         }),
-        h(NButton, {
+        h(PermissionButton, {
+          permission: 'GET /api/v2/devices/{device_id}/history',
           size: 'small',
           type: 'info',
           secondary: true,
@@ -614,7 +615,11 @@ const deviceRules = {
             :icon-size="16"
             align="right"
           />
-          <PermissionButton permission="POST /api/v2/devices" type="primary" @click="handleAdd">
+          <PermissionButton 
+            permission="POST /api/v2/devices" 
+            type="primary" 
+            @click="handleAdd"
+          >
             <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建设备
           </PermissionButton>
         </div>
@@ -746,7 +751,8 @@ const deviceRules = {
             >
               <TheIcon icon="mdi:clipboard-text-outline" :size="14" />
             </PermissionButton>
-            <NButton
+            <PermissionButton
+              permission="GET /api/v2/devices/{device_id}/history"
               size="small"
               type="info"
               class="mr-8"
@@ -761,7 +767,7 @@ const deviceRules = {
               title="查看数据"
             >
               <TheIcon icon="mdi:chart-line" :size="14" />
-            </NButton>
+            </PermissionButton>
             <PermissionButton
               permission="PUT /api/v2/devices/{id}"
               size="small"

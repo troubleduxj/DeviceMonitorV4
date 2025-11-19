@@ -12,8 +12,6 @@
           <PermissionButton
             permission="POST /api/v2/device/maintenance/repair-records"
             type="primary"
-            :hide-when-no-permission="false"
-            :disable-when-no-permission="true"
             no-permission-text="您没有权限创建维修记录"
             @click="handleAdd"
           >
@@ -23,8 +21,6 @@
           <PermissionButton
             permission="GET /api/v2/device/maintenance/repair-records/export"
             :loading="exporting"
-            :hide-when-no-permission="false"
-            :disable-when-no-permission="true"
             no-permission-text="您没有权限导出维修记录数据"
             @click="handleExportClick"
           >

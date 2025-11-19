@@ -157,7 +157,7 @@
             <n-card
               class="module-card monitoring"
               hoverable
-              @click="handleCardClick('/device-monitor')"
+              @click="handleCardClick('/device-monitoring')"
             >
               <div class="module-header">
                 <div class="module-icon">
@@ -251,6 +251,24 @@
             </n-card>
           </n-gi>
 
+          <n-gi v-if="hasWorkbenchModulePermission('/data-model')">
+            <n-card class="module-card data-model" hoverable @click="handleCardClick('/data-model')">
+              <div class="module-header">
+                <div class="module-icon">
+                  <Icon icon="ant-design:database-outlined" />
+                </div>
+                <div class="module-badge">模型</div>
+              </div>
+              <div class="module-content">
+                <h3 class="module-title">数据模型</h3>
+                <p class="module-description">数据模型管理和配置</p>
+              </div>
+              <div class="module-footer">
+                <span class="module-action">模型管理</span>
+              </div>
+            </n-card>
+          </n-gi>
+
           <n-gi v-if="hasWorkbenchModulePermission('/ai-monitoring')">
             <n-card class="module-card ai" hoverable @click="handleCardClick('/ai-monitoring')">
               <div class="module-header">
@@ -325,8 +343,112 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { getCachedConfig } from '@/api/index.js'
 
+// 获取菜单的第一个可访问子菜单路径
+const getFirstChildMenuPath = (modulePath) => {
+  // 定义模块路径映射（与权限检查保持一致）
+  const modulePathMappings = {
+    '/dashboard': ['dashboard', '/dashboard', 'monitoring-dashboard', 'monitor-dashboard', '监测看板'],
+    '/device': ['device', '/device', 'device-management', '设备管理'],
+    '/device-monitor': ['device-monitoring', '/device-monitoring', 'device-monitor', '/device-monitor', '设备监测'],
+    '/device-monitoring': ['device-monitoring', '/device-monitoring', 'device-monitor', '/device-monitor', '设备监测'],
+    '/device-maintenance': ['device-maintenance', '/device-maintenance', '设备维护'],
+    '/statistics': ['statistics', '/statistics', 'data-statistics', '数据统计'],
+    '/alarm': ['alarm', '/alarm', 'alarm-center', '告警中心'],
+    '/workflow': ['workflow', '/workflow', 'flow-settings', '流程编排'],
+    '/data-model': ['data-model', '/data-model', 'data-models', 'model-management', '数据模型', '数据模型管理'],
+    '/ai-monitoring': ['ai-monitoring', '/ai-monitoring', 'ai-monitor', 'AI监测'],
+    '/system': ['system', '/system', 'system-management', '系统管理'],
+  }
+  
+  // 获取可能的路径匹配列表
+  const possiblePaths = modulePathMappings[modulePath] || [modulePath]
+  
+  // 递归查找菜单
+  const findMenu = (menus, pathList, depth = 0) => {
+    for (const menu of menus) {
+      // 只使用path字段（字符串），不使用component（可能是函数）
+      const menuPath = typeof menu.path === 'string' ? menu.path : ''
+      const menuPathClean = menuPath.replace(/^\/+/, '')
+      const menuName = menu.name || menu.title || ''
+      
+      // 跳过工作台菜单本身
+      if (menuName.includes('工作台') && depth === 0) {
+        // 但要检查其子菜单
+        if (menu.children && menu.children.length > 0) {
+          const result = findMenu(menu.children, pathList, depth + 1)
+          if (result) return result
+        }
+        continue
+      }
+      
+      // 检查是否匹配任何可能的路径
+      const isMatch = pathList.some(targetPath => {
+        const targetPathClean = targetPath.replace(/^\/+/, '')
+        // 精确匹配或名称匹配
+        return menuPathClean === targetPathClean || 
+               (menuName && targetPathClean && menuName.includes(targetPathClean))
+      })
+      
+      if (isMatch) {
+        console.log(`🔍 匹配到菜单: "${menuName}" (path: ${menuPath})`)
+        
+        // 如果有子菜单，返回第一个子菜单的路径
+        if (menu.children && menu.children.length > 0) {
+          const firstChild = menu.children[0]
+          // 只使用path字段
+          let childPath = typeof firstChild.path === 'string' ? firstChild.path : null
+          if (childPath) {
+            // 如果子路径不是以 / 开头，需要拼接父路径
+            if (!childPath.startsWith('/')) {
+              childPath = menuPath ? `${menuPath}/${childPath}` : `/${childPath}`
+            }
+            console.log(`✅ 找到菜单 "${menuName}" 的第一个子菜单: ${childPath}`)
+            return childPath
+          }
+        }
+        
+        // 没有子菜单，返回当前菜单路径
+        if (menuPath) {
+          console.log(`✅ 找到菜单 "${menuName}" (无子菜单): ${menuPath}`)
+          return menuPath
+        }
+      }
+      
+      // 递归查找子菜单
+      if (menu.children && menu.children.length > 0) {
+        const result = findMenu(menu.children, pathList, depth + 1)
+        if (result) return result
+      }
+    }
+    return null
+  }
+  
+  // 如果没有菜单数据，直接返回原路径
+  if (!permissionStore.menus || permissionStore.menus.length === 0) {
+    console.log(`⚠️ 菜单数据未加载，使用默认路径: ${modulePath}`)
+    return modulePath
+  }
+  
+  const foundPath = findMenu(permissionStore.menus, possiblePaths)
+  if (!foundPath) {
+    console.log(`⚠️ 未找到匹配的菜单，使用默认路径: ${modulePath}`)
+  }
+  return foundPath || modulePath
+}
+
 const handleCardClick = (route) => {
-  router.push(route)
+  // 获取第一个子菜单路径
+  const targetPath = getFirstChildMenuPath(route)
+  console.log(`🔗 卡片点击: ${route} -> ${targetPath}`)
+  
+  // 确保targetPath是字符串
+  if (typeof targetPath === 'string') {
+    router.push(targetPath)
+  } else {
+    console.error(`❌ 无效的路径类型: ${typeof targetPath}`, targetPath)
+    // 使用原始路径作为后备
+    router.push(route)
+  }
 }
 
 const { t } = useI18n({ useScope: 'global' })
@@ -373,6 +495,7 @@ const hasAnyModulePermission = computed(() => {
     '/alarm',
     '/workflow',
     '/ai-monitoring',
+    '/data-model',
     '/system',
   ]
 
@@ -461,6 +584,10 @@ const hasMenuPermission = (menuPath) => {
           console.log(`✅ 名称匹配: ${menuName} 匹配 ${targetPath}`)
           return true
         }
+        if (menuName.includes('数据模型') && targetPath.includes('data-model')) {
+          console.log(`✅ 名称匹配: ${menuName} 匹配 ${targetPath}`)
+          return true
+        }
       }
 
       // 5. 递归检查子菜单
@@ -483,7 +610,7 @@ const hasMenuPermission = (menuPath) => {
       `🔍 调试信息 - 用户菜单列表:`,
       permissionStore.menus?.map((m) => ({
         path: m.path,
-        name: m.name || m.title,
+        name: m.name || (m.meta?.title as string),
         component: m.component,
         children: m.children?.length || 0,
       }))
@@ -579,6 +706,15 @@ const hasWorkbenchModulePermission = (modulePath) => {
       'AI监测',
       '智能监测',
       '人工智能',
+    ],
+    '/data-model': [
+      'data-model',
+      '/data-model',
+      'data-models',
+      'model-management',
+      '数据模型',
+      '模型管理',
+      '数据模型管理',
     ],
     '/system': [
       'system',
@@ -967,6 +1103,10 @@ onMounted(async () => {
   background: linear-gradient(135deg, rgba(19, 194, 194, 0.08), rgba(54, 207, 201, 0.08));
 }
 
+.module-card.data-model:hover {
+  background: linear-gradient(135deg, rgba(47, 84, 235, 0.08), rgba(89, 126, 247, 0.08));
+}
+
 .module-card.workflow:hover {
   background: linear-gradient(135deg, rgba(235, 47, 150, 0.08), rgba(247, 89, 171, 0.08));
 }
@@ -1034,6 +1174,11 @@ onMounted(async () => {
   color: #13c2c2;
 }
 
+.module-card.data-model .module-icon {
+  background: linear-gradient(135deg, rgba(47, 84, 235, 0.1), rgba(89, 126, 247, 0.1));
+  color: #2f54eb;
+}
+
 .module-card.workflow .module-icon {
   background: linear-gradient(135deg, rgba(235, 47, 150, 0.1), rgba(247, 89, 171, 0.1));
   color: #eb2f96;
@@ -1085,6 +1230,11 @@ onMounted(async () => {
 
 .module-card.ai .module-badge {
   background: linear-gradient(135deg, #13c2c2, #36cfc9);
+  color: white;
+}
+
+.module-card.data-model .module-badge {
+  background: linear-gradient(135deg, #2f54eb, #597ef7);
   color: white;
 }
 
@@ -1169,6 +1319,10 @@ onMounted(async () => {
 
 .module-card.ai .module-action {
   background: linear-gradient(135deg, #13c2c2, #36cfc9);
+}
+
+.module-card.data-model .module-action {
+  background: linear-gradient(135deg, #2f54eb, #597ef7);
 }
 
 .module-card.workflow .module-action {
@@ -1377,6 +1531,10 @@ onMounted(async () => {
 
 .dark .module-card.ai .module-icon {
   background: linear-gradient(135deg, rgba(19, 194, 194, 0.2), rgba(54, 207, 201, 0.2));
+}
+
+.dark .module-card.data-model .module-icon {
+  background: linear-gradient(135deg, rgba(47, 84, 235, 0.2), rgba(89, 126, 247, 0.2));
 }
 
 .dark .module-card.system .module-icon {

@@ -14,9 +14,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { NButton } from 'naive-ui'
 import { useEnhancedPermissionStore } from '@/store/modules/permission'
+import { usePermissionButtonMode } from '@/composables/usePermissionButtonMode'
 
 // 直接定义权限模式，避免循环导入
 const PermissionMode = {
@@ -42,14 +43,14 @@ const props = defineProps({
     validator: (value) => ['all', 'any', 'exact'].includes(value),
   },
 
-  // 显示控制
+  // 显示控制（如果不指定，则使用系统配置）
   hideWhenNoPermission: {
     type: Boolean,
-    default: false,
+    default: undefined, // undefined表示使用系统配置
   },
   disableWhenNoPermission: {
     type: Boolean,
-    default: true,
+    default: undefined, // undefined表示使用系统配置
   },
   showTooltipWhenNoPermission: {
     type: Boolean,
@@ -131,6 +132,14 @@ try {
   console.warn('PermissionButton: useEnhancedPermissionStore failed:', error)
 }
 
+// 使用权限按钮显示模式配置
+const { hideWhenNoPermission: globalHideMode, disableWhenNoPermission: globalDisableMode, loadConfig } = usePermissionButtonMode()
+
+// 组件挂载时加载配置
+onMounted(() => {
+  loadConfig()
+})
+
 // 权限检查 - 添加缓存和错误处理
 const hasAuth = computed(() => {
   try {
@@ -143,15 +152,15 @@ const hasAuth = computed(() => {
       try {
         permissionStore = useEnhancedPermissionStore()
       } catch (error) {
-        console.warn('PermissionButton: Cannot get permission store, defaulting to true')
-        return true // 默认允许，避免误拦截
+        console.error('PermissionButton: Cannot get permission store, denying access for security')
+        return false // 🔒 默认拒绝，确保安全
       }
     }
 
     // 如果权限检查方法不存在，返回默认值
     if (!permissionStore || !permissionStore.hasPermission) {
-      console.warn('PermissionButton: hasPermission method not available, defaulting to true')
-      return true // 默认允许，避免误拦截
+      console.error('PermissionButton: hasPermission method not available, denying access for security')
+      return false // 🔒 默认拒绝，确保安全
     }
 
     const result = permissionStore.hasPermission(props.permission, props.permissionMode)
@@ -235,21 +244,31 @@ const hasAuth = computed(() => {
   }
 })
 
-// 按钮显示控制
+// 按钮显示控制（优先使用props，否则使用全局配置）
 const showButton = computed(() => {
-  if (!hasAuth.value && props.hideWhenNoPermission) {
-    return false
+  if (!hasAuth.value) {
+    // 如果props明确指定了hideWhenNoPermission，使用props的值
+    if (props.hideWhenNoPermission !== undefined) {
+      return !props.hideWhenNoPermission
+    }
+    // 否则使用全局配置
+    return !globalHideMode.value
   }
   return true
 })
 
-// 按钮禁用控制
+// 按钮禁用控制（优先使用props，否则使用全局配置）
 const buttonDisabled = computed(() => {
   if (props.disabled) {
     return true
   }
-  if (!hasAuth.value && props.disableWhenNoPermission) {
-    return true
+  if (!hasAuth.value) {
+    // 如果props明确指定了disableWhenNoPermission，使用props的值
+    if (props.disableWhenNoPermission !== undefined) {
+      return props.disableWhenNoPermission
+    }
+    // 否则使用全局配置
+    return globalDisableMode.value
   }
   return false
 })
