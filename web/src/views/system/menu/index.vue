@@ -95,7 +95,7 @@ const handleDelete = async (params, showModal = true) => {
 
     if (!checkUsageApi) {
       console.error('无法找到checkUsage API方法')
-      message.error('菜单使用情况检查功能不可用，将直接尝试删除')
+      $message.error('菜单使用情况检查功能不可用，将直接尝试删除')
       // 如果检查功能不可用，直接执行删除
       await originalHandleDelete(params, showModal)
       return
@@ -122,7 +122,7 @@ const handleDelete = async (params, showModal = true) => {
       })
       messageText += '\n请先处理以上问题后再删除。'
 
-      message.warning(messageText)
+      $message.warning(messageText)
       return
     }
 
@@ -133,7 +133,7 @@ const handleDelete = async (params, showModal = true) => {
 
     // 检查是否是菜单被角色使用的错误（兜底处理）
     if (error.message && error.message.includes('Cannot delete menu that is assigned to roles')) {
-      message.error(
+      $message.error(
         '无法删除该菜单：该菜单已分配给某些角色，请先从相关角色中移除此菜单权限后再删除'
       )
       return
@@ -141,12 +141,12 @@ const handleDelete = async (params, showModal = true) => {
 
     // 检查其他常见的删除错误
     if (error.message && error.message.includes('has children')) {
-      message.error('无法删除该菜单：该菜单包含子菜单，请先删除所有子菜单')
+      $message.error('无法删除该菜单：该菜单包含子菜单，请先删除所有子菜单')
       return
     }
 
     // 默认错误提示
-    message.error(error.message || '删除菜单失败，请稍后重试')
+    $message.error(error.message || '删除菜单失败，请稍后重试')
   }
 }
 
@@ -189,60 +189,27 @@ const buildMenuTree = (menus, parentId = 0) => {
   return tree.sort((a, b) => (a.order || 0) - (b.order || 0))
 }
 
-// 菜单列表数据获取函数 - 使用统一错误处理
+// 菜单列表数据获取函数 - 获取全部菜单，以树状形式显示
 const getMenuListData = async (params) => {
   try {
     console.log('调用菜单列表API v2，参数:', params)
 
-    // 直接调用API，不使用safeDataFetch避免自动退出登录
-    const res = await systemV2Api.getMenus({
-      ...params,
-      page: 1,
-      page_size: 100, // 固定获取100条记录
-    })
+    // 直接调用底层API，绕过适配器
+    const res = await menuApi.getTree({ include_hidden: false })
 
-    console.log('菜单API v2原始响应:', res)
-    console.log('原始数据示例:', res.data?.[0]) // 打印第一条数据查看结构
+    console.log('菜单树形API原始响应:', res)
 
-    // 检查v2 API响应格式
+    // 检查响应格式
     if (res?.success === true || (res?.code === 200 && res?.data)) {
-      console.log('菜单API v2返回数据:', res.data)
-      const processedData = (res.data || []).map((item) => {
-        console.log('处理前的item:', item)
-        const processed = {
-          ...item,
-          id: item.id, // 明确保留ID字段
-        }
-        console.log('处理后的item:', processed)
-        return processed
-      })
+      // 树形API返回的数据结构: { tree: [...], total: ..., tree_depth: ... }
+      const treeData = res.data?.tree || []
+      const total = res.data?.total || 0
 
-      console.log('所有处理后的数据:', processedData)
-
-      // 继续原有的字段处理
-      const finalData = processedData.map((item) => ({
-        ...item,
-        name: item.name || '',
-        path: item.path || '',
-        component: item.component || '',
-        redirect: item.redirect || '',
-        icon: item.icon || '',
-        order: item.order || 0,
-        is_hidden: item.is_hidden ?? false,
-        keepalive: item.keepalive ?? true,
-        menu_type: item.menu_type || 'menu',
-        parent_id: item.parent_id || 0,
-        created_at: item.created_at || new Date().toISOString(),
-      }))
-
-      // 构建树形结构
-      const treeData = buildMenuTree(finalData)
-      console.log('菜单树形结构数据:', treeData)
-      console.log('树形数据第一个节点:', treeData[0])
+      console.log('解析后的树形数据:', treeData, '总数:', total)
 
       return {
         data: treeData,
-        total: treeData.length, // 返回根节点数量
+        total: total,
       }
     }
     return { data: [], total: 0 }
@@ -252,7 +219,7 @@ const getMenuListData = async (params) => {
     // 检查是否是认证错误
     if (err.response?.status === 401 || err.code === 401) {
       console.warn('检测到认证错误，可能需要重新登录')
-      message.error('登录已过期，请重新登录。请手动刷新页面或点击登录按钮重新登录。', {
+      $message.error('登录已过期，请重新登录。请手动刷新页面或点击登录按钮重新登录。', {
         duration: 0, // 不自动消失
         closable: true,
       })
@@ -260,7 +227,7 @@ const getMenuListData = async (params) => {
       // 不自动清除认证信息，让用户自己决定
       // 不自动跳转，让用户自己操作
     } else {
-      message.error('获取菜单列表失败: ' + (err.message || '未知错误'))
+      $message.error('获取菜单列表失败: ' + (err.message || '未知错误'))
     }
 
     // 兜底处理
@@ -489,13 +456,13 @@ async function handleUpdateKeepalive(row) {
     await systemV2Api.updateMenu(updateData)
 
     row.keepalive = newKeepalive
-    message?.success(row.keepalive ? 'KeepAlive已开启' : 'KeepAlive已关闭')
+    $message?.success(row.keepalive ? 'KeepAlive已开启' : 'KeepAlive已关闭')
     console.log('菜单keepalive状态更新成功')
   } catch (error) {
     console.error('更新菜单keepalive状态失败:', error)
     // 检查错误是否已经被HTTP拦截器处理过，避免重复提示
     if (!(error && typeof error === 'object' && error.success === false)) {
-      message?.error('更新失败: ' + (error.message || '未知错误'))
+      $message?.error('更新失败: ' + (error.message || '未知错误'))
     }
   } finally {
     row.publishing = false
@@ -527,13 +494,13 @@ async function handleUpdateHidden(row) {
     await systemV2Api.updateMenu(updateData)
 
     row.is_hidden = newHidden
-    message?.success(row.is_hidden ? '菜单已隐藏' : '菜单已显示')
+    $message?.success(row.is_hidden ? '菜单已隐藏' : '菜单已显示')
     console.log('菜单隐藏状态更新成功')
   } catch (error) {
     console.error('更新菜单隐藏状态失败:', error)
     // 检查错误是否已经被HTTP拦截器处理过，避免重复提示
     if (!(error && typeof error === 'object' && error.success === false)) {
-      message?.error('更新失败: ' + (error.message || '未知错误'))
+      $message?.error('更新失败: ' + (error.message || '未知错误'))
     }
   } finally {
     row.publishing = false
@@ -597,19 +564,12 @@ function validatePath(rule, value) {
 async function getTreeSelect() {
   try {
     console.log('获取菜单树形选择数据')
-    const res = await systemV2Api.getMenus({ page: 1, page_size: 100 })
+    const res = await menuApi.getTree({ include_hidden: false })
     console.log('菜单树形数据响应:', res)
 
     if (res?.success === true || (res?.code === 200 && res?.data)) {
-      const processedData = (res.data || []).map((item) => ({
-        ...item,
-        name: item.name || '',
-        parent_id: item.parent_id || 0,
-        order: item.order || 0,
-      }))
-
-      // 构建树形结构
-      const treeData = buildMenuTree(processedData)
+      // 树形API返回的数据在 data.tree 中
+      const treeData = res.data?.tree || []
       const menu = { id: 0, name: '根目录', children: treeData }
       menuOptions.value = [menu]
       console.log('菜单树形选择数据处理完成:', menuOptions.value)
@@ -618,7 +578,7 @@ async function getTreeSelect() {
     }
   } catch (error) {
     console.error('获取菜单树形数据失败:', error)
-    message?.error('获取菜单数据失败: ' + (error.message || '未知错误'))
+    $message?.error('获取菜单数据失败: ' + (error.message || '未知错误'))
     menuOptions.value = [{ id: 0, name: '根目录', children: [] }]
   }
 }

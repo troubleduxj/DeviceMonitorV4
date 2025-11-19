@@ -80,9 +80,12 @@ async def get_menus(
                 menu_dict = await menu.to_dict()
                 
                 # 添加v2版本增强字段
+                children_count = await Menu.filter(parent_id=menu.id).count()
+                roles_count = await menu.roles.all().count() if hasattr(menu, 'roles') else 0
+                
                 menu_dict["stats"] = {
-                    "children_count": await Menu.filter(parent_id=menu.id).count(),
-                    "roles_count": await menu.role_menus.all().count()
+                    "children_count": children_count,
+                    "roles_count": roles_count
                 }
                 
                 # 添加层级信息
@@ -120,9 +123,12 @@ async def get_menus(
             menu_dict = await menu.to_dict()
             
             # 添加v2版本增强字段
+            children_count = await Menu.filter(parent_id=menu.id).count()
+            roles_count = await menu.roles.all().count() if hasattr(menu, 'roles') else 0
+            
             menu_dict["stats"] = {
-                "children_count": await Menu.filter(parent_id=menu.id).count(),
-                "roles_count": await menu.role_menus.all().count()
+                "children_count": children_count,
+                "roles_count": roles_count
             }
             
             # 添加层级信息
@@ -592,7 +598,7 @@ async def get_menu_tree(
         # 构建查询条件
         q = Q()
         if not include_hidden:
-            q &= Q(is_hidden=False)
+            q &= Q(visible=True)  # 使用visible字段而不是is_hidden
         
         # 获取所有菜单
         menus = await Menu.filter(q).order_by("parent_id", "order_num").all()
@@ -603,9 +609,13 @@ async def get_menu_tree(
             menu_dict = await menu.to_dict()
             
             # 添加增强信息
+            children_count = await Menu.filter(parent_id=menu.id).count()
+            # 统计关联的角色数量
+            roles_count = await menu.roles.all().count() if hasattr(menu, 'roles') else 0
+            
             menu_dict["stats"] = {
-                "children_count": await Menu.filter(parent_id=menu.id).count(),
-                "roles_count": await menu.role_menus.all().count()
+                "children_count": children_count,
+                "roles_count": roles_count
             }
             menu_dict["level"] = await get_menu_level(menu.id)
             
