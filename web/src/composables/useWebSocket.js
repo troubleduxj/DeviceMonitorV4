@@ -238,7 +238,9 @@ export function useWebSocket(url, options = {}) {
 export function useDeviceWebSocket(options = {}) {
   const {
     deviceType = '',
-    deviceCodes = null, // 新增：设备编码列表
+    deviceCodes = null, // 设备编码列表
+    page = ref(1), // 新增：当前页码
+    pageSize = ref(20), // 新增：每页数量
     onDataUpdate = () => {},
     ...wsOptions
   } = options
@@ -266,27 +268,32 @@ export function useDeviceWebSocket(options = {}) {
       params.append('token', token)
     }
 
-    if (deviceType) {
-      params.append('type_code', deviceType)
+    // 支持响应式的 deviceType (ref)
+    const currentDeviceType = deviceType?.value !== undefined ? deviceType.value : deviceType
+    if (currentDeviceType) {
+      params.append('type_code', currentDeviceType)
     }
 
-    // 移除 device_codes 参数，以避免后端问题并保持单一稳定连接
-    // const currentDeviceCodes = computed(() => deviceCodes?.value || deviceCodes)
-    // const codes = currentDeviceCodes.value
-    // if (codes && Array.isArray(codes) && codes.length > 0) {
-    //   params.append('device_codes', codes.join(','))
-    // }
-
-    // 使用固定的page_size值，与后端默认值保持一致
-    params.append('page_size', '100') // 固定page_size，足够处理大部分场景
+    // 支持响应式的 page 和 pageSize (ref)
+    const currentPage = page?.value !== undefined ? page.value : (page || 1)
+    const currentPageSize = pageSize?.value !== undefined ? pageSize.value : (pageSize || 20)
+    
+    console.log('🔗 [buildWebSocketUrl] 构建URL时的参数:')
+    console.log('  - page参数类型:', typeof page, ', 是否是ref:', page?.value !== undefined)
+    console.log('  - page.value:', page?.value)
+    console.log('  - 最终使用的page:', currentPage)
+    console.log('  - pageSize.value:', pageSize?.value)
+    console.log('  - 最终使用的pageSize:', currentPageSize)
+    
+    params.append('page', currentPage)
+    params.append('page_size', currentPageSize)
 
     if (params.toString()) {
       wsUrl += '?' + params.toString()
     }
 
-    console.log('WebSocket连接URL:', wsUrl)
-    console.log('使用token:', token ? '已设置' : '未设置')
-    // console.log('设备编码列表:', codes) // codes is not defined after refactoring
+    console.log('🔗 [buildWebSocketUrl] 最终URL:', wsUrl)
+    console.log('🔗 [buildWebSocketUrl] 分页参数:', { page: currentPage, pageSize: currentPageSize })
 
     return wsUrl
   }
@@ -297,7 +304,7 @@ export function useDeviceWebSocket(options = {}) {
   // 初始URL
   const initialUrl = buildWebSocketUrl()
 
-  const { isConnected, isConnecting, error, connect, disconnect, send, reconnect } = useWebSocket(
+  const wsInstance = useWebSocket(
     initialUrl,
     {
       ...wsOptions,
@@ -306,11 +313,24 @@ export function useDeviceWebSocket(options = {}) {
         wsOptions.onMessage?.(data)
       },
       onOpen: (event) => {
-        console.log('WebSocket连接已建立，设备类型:', deviceType || '全部')
+        const currentType = deviceType?.value !== undefined ? deviceType.value : deviceType
+        console.log('WebSocket连接已建立，设备类型:', currentType || '全部')
         wsOptions.onOpen?.(event)
       },
     }
   )
+
+  const { isConnected, isConnecting, error, connect, disconnect, send } = wsInstance
+  
+  // 重写reconnect函数，使用新的URL
+  const reconnect = () => {
+    disconnect()
+    setTimeout(() => {
+      const newUrl = buildWebSocketUrl()
+      console.log('重新连接WebSocket，新URL:', newUrl)
+      connect(newUrl)
+    }, 1000)
+  }
 
   // 防抖定时器
   let reconnectTimer = null
@@ -324,9 +344,12 @@ export function useDeviceWebSocket(options = {}) {
     try {
       if (data.type === 'realtime_data') {
         // 更新设备实时数据
-        const items = data.data?.data || data.data?.items || data.data || []
+        // 传递完整的data对象，包含items、total、page、page_size等分页信息
+        const dataPayload = data.data || {}
+        const items = dataPayload.items || dataPayload.data || dataPayload || []
         deviceData.value = items
-        onDataUpdate(items)
+        // 传递完整的分页数据对象，而不仅仅是items数组
+        onDataUpdate(dataPayload)
       } else if (data.type === 'device_summary') {
         // 更新设备状态汇总
         deviceSummary.value = data.data || {}

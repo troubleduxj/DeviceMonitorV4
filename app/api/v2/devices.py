@@ -2507,6 +2507,7 @@ class ConnectionManagerV2:
         device_code: Optional[str] = None,
         device_codes: Optional[List[str]] = None,
         type_code: Optional[str] = None,
+        page: int = 1,
         page_size: int = 20,
     ):
         """建立WebSocket连接"""
@@ -2515,13 +2516,21 @@ class ConnectionManagerV2:
 
         # 创建设备查询参数
         from app.schemas.devices import DeviceRealtimeQuery
+        
+        # 如果没有指定type_code，默认使用welding（焊接设备）
+        # 不要使用"all"，因为这会查询所有设备类型，造成性能问题
+        effective_type_code = type_code or "welding"
+        
         query = DeviceRealtimeQuery(
             device_code=device_code,
             device_codes=device_codes,
-            type_code=type_code or "welding",
-            page=1,
+            type_code=effective_type_code,
+            page=page,
             page_size=page_size,
+            paged=True,  # 启用分页查询
         )
+        
+        logger.info(f"WebSocket订阅参数: type_code={effective_type_code}, page={page}, page_size={page_size}, device_codes={device_codes}")
 
         self.device_subscriptions[websocket] = {
             "device_code": device_code,
@@ -2539,6 +2548,10 @@ class ConnectionManagerV2:
         """断开WebSocket连接"""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        
+        type_code = None
+        device_info = "未知"
+        
         if websocket in self.device_subscriptions:
             subscription = self.device_subscriptions[websocket]
             type_code = subscription.get("type_code")
@@ -2570,7 +2583,8 @@ async def websocket_realtime_data_v2(
     device_code: Optional[str] = Query(None, description="设备编号，不提供则订阅所有设备"),
     device_codes: Optional[str] = Query(None, description="设备编号列表，逗号分隔，用于订阅指定设备"),
     type_code: Optional[str] = Query(None, description="设备类型代码，不提供则默认为焊接设备"),
-    page_size: int = Query(20, description="每次推送数据量", ge=1, le=2000),
+    page: int = Query(1, description="页码", ge=1),
+    page_size: int = Query(20, description="每页数量", ge=1, le=100),
     token: Optional[str] = Query(None, description="JWT认证token"),
 ):
     """WebSocket实时数据推送端点 V2版本"""
@@ -2591,9 +2605,12 @@ async def websocket_realtime_data_v2(
             await websocket.close(code=1008, reason="设备数量超过限制（最大100个）")
             return
 
-    await manager_v2.connect(websocket, device_code, device_codes_list, type_code, page_size)
+    await manager_v2.connect(websocket, device_code, device_codes_list, type_code, page, page_size)
     
     try:
+        # 立即推送一次初始数据
+        first_push = True
+        
         while True:
             try:
                 # 获取订阅信息
@@ -2603,38 +2620,84 @@ async def websocket_realtime_data_v2(
 
                 query = subscription["query"]
 
-                # 如果没有指定具体的设备编码，说明是通用订阅，获取所有设备的数据
+                # 确保type_code参数正确传递
+                # 如果没有指定具体的设备编码，获取该类型的所有设备（但限制在指定类型内）
                 if not query.device_code and not query.device_codes:
-                    query.page_size = 10000  # 获取所有设备
-                    query.page = 1
+                    # 使用分页查询，避免一次性获取过多数据
+                    # ⚠️ 不要覆盖query.page，它已经在连接时由用户指定
+                    # query.page = 1  # ❌ 不要强制设置为1
+                    # 注意：query.type_code 和 query.page 应该已经在连接时设置好了
+                    logger.debug(f"WebSocket查询参数: type_code={query.type_code}, page={query.page}, page_size={query.page_size}")
 
                 # 获取设备实时数据
                 from app.controllers.device_data import DeviceDataController
                 controller = DeviceDataController()
-                result = await controller.get_device_realtime_data(query)
+                
+                try:
+                    result = await controller.get_device_realtime_data(query)
+                    
+                    # 检查是否有错误信息
+                    if isinstance(result, dict) and "error" in result:
+                        # 发送错误消息，但不关闭连接
+                        logger.warning(f"查询返回错误: {result.get('error')}")
+                        error_message = json.dumps(
+                            {
+                                "type": "error",
+                                "timestamp": datetime.now().isoformat(),
+                                "message": result.get("error"),
+                                "data": result,
+                                "version": "v2"
+                            },
+                            ensure_ascii=False,
+                        )
+                        await manager_v2.send_personal_message(error_message, websocket)
+                    else:
+                        # 发送正常数据（使用V2格式，包含分页信息）
+                        message = json.dumps(
+                            {
+                                "type": "realtime_data",
+                                "timestamp": datetime.now().isoformat(),
+                                "device_type": subscription.get("type_code", "welding"),
+                                "data": {
+                                    "items": result.get("items", []),
+                                    "total": result.get("total", 0),
+                                    "page": query.page,
+                                    "page_size": query.page_size,
+                                },
+                                "version": "v2",  # 标识V2版本
+                            },
+                            ensure_ascii=False,
+                            default=str,
+                        )
+                        await manager_v2.send_personal_message(message, websocket)
 
-                # 发送数据（使用V2格式）
-                message = json.dumps(
-                    {
-                        "type": "realtime_data",
-                        "timestamp": datetime.now().isoformat(),
-                        "device_type": subscription.get("type_code", "welding"),
-                        "data": result,
-                        "version": "v2",  # 标识V2版本
-                    },
-                    ensure_ascii=False,
-                    default=str,
-                )
-
-                await manager_v2.send_personal_message(message, websocket)
-
+                    # 第一次推送后立即进入正常循环，后续等待60秒
+                    if first_push:
+                        first_push = False
+                        logger.info(f"WebSocket V2初始数据已推送，设备类型: {subscription.get('type_code', 'welding')}")
+                    
+                except HTTPException as http_ex:
+                    # 捕获HTTP异常，发送错误消息而不关闭连接
+                    logger.error(f"WebSocket查询数据失败(HTTP): {http_ex.detail}")
+                    error_message = json.dumps(
+                        {
+                            "type": "error",
+                            "timestamp": datetime.now().isoformat(),
+                            "message": str(http_ex.detail),
+                            "code": http_ex.status_code,
+                            "version": "v2"
+                        },
+                        ensure_ascii=False,
+                    )
+                    await manager_v2.send_personal_message(error_message, websocket)
+                
                 # 等待60秒（按用户要求的查询频率）
                 await asyncio.sleep(60)
 
             except WebSocketDisconnect:
                 break
             except Exception as e:
-                logger.error(f"WebSocket V2数据推送错误: {str(e)}")
+                logger.error(f"WebSocket V2数据推送错误: {str(e)}", exc_info=True)
                 error_message = json.dumps(
                     {
                         "type": "error", 

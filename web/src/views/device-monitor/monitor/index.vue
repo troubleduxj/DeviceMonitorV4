@@ -141,7 +141,7 @@
     </NCard>
 
     <!-- 卡片视图 -->
-    <div v-if="viewMode === 'card'" class="device-grid">
+    <div v-if="viewMode === 'card'">
       <FastPermissionWrapper
         :data="filteredDevices"
         :loading="loading"
@@ -149,30 +149,34 @@
         permission-name="设备监测数据"
         empty-description="当前没有设备监测数据，请检查设备连接状态或联系管理员"
         loading-text="正在加载设备监测数据..."
+        :show-create="false"
         @refresh="refreshData"
         @contact="handleContactAdmin"
       >
         <template #default="{ data, loading: dataLoading }">
-          <!-- 骨架屏加载状态 -->
-          <template v-if="dataLoading">
-            <!-- 加载进度提示 -->
-            <div v-if="loadingProgress" class="col-span-full mb-4 text-center">
-              <NSpin size="small" class="mr-2" />
-              <span class="text-gray-600">{{ loadingProgress }}</span>
-            </div>
-            <DeviceCardSkeleton v-for="n in 20" :key="n" />
-          </template>
+          <!-- 加载进度提示 -->
+          <div v-if="loadingProgress && dataLoading" class="mb-4 text-center">
+            <NSpin size="small" class="mr-2" />
+            <span class="text-gray-600">{{ loadingProgress }}</span>
+          </div>
+          
+          <!-- 设备网格容器 -->
+          <div class="device-grid">
+            <!-- 骨架屏加载状态 -->
+            <template v-if="dataLoading">
+              <DeviceCardSkeleton v-for="n in skeletonCount" :key="n" />
+            </template>
 
-          <!-- 真实设备卡片 -->
-          <template v-else>
-        <NCard
-          v-for="device in filteredDevices"
-          :key="device.id"
-          class="device-card"
-          :class="getDeviceCardClass(device.device_status)"
-          hoverable
-          @click="showDeviceDetails(device)"
-        >
+            <!-- 真实设备卡片 -->
+            <template v-else>
+              <NCard
+                v-for="device in filteredDevices"
+                :key="device.id"
+                class="device-card"
+                :class="getDeviceCardClass(device.device_status)"
+                hoverable
+                @click="showDeviceDetails(device)"
+              >
           <!-- 设备状态指示器 -->
           <div class="status-indicator" :class="getStatusClass(device.device_status)"></div>
 
@@ -201,39 +205,12 @@
             </template>
           </div>
 
-          <!-- 设备监控数据 -->
-          <div class="monitoring-data">
-            <!-- 实时数据加载状态 -->
-            <template v-if="realtimeDataLoading">
-              <div class="data-row">
-                <span class="data-label">⚡ 预设电流:</span>
-                <NSkeleton text :repeat="1" style="width: 60px; height: 16px" />
-                <span class="data-label ml-20">🔌 预设电压:</span>
-                <NSkeleton text :repeat="1" style="width: 60px; height: 16px" />
-              </div>
-              <div class="data-row">
-                <span class="data-label">⚡ 焊接电流:</span>
-                <NSkeleton text :repeat="1" style="width: 60px; height: 16px" />
-                <span class="data-label ml-20">🔌 焊接电压:</span>
-                <NSkeleton text :repeat="1" style="width: 60px; height: 16px" />
-              </div>
-            </template>
-            <!-- 实时数据已加载 -->
-            <template v-else>
-              <div class="data-row">
-                <span class="data-label">⚡ 预设电流:</span>
-                <span class="data-value">{{ device.preset_current ?? '--' }} A</span>
-                <span class="data-label ml-20">🔌 预设电压:</span>
-                <span class="data-value">{{ device.preset_voltage ?? '--' }} V</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label">⚡ 焊接电流:</span>
-                <span class="data-value">{{ device.welding_current ?? '--' }} A</span>
-                <span class="data-label ml-20">🔌 焊接电压:</span>
-                <span class="data-value">{{ device.welding_voltage ?? '--' }} V</span>
-              </div>
-            </template>
-          </div>
+          <!-- 设备监控数据 - 动态参数展示 -->
+          <DynamicMonitoringData
+            :monitoring-fields="getDeviceFields(device.device_type)"
+            :realtime-data="getDeviceRealtimeData(device)"
+            :loading="realtimeDataLoading"
+          />
 
           <!-- 设备位置 -->
           <div class="device-location">
@@ -265,8 +242,9 @@
               分析设备
             </PermissionButton>
           </div>
-        </NCard>
-          </template>
+              </NCard>
+            </template>
+          </div>
         </template>
       </FastPermissionWrapper>
     </div>
@@ -280,6 +258,7 @@
         permission-name="设备监测数据"
         empty-description="当前没有设备监测数据，请检查设备连接状态或联系管理员"
         loading-text="正在加载设备监测数据..."
+        :show-create="false"
         @refresh="refreshData"
         @contact="handleContactAdmin"
       >
@@ -585,8 +564,8 @@
       </template>
     </NModal>
 
-    <!-- 分页组件 -->
-    <div v-if="filteredDevices.length > 0" class="pagination-container">
+    <!-- 分页组件 - 服务端分页 -->
+    <div v-if="!loading && pagination.itemCount > 0" class="pagination-container">
       <NPagination
         v-model:page="pagination.page"
         v-model:page-size="pagination.pageSize"
@@ -595,7 +574,6 @@
         :show-size-picker="pagination.showSizePicker"
         :show-quick-jumper="pagination.showQuickJumper"
         :prefix="pagination.prefix"
-        :suffix="pagination.suffix"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
       />
@@ -630,7 +608,9 @@ import TheIcon from '@/components/icon/TheIcon.vue'
 import ViewToggle from '@/components/common/ViewToggle.vue'
 import DeviceCardSkeleton from '@/components/card/DeviceCardSkeleton.vue'
 import FastPermissionWrapper from '@/components/Permission/FastPermissionWrapper.vue'
+import DynamicMonitoringData from '@/components/device/DynamicMonitoringData.vue'
 import { useDeviceWebSocket } from '@/composables/useWebSocket'
+import { useDeviceFieldStore } from '@/store/modules/device-field'
 import {
   statusOptions,
   viewOptions,
@@ -706,12 +686,16 @@ const router = useRouter()
 // Store
 const userStore = useUserStore()
 const permissionStore = usePermissionStore()
+const deviceFieldStore = useDeviceFieldStore()
 
 // 响应式数据
 const devices = ref<DeviceInfo[]>([])
 const allDevices = ref<DeviceInfo[]>([]) // 存储所有设备数据
 const loading = ref<boolean>(false)
 const loadingProgress = ref<string>('') // 加载进度提示
+// 设备字段配置缓存（用于动态参数展示）
+const deviceFieldsCache = ref<Map<string, any[]>>(new Map())
+const deviceRealtimeDataCache = ref<Map<string, any>>(new Map())
 // 移除设备列表缓存相关变量 - 现在直接从WebSocket数据构建设备对象
 const REALTIME_CACHE_DURATION = 2 * 60 * 1000 // 实时数据缓存2分钟
 const realtimeDataCache = ref<Map<string, RealtimeData>>(new Map()) // 实时数据缓存
@@ -731,7 +715,7 @@ const checkMockMode = () => {
   }
   return false
 }
-const filterType = ref<string>('welding') // 默认选择焊机类型
+const filterType = ref<string>('welding') // 默认选择焊接设备类型
 const filterStatus = ref<string | null>(null)
 const filterLocation = ref<string>('')
 const filterDeviceCode = ref<string>('') // 设备编码筛选
@@ -746,25 +730,29 @@ const error = ref<Error | null>(null) // 错误信息
 const connectionStatus = ref<ConnectionStatus>('unknown') // 连接状态
 const retryCount = ref<number>(0) // 重试次数
 const maxRetries = 3 // 最大重试次数
+const deviceCount = ref<number>(0) // 当前筛选条件下的设备总数
+const skeletonCount = ref<number>(20) // 骨架屏数量，默认20个
 
 // 分页数据
 const pagination = ref<PaginationInfo>({
   page: 1,
   pageSize: 20, // 每页显示20条记录
-  itemCount: 0,
+  itemCount: 0, // 总设备数
   showSizePicker: true,
-  pageSizes: [20, 24, 48, 96],
+  pageSizes: [20, 50, 100], // 服务端分页推荐的页面大小
   showQuickJumper: true,
-  prefix: ({ itemCount }) => `共 ${itemCount} 条`,
-  suffix: ({ startIndex, endIndex }) => `显示 ${startIndex}-${endIndex} 条`,
+  prefix: ({ itemCount }) => `共 ${itemCount} 个设备`,
 })
 
 // 设备类型选项 - 只从API获取，不使用硬编码
 const deviceTypeOptions = computed(() => {
-  return deviceTypes.value.map((type) => ({
+  // 添加"全部"选项
+  const allOption = { label: '全部设备类型', value: '' }
+  const typeOptions = deviceTypes.value.map((type) => ({
     label: type.type_name,
     value: type.type_code,
   }))
+  return [allOption, ...typeOptions]
 })
 
 // 过滤后的设备列表（用于分页计算）
@@ -783,12 +771,9 @@ const filteredAllDevices = computed(() => {
 
 // 当前页显示的设备列表
 const filteredDevices = computed(() => {
-  const filtered = filteredAllDevices.value
-  // pagination.value.itemCount = filtered.length // 注释掉，避免覆盖真实设备总数
-
-  const start = (pagination.value.page - 1) * pagination.value.pageSize
-  const end = start + pagination.value.pageSize
-  return filtered.slice(start, end)
+  // ⚠️ 服务端分页模式：devices.value已经是当前页的数据，直接返回即可
+  // 不需要再进行前端分页切片
+  return devices.value
 })
 
 // 表格列配置
@@ -933,26 +918,29 @@ function processWebSocketData(data) {
   }
 
   // 直接从WebSocket数据构建设备对象数组
+  let processedCount = 0
   const deviceList = data
     .map((item) => {
-      // 调试：检查每个WebSocket数据项的关键字段
-      console.log('WebSocket原始数据项:', item)
-      console.log('设备名称相关字段:', {
-        device_name: item.device_name,
-        name: item.name,
-        device_code: item.device_code,
-      })
-      console.log('关键字段检查:', {
-        device_code: item.device_code,
-        preset_current: item.preset_current,
-        preset_voltage: item.preset_voltage,
-        weld_current: item.weld_current,
-        weld_voltage: item.weld_voltage,
-        device_status: item.device_status,
-        team_name: item.team_name,
-        operator: item.operator,
-        material: item.material,
-      })
+      // 只输出前3个设备的调试信息
+      if (processedCount < 3) {
+        console.log('WebSocket原始数据项:', item)
+        console.log('设备名称相关字段:', {
+          device_name: item.device_name,
+          name: item.name,
+          device_code: item.device_code,
+        })
+        console.log('关键字段检查:', {
+          device_code: item.device_code,
+          preset_current: item.preset_current,
+          preset_voltage: item.preset_voltage,
+          weld_current: item.weld_current,
+          weld_voltage: item.weld_voltage,
+          device_status: item.device_status,
+          team_name: item.team_name,
+          operator: item.operator,
+          material: item.material,
+        })
+      }
 
       if (!item.device_code) {
         console.warn('WebSocket数据项缺少device_code字段:', item)
@@ -960,38 +948,40 @@ function processWebSocketData(data) {
       }
 
       // 从实时数据构建完整的设备对象
+      // 注意：后端返回的字段是 type_code，不是 device_type
+      const deviceType = item.type_code || item.device_type || filterType.value || 'welding'
+      
       const device = {
+        // 保留所有原始字段（包括动态字段）
+        ...item,
+        
         // 基础标识信息
         id: item.device_code, // 使用设备编码作为主要标识符
-        name: item.device_name || item.name || '', // 优先使用device_name，其次使用name，如果都为空则显示空字符串
-        device_type: item.device_type || item.type_code || 'welding', // 设备类型，优先使用device_type，其次使用type_code
+        name: item.device_name || item.name || '', // 优先使用device_name，其次使用name
+        device_type: deviceType, // 设备类型（统一使用device_type字段）
+        type_code: deviceType, // 保留type_code字段以兼容
         ip_address: item.ip_address || '未知', // IP地址
-        location: item.location || item.team_name || '未设置', // 位置信息，优先使用location，其次使用team_name
+        location: item.location || item.team_name || '未设置', // 位置信息
 
-        // 实时监控数据 - 包含TDengine中的所有数值字段
-        preset_current: item.preset_current,
-        preset_voltage: item.preset_voltage,
-        welding_current: item.weld_current,
-        welding_voltage: item.weld_voltage,
-        device_status: item.device_status,
-
-        // 扩展的TDengine字段
-        team_name: item.team_name,
-        lock_status: item.lock_status,
-        material: item.material,
-        wire_diameter: item.wire_diameter,
-        gas_type: item.gas_type,
-        weld_method: item.weld_method,
-        weld_control: item.weld_control,
-        staff_id: item.staff_id,
-        workpiece_id: item.workpiece_id,
-        ip_quality: item.ip_quality,
-        operator: item.operator,
-        timestamp: item.ts,
-
+        // 兼容性字段映射（焊机）
+        welding_current: item.weld_current || item.welding_current,
+        welding_voltage: item.weld_voltage || item.welding_voltage,
+        
         // 时间戳
+        timestamp: item.ts,
         created_at: item.ts || new Date().toISOString(),
         updated_at: item.ts || new Date().toISOString(),
+      }
+      
+      // 调试：输出设备类型信息（只输出前3个）
+      if (processedCount < 3) {
+        console.log('设备类型设置:', {
+          device_code: device.id,
+          from_item_type_code: item.type_code,
+          from_item_device_type: item.device_type,
+          from_filterType: filterType.value,
+          final_device_type: device.device_type
+        })
       }
 
       // 设置设备状态
@@ -1000,6 +990,7 @@ function processWebSocketData(data) {
         device.device_status = device.status
       }
 
+      processedCount++
       return device
     })
     .filter((device) => device !== null) // 过滤掉无效的设备对象
@@ -1033,6 +1024,11 @@ function processWebSocketData(data) {
   // 重新应用筛选和分页，更新devices.value
   applyFilters()
 
+  // 停止加载状态
+  loading.value = false
+  realtimeDataLoading.value = false
+  loadingProgress.value = ''
+
   // 调试：检查当前页显示的设备数据
   console.log('filteredDevices数量:', filteredDevices.value.length)
   if (filteredDevices.value.length > 0) {
@@ -1062,20 +1058,77 @@ const {
   error: wsError,
   deviceData,
   deviceSummary: wsSummary,
+  connect,
+  disconnect,
+  reconnect,
   subscribeDeviceType,
   unsubscribeDeviceType,
   requestRefresh,
 } = useDeviceWebSocket({
-  deviceCodes: currentPageDeviceCodes,
+  deviceType: filterType, // 传递设备类型筛选
+  page: computed(() => pagination.value.page), // 传递当前页码
+  pageSize: computed(() => pagination.value.pageSize), // 传递每页数量
   onDataUpdate: (data) => {
     console.log('WebSocket数据更新:', data)
-    console.log('WebSocket数据数量:', Array.isArray(data) ? data.length : 0)
-
-    // 确保数据格式正确
-    if (Array.isArray(data)) {
-      processWebSocketData(data)
+    
+    // 处理分页数据格式
+    let items = []
+    let total = 0
+    let page = 1
+    let pageSize = 20
+    
+    if (data && typeof data === 'object') {
+      // 格式1: { items: [...], total: 7203, page: 1, page_size: 20 } - 服务端分页格式
+      if (data.items && Array.isArray(data.items)) {
+        items = data.items
+        total = data.total || 0
+        page = data.page || 1
+        pageSize = data.page_size || 20
+        console.log('✅ 检测到服务端分页格式:', { total, page, pageSize, itemsCount: items.length })
+      }
+      // 格式2: 直接是数组（旧格式）
+      else if (Array.isArray(data)) {
+        items = data
+        total = data.length
+        console.log('⚠️  检测到旧格式（数组）:', { itemsCount: items.length })
+      }
+      // 格式3: 其他对象格式
+      else {
+        console.warn('⚠️  未知的数据格式:', data)
+        items = []
+        total = 0
+      }
+    } else if (Array.isArray(data)) {
+      items = data
+      total = data.length
+      console.log('⚠️  检测到旧格式（数组）:', { itemsCount: items.length })
+    }
+    
+    console.log('📊 解析后的分页数据:', { 
+      itemsCount: items.length, 
+      total, 
+      page, 
+      pageSize,
+      totalPages: total > 0 ? Math.ceil(total / pageSize) : 0
+    })
+    
+    // 更新总设备数和分页信息
+    if (total > 0) {
+      pagination.value.itemCount = total
+      console.log(`✅ 更新分页信息: 共${total}个设备，当前第${page}页，每页${pageSize}个`)
     } else {
-      console.warn('WebSocket数据格式不正确:', data)
+      console.warn('⚠️  total为0，分页控件可能不会显示')
+    }
+
+    // 处理设备数据
+    if (Array.isArray(items) && items.length > 0) {
+      processWebSocketData(items)
+    } else {
+      console.warn('WebSocket数据格式不正确或为空:', data)
+      // 如果没有数据，也要停止加载状态
+      loading.value = false
+      realtimeDataLoading.value = false
+      loadingProgress.value = ''
     }
   },
   onError: (err) => {
@@ -1092,6 +1145,49 @@ const {
 let deviceTypesCache = null
 let deviceTypesCacheTime = 0
 const DEVICE_TYPES_CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
+
+/**
+ * 获取设备数量统计
+ */
+async function getDeviceCount(typeCode: string) {
+  try {
+    console.log(`获取设备类型 ${typeCode} 的设备数量...`)
+    
+    // 调用设备列表API，只获取总数，不获取详细数据
+    const response = await deviceV2Api.devices.list({
+      device_type: typeCode,
+      page: 1,
+      page_size: 1, // 只获取1条数据，减少数据传输
+    })
+    
+    if (response && response.data) {
+      const total = response.data.total || 0
+      console.log(`设备类型 ${typeCode} 的设备总数: ${total}`)
+      return total
+    }
+    
+    return 0
+  } catch (error) {
+    console.error('获取设备数量失败:', error)
+    return 0
+  }
+}
+
+/**
+ * 更新骨架屏数量
+ */
+async function updateSkeletonCount() {
+  const typeCode = filterType.value || 'welding'
+  const count = await getDeviceCount(typeCode)
+  
+  deviceCount.value = count
+  
+  // 计算当前页应该显示的骨架屏数量
+  const currentPageSize = pagination.value.pageSize
+  skeletonCount.value = Math.min(count, currentPageSize)
+  
+  console.log(`更新骨架屏数量: ${skeletonCount.value} (总设备数: ${count}, 每页: ${currentPageSize})`)
+}
 
 /**
  * 加载设备类型列表 - 性能优化版本
@@ -1372,6 +1468,39 @@ async function loadDevices() {
 }
 
 /**
+ * 获取设备类型的字段配置（用于动态参数展示）
+ */
+function getDeviceFields(deviceType: string) {
+  if (!deviceType) return []
+  
+  // 从缓存获取
+  const cached = deviceFieldsCache.value.get(deviceType)
+  if (cached) {
+    return cached
+  }
+  
+  // 如果缓存中没有，从 store 获取
+  deviceFieldStore.getMonitoringFields(deviceType).then((fields) => {
+    deviceFieldsCache.value.set(deviceType, fields)
+  }).catch((error) => {
+    console.error(`获取设备类型 ${deviceType} 的字段配置失败:`, error)
+  })
+  
+  return []
+}
+
+/**
+ * 获取设备的实时数据（用于动态参数展示）
+ */
+function getDeviceRealtimeData(device: any) {
+  if (!device) return {}
+  
+  // 从设备对象中提取实时数据
+  // 这里返回整个设备对象，让 DynamicMonitoringData 组件根据字段配置提取需要的数据
+  return device
+}
+
+/**
  * 根据设备数据判断设备状态
  */
 function getDeviceStatus(deviceData) {
@@ -1483,22 +1612,39 @@ function generateMockDevices() {
  * 刷新数据
  */
 function refreshData(forceReload = false) {
+  console.log('刷新数据，forceReload:', forceReload)
+  
+  // 设置加载状态
+  loading.value = true
+  realtimeDataLoading.value = true
+  loadingProgress.value = '正在刷新数据...'
+  
   // 如果强制重新加载，清除缓存
   if (forceReload) {
     clearRealtimeCache()
   }
 
-  // 重构后的刷新逻辑：仅依赖WebSocket数据
-  if (forceReload || allDevices.value.length === 0) {
-    console.log('执行完整数据重新加载 - 等待WebSocket数据')
-    // 清空当前设备列表，等待WebSocket数据重新构建
-    allDevices.value = []
-    devices.value = []
-    // WebSocket会自动推送数据并通过processWebSocketData重新构建设备列表
-  } else {
-    console.log('数据刷新 - 依赖WebSocket实时推送')
-    // 现在完全依赖WebSocket数据，无需手动调用API
-  }
+  // 清空当前设备列表
+  allDevices.value = []
+  devices.value = []
+  
+  // 重新建立WebSocket连接以获取最新数据
+  console.log('重新建立WebSocket连接以刷新数据')
+  disconnect()
+  
+  setTimeout(() => {
+    reconnect()
+    
+    // 设置超时，如果10秒内没有收到数据，停止加载状态
+    setTimeout(() => {
+      if (allDevices.value.length === 0) {
+        loading.value = false
+        realtimeDataLoading.value = false
+        loadingProgress.value = ''
+        message.warning('刷新数据超时，请检查WebSocket连接')
+      }
+    }, 10000)
+  }, 100)
 }
 
 /**
@@ -1507,9 +1653,29 @@ function refreshData(forceReload = false) {
 function getFilteredDevices() {
   let filtered = [...allDevices.value]
 
+  // 调试：输出筛选前的设备信息
+  console.log('筛选前设备总数:', filtered.length)
+  if (filtered.length > 0) {
+    console.log('第一个设备的device_type:', filtered[0].device_type)
+    console.log('当前filterType.value:', filterType.value)
+  }
+
   // 按设备类型筛选
   if (filterType.value) {
-    filtered = filtered.filter((device) => device.device_type === filterType.value)
+    const beforeFilter = filtered.length
+    filtered = filtered.filter((device) => {
+      const match = device.device_type === filterType.value
+      if (!match && beforeFilter <= 5) {
+        // 只在设备数量少时输出详细信息，避免日志过多
+        console.log('设备类型不匹配:', {
+          device_code: device.device_code || device.id,
+          device_type: device.device_type,
+          expected: filterType.value
+        })
+      }
+      return match
+    })
+    console.log(`设备类型筛选: ${beforeFilter} -> ${filtered.length}`)
   }
 
   // 按设备状态筛选
@@ -1561,14 +1727,17 @@ function getFilteredDevices() {
 function applyFilters() {
   const filtered = getFilteredDevices()
 
-  // 计算分页
-  const startIndex = (pagination.value.page - 1) * pagination.value.pageSize
-  const endIndex = startIndex + pagination.value.pageSize
-
-  devices.value = filtered.slice(startIndex, endIndex)
-  pagination.value.itemCount = filtered.length
+  // ⚠️ 服务端分页模式：后端已经返回了当前页的数据，不需要再进行前端分页切片
+  // 直接使用筛选后的结果作为当前页数据
+  devices.value = filtered
+  
+  // ⚠️ 注意：在服务端分页模式下，不要覆盖itemCount
+  // itemCount应该由WebSocket返回的total字段设置，而不是前端筛选后的数量
+  // pagination.value.itemCount = filtered.length  // ❌ 不要覆盖
 
   console.log('筛选结果:', filtered.length, '个设备，当前页:', devices.value.length, '个设备')
+  console.log('总设备数(itemCount):', pagination.value.itemCount, '（由服务端返回，不应被覆盖）')
+  console.log('当前页码:', pagination.value.page, '每页数量:', pagination.value.pageSize)
 }
 
 /**
@@ -1583,9 +1752,21 @@ function handleFilterChange() {
 }
 
 // 监听设备类型变化，重新订阅WebSocket数据
-watch(filterType, (newType, oldType) => {
-  if (newType !== oldType && newType) {
+watch(filterType, async (newType, oldType) => {
+  if (newType !== oldType) {
     console.log('设备类型变化:', { from: oldType, to: newType })
+
+    // 重置到第一页
+    pagination.value.page = 1
+    pagination.value.itemCount = 0
+
+    // 设置加载状态，显示骨架屏
+    loading.value = true
+    realtimeDataLoading.value = true
+    loadingProgress.value = '正在切换设备类型...'
+
+    // 更新骨架屏数量
+    await updateSkeletonCount()
 
     // 检查Mock模式
     const mockEnabled = checkMockMode()
@@ -1595,16 +1776,31 @@ watch(filterType, (newType, oldType) => {
       console.log('🎭 Mock模式：重新加载设备数据')
       loadDevicesByHttp()
     } else {
-      // WebSocket模式：重新订阅
-      console.log('重新订阅WebSocket数据')
+      // WebSocket模式：重新建立连接以切换设备类型
+      console.log('🔄 重新建立WebSocket连接，切换设备类型:', newType || 'welding')
       
-      // 取消订阅旧类型
-      if (oldType) {
-        unsubscribeDeviceType(oldType)
-      }
-
-      // 订阅新类型
-      subscribeDeviceType(newType)
+      // 清空当前设备数据，避免显示旧数据
+      allDevices.value = []
+      devices.value = []
+      
+      // 断开旧连接
+      disconnect()
+      
+      // 等待一小段时间确保连接完全断开
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // 重新建立连接（useDeviceWebSocket会使用新的filterType和page值）
+      reconnect()
+      
+      // 设置超时，如果10秒内没有收到数据，停止加载状态
+      setTimeout(() => {
+        if (allDevices.value.length === 0) {
+          loading.value = false
+          realtimeDataLoading.value = false
+          loadingProgress.value = ''
+          console.warn('切换设备类型后未收到数据')
+        }
+      }, 10000)
     }
   }
 })
@@ -1613,7 +1809,7 @@ watch(filterType, (newType, oldType) => {
  * 重置筛选条件
  */
 function resetFilters() {
-  filterType.value = 'welding'
+  filterType.value = '' // 重置为显示所有设备类型
   filterStatus.value = ''
   filterLocation.value = ''
   filterDeviceCode.value = ''
@@ -1686,31 +1882,58 @@ function getConnectionStatusColor() {
 }
 
 /**
- * 分页处理函数
+ * 分页处理函数 - 服务端分页
  */
 function handlePageChange(page) {
+  console.log('🔄 [分页] 切换到第', page, '页')
+  console.log('🔄 [分页] 当前pagination.value.page:', pagination.value.page)
+  console.log('🔄 [分页] 当前pagination.value.pageSize:', pagination.value.pageSize)
+  
   pagination.value.page = page
-  applyFilters() // 重新应用筛选和分页，这将自动触发currentPageDeviceCodes的更新和WebSocket的重连
-
-  // 异步预加载下一页数据
+  
+  console.log('🔄 [分页] 更新后pagination.value.page:', pagination.value.page)
+  
+  // 设置加载状态
+  loading.value = true
+  realtimeDataLoading.value = true
+  loadingProgress.value = `正在加载第${page}页...`
+  
+  // 清空当前设备列表
+  allDevices.value = []
+  devices.value = []
+  
+  console.log('🔄 [分页] 准备断开WebSocket连接')
+  
+  // 重新连接WebSocket获取新页数据
+  disconnect()
+  
   setTimeout(() => {
-    preloadNextPageData()
+    console.log('🔄 [分页] 准备重新连接WebSocket，page=', pagination.value.page, ', pageSize=', pagination.value.pageSize)
+    reconnect()
+    
+    // 设置超时保护
+    setTimeout(() => {
+      if (allDevices.value.length === 0) {
+        console.error('❌ [分页] 加载数据超时，allDevices为空')
+        loading.value = false
+        realtimeDataLoading.value = false
+        loadingProgress.value = ''
+        message.warning('加载数据超时，请检查网络连接')
+      } else {
+        console.log('✅ [分页] 数据加载成功，allDevices数量:', allDevices.value.length)
+      }
+    }, 10000)
   }, 100)
 }
 
 function handlePageSizeChange(pageSize) {
+  console.log('每页数量改为', pageSize)
+  
   pagination.value.pageSize = pageSize
   pagination.value.page = 1 // 重置到第一页
-
-  // 清除预加载缓存，因为页面大小改变了
-  preloadedPages.value.clear()
-
-  applyFilters() // 重新应用筛选和分页，这将自动触发currentPageDeviceCodes的更新和WebSocket的重连
-
-  // 异步预加载下一页数据
-  setTimeout(() => {
-    preloadNextPageData()
-  }, 100)
+  
+  // 重新加载数据
+  handlePageChange(1)
 }
 
 /**
@@ -1876,7 +2099,7 @@ onMounted(async () => {
     }
 
     // 并行加载设备类型
-    const deviceTypesPromise = loadDeviceTypes().then(() => {
+    const deviceTypesPromise = loadDeviceTypes().then(async () => {
       // 设备类型加载完成后，更新筛选类型
       if (!filterType.value && deviceTypes.value.length > 0) {
         const weldingType = deviceTypes.value.find((type) => type.type_code === 'welding')
@@ -1893,6 +2116,20 @@ onMounted(async () => {
 
       const typeLoadTime = performance.now()
       console.log(`设备类型加载完成，耗时: ${(typeLoadTime - startTime).toFixed(2)}ms`)
+      
+      // 获取设备数量并更新骨架屏
+      loadingProgress.value = '正在获取设备数量...'
+      await updateSkeletonCount()
+      
+      // 预加载所有设备类型的字段配置
+      console.log('开始预加载设备字段配置...')
+      const deviceTypeCodes = deviceTypes.value.map(type => type.type_code)
+      try {
+        await deviceFieldStore.batchGetMonitoringFields(deviceTypeCodes)
+        console.log('设备字段配置预加载完成')
+      } catch (error) {
+        console.error('预加载设备字段配置失败:', error)
+      }
     })
 
     // 等待设备类型加载完成（但不阻塞WebSocket连接）
