@@ -2194,240 +2194,174 @@ onUnmounted(() => {
   }
 }
 
-/* 设备网格布局 - 美化版本 */
+/* 设备网格布局 - 紧凑简洁版本 */
 .device-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 28px;
-  margin-top: 24px;
-  padding: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+  padding: 2px;
 }
 
 @media (max-width: 1400px) {
   .device-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
   }
 }
 
 @media (max-width: 768px) {
   .device-grid {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 14px;
   }
 }
 
-/* 设备卡片样式 - 美化版本 */
+/* 设备卡片样式 - 紧凑简洁版本 */
 .device-card {
   position: relative;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-left: 4px solid #e0e0e0;
-  border-radius: 16px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-left: 3px solid #e0e0e0;
+  border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.device-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.device-card:hover::before {
-  opacity: 1;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .device-card :deep(.n-card__content) {
-  padding: 18px !important;
+  padding: 12px !important;
 }
 
 .device-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-  border-left-width: 6px;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  border-left-width: 4px;
 }
 
 .device-card--welding {
-  border-left-color: #10b981; /* 焊接 - 现代绿色 */
-  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+  border-left-color: #10b981;
 }
 
 .device-card--welding:hover {
-  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.15);
 }
 
 .device-card--standby {
-  border-left-color: #f59e0b; /* 待机 - 现代橙色 */
-  background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+  border-left-color: #f59e0b;
 }
 
 .device-card--standby:hover {
-  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.15);
 }
 
 .device-card--fault {
-  border-left-color: #ef4444; /* 报警 - 现代红色 */
-  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+  border-left-color: #ef4444;
 }
 
 .device-card--fault:hover {
-  box-shadow: 0 12px 32px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.15);
 }
 
 .device-card--inactive {
-  border-left-color: #6b7280; /* 关机 - 现代灰色 */
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  opacity: 0.85;
+  border-left-color: #9ca3af;
+  opacity: 0.8;
 }
 
 .device-card--inactive:hover {
   opacity: 1;
-  box-shadow: 0 12px 32px rgba(107, 114, 128, 0.2);
+  box-shadow: 0 6px 16px rgba(107, 114, 128, 0.12);
 }
 
-/* 状态指示器 - 美化版本 */
+/* 状态指示器 - 紧凑版本 */
 .status-indicator {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 12px;
-  height: 12px;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   z-index: 10;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.status-indicator::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: inherit;
-  opacity: 0.3;
 }
 
 .status-indicator--welding {
-  background-color: #10b981; /* 焊接 - 现代绿色闪烁 */
+  background-color: #10b981;
   animation: pulse-green 2s infinite;
 }
 
 .status-indicator--standby {
-  background-color: #f59e0b; /* 待机 - 现代橙色闪烁 */
+  background-color: #f59e0b;
   animation: pulse-orange 2s infinite;
 }
 
 .status-indicator--fault {
-  background-color: #ef4444; /* 报警 - 现代红色闪烁 */
+  background-color: #ef4444;
   animation: pulse-red 2s infinite;
 }
 
 .status-indicator--inactive {
-  background-color: #6b7280; /* 关机 - 现代灰色无闪烁 */
+  background-color: #9ca3af;
   animation: none;
-  opacity: 0.6;
 }
 
-/* 绿色闪烁动画 - 待机/焊接状态 - 美化版本 */
+/* 状态闪烁动画 - 简洁版本 */
 @keyframes pulse-green {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.2), 0 2px 12px rgba(16, 185, 129, 0.4);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
 }
 
-/* 橙色闪烁动画 - 维护状态 - 美化版本 */
 @keyframes pulse-orange {
-  0% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.8), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.2), 0 2px 12px rgba(245, 158, 11, 0.4);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2); }
 }
 
-/* 红色闪烁动画 - 报警/故障状态 - 美化版本 */
 @keyframes pulse-red {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.2), 0 2px 12px rgba(239, 68, 68, 0.4);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2); }
 }
 
-/* 设备头部信息 - 美化版本 */
+/* 设备头部信息 - 紧凑版本 */
 .device-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .device-info {
   flex: 1;
+  min-width: 0;
 }
 
 .device-name {
-  font-size: 17px;
-  font-weight: 700;
-  margin: 0 0 6px 0;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
   color: #1f2937;
-  letter-spacing: -0.02em;
   line-height: 1.3;
-  transition: color 0.2s ease;
-}
-
-.device-card:hover .device-name {
-  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .device-id {
-  font-size: 12px;
+  font-size: 11px;
   color: #6b7280;
   margin: 0;
-  font-weight: 500;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-  background: rgba(0, 0, 0, 0.04);
-  padding: 2px 8px;
-  border-radius: 6px;
-  display: inline-block;
 }
 
 .device-type {
-  margin-left: 12px;
-  margin-top: 2px;
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 
 .device-type :deep(.n-tag) {
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 /* 设备状态 */
@@ -2476,32 +2410,13 @@ onUnmounted(() => {
   transition: all 0.3s ease;
 }
 
-/* 设备位置 - 美化版本 */
+/* 设备位置 - 紧凑版本 */
 .device-location {
   display: flex;
   align-items: center;
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.device-location:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: #374151;
-}
-
-.device-location .icon {
+  font-size: 11px;
   color: #9ca3af;
-  transition: color 0.2s ease;
-}
-
-.device-location:hover .icon {
-  color: #6b7280;
+  margin-bottom: 8px;
 }
 
 /* 设备操作 - 美化版本 */

@@ -314,131 +314,158 @@ function getFieldColor(field: DeviceField): string {
 
 <style scoped lang="scss">
 .grouped-monitoring-data {
-  padding: 8px 0;
+  padding: 12px 0;
 }
 
 .loading-skeleton {
-  padding: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+  border-radius: 12px;
 }
 
-// 轮播头部
+// 轮播头部 - 美化版本
 .carousel-header {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .group-navigation {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(24, 144, 255, 0.08) 0%, rgba(24, 144, 255, 0.03) 100%);
-  border: 1px solid rgba(24, 144, 255, 0.15);
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
 }
 
 .nav-btn {
-  padding: 4px;
-  min-width: 32px;
-  transition: all 0.2s;
+  padding: 6px;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.8);
   
   &:not(:disabled):hover {
-    transform: scale(1.1);
+    transform: scale(1.15);
+    background: rgba(59, 130, 246, 0.15);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
   }
   
   &:disabled {
-    opacity: 0.3;
+    opacity: 0.25;
     cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.03);
   }
 }
 
 .group-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: #1f2937;
   flex: 1;
   justify-content: center;
 
   .group-icon {
-    font-size: 18px;
-    animation: pulse 2s ease-in-out infinite;
+    font-size: 22px;
+    animation: iconBounce 2s ease-in-out infinite;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
   }
 
   .group-title {
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .group-count {
-    font-size: 12px;
-    color: #666;
-    font-weight: 400;
-    background: rgba(0, 0, 0, 0.05);
-    padding: 2px 8px;
-    border-radius: 12px;
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 4px 10px;
+    border-radius: 20px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.05);
   }
 }
 
-@keyframes pulse {
+@keyframes iconBounce {
   0%, 100% {
-    transform: scale(1);
+    transform: scale(1) translateY(0);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.1) translateY(-2px);
   }
 }
 
-// 轮播容器
+// 轮播容器 - 美化版本
 .carousel-container {
   position: relative;
-  padding-bottom: 32px;
+  padding-bottom: 36px;
 }
 
 .monitoring-carousel {
   :deep(.n-carousel__dots) {
-    bottom: 0;
-    gap: 8px;
+    bottom: 4px;
+    gap: 10px;
   }
   
   :deep(.n-carousel__dot) {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.15);
-    transition: all 0.3s;
+    background: rgba(0, 0, 0, 0.12);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
   :deep(.n-carousel__dot--active) {
-    background: #1890ff;
-    width: 24px;
-    border-radius: 4px;
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    width: 28px;
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   }
 
   :deep(.n-carousel__slides) {
-    min-height: 140px;
+    min-height: 150px;
   }
 }
 
 .carousel-item {
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.01);
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 8px;
-  min-height: 120px;
-  transition: all 0.3s;
+  border-radius: 14px;
+  min-height: 130px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   
   &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    border-color: rgba(24, 144, 255, 0.2);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-color: rgba(59, 130, 246, 0.25);
+    transform: translateY(-2px);
   }
 }
 
 .field-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .data-row {
@@ -447,39 +474,45 @@ function getFieldColor(field: DeviceField): string {
   align-items: center;
   font-size: 13px;
   line-height: 1.6;
-  padding: 6px 8px;
-  border-radius: 4px;
-  transition: all 0.2s;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-
-  &:last-child {
-    border-bottom: none;
-  }
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid transparent;
 
   &:hover {
-    background: rgba(24, 144, 255, 0.04);
-    transform: translateX(2px);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.04) 100%);
+    border-color: rgba(59, 130, 246, 0.15);
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
   }
 }
 
 .data-label {
-  color: #666;
-  font-weight: 500;
+  color: #4b5563;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
 
   .field-icon {
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
   }
 }
 
 .data-value {
-  font-weight: 600;
-  font-size: 14px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  transition: all 0.3s;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  transition: all 0.3s ease;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+  letter-spacing: -0.02em;
 }
 
 .empty-state {
@@ -487,18 +520,36 @@ function getFieldColor(field: DeviceField): string {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 16px;
-  color: #999;
+  padding: 48px 20px;
+  color: #9ca3af;
   text-align: center;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.01) 100%);
+  border-radius: 16px;
+  border: 2px dashed rgba(0, 0, 0, 0.08);
 
   .empty-icon {
-    margin-bottom: 12px;
-    opacity: 0.4;
+    margin-bottom: 16px;
+    opacity: 0.5;
+    color: #d1d5db;
+    animation: emptyPulse 3s ease-in-out infinite;
   }
 
   .empty-text {
-    font-size: 13px;
-    opacity: 0.6;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.7;
+    letter-spacing: 0.01em;
+  }
+}
+
+@keyframes emptyPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.7;
   }
 }
 
@@ -588,24 +639,85 @@ function getFieldColor(field: DeviceField): string {
   }
 }
 
-// 动画效果
+// 动画效果 - 美化版本
 .carousel-item {
-  animation: fadeInUp 0.4s ease-out;
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(24px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-// 数据值过渡动画
+// 数据行入场动画
+.data-row {
+  animation: slideInRight 0.4s ease-out;
+  animation-fill-mode: both;
+  
+  @for $i from 1 through 10 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.05}s;
+    }
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+// 数据值闪烁效果（数据更新时）
 .data-value {
   transition: all 0.3s ease;
+  
+  &.updated {
+    animation: valueFlash 0.6s ease;
+  }
+}
+
+@keyframes valueFlash {
+  0% {
+    background: rgba(59, 130, 246, 0.3);
+    transform: scale(1.05);
+  }
+  100% {
+    background: rgba(0, 0, 0, 0.03);
+    transform: scale(1);
+  }
+}
+
+// 悬浮时的光效
+.carousel-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.5), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: 14px 14px 0 0;
+}
+
+.carousel-item:hover::before {
+  opacity: 1;
+}
+
+.carousel-item {
+  position: relative;
+  overflow: hidden;
 }
 </style>
