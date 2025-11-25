@@ -170,7 +170,8 @@ async def get_user_menu(request: Request, current_user=DependAuth):
                 "order": menu.order,
                 "is_hidden": menu.is_hidden,
                 "keepalive": menu.keepalive,
-                "menu_type": menu.menu_type,
+                "menuType": menu.menu_type,  # 使用驼峰命名，与前端一致
+                "type": menu.menu_type,      # 兼容字段
                 "parent_id": menu.parent_id,
                 "children": []
             }

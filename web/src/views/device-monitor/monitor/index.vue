@@ -218,7 +218,7 @@
             </PermissionButton>
             <PermissionButton
               permission="GET /api/v2/devices/{device_id}"
-              class="w-full"
+              class="w-full analyze-device-btn"
               type="primary"
               size="small"
               secondary
@@ -568,7 +568,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, h, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, h, watch, type Ref, type ComputedRef } from 'vue'
 import {
   NButton,
   NCard,
@@ -694,8 +694,8 @@ const realtimeDataLoading = ref<boolean>(false) // 实时数据加载状态
 const isMockMode = ref<boolean>(false) // 是否启用Mock模式
 const checkMockMode = () => {
   // 检查window.__mockInterceptor是否存在并启用
-  if (window.__mockInterceptor) {
-    const stats = window.__mockInterceptor.getStats()
+  if ((window as any).__mockInterceptor) {
+    const stats = (window as any).__mockInterceptor.getStats()
     isMockMode.value = stats.enabled
     console.log('🔍 Mock模式检测:', isMockMode.value ? '已启用' : '已禁用', stats)
     return isMockMode.value
@@ -729,6 +729,7 @@ const pagination = ref<PaginationInfo>({
   pageSizes: [20, 50, 100], // 服务端分页推荐的页面大小
   showQuickJumper: true,
   prefix: ({ itemCount }) => `共 ${itemCount} 个设备`,
+  suffix: ({ startIndex, endIndex }) => `${startIndex + 1}-${endIndex + 1}`,
 })
 
 // 设备类型选项 - 只从API获取，不使用硬编码
@@ -1203,7 +1204,7 @@ async function loadDeviceTypes() {
       }, 15000) // 增加超时时间到15秒，避免网络延迟导致的超时
     })
 
-    const response = await Promise.race([apiPromise, timeoutPromise])
+    const response = await Promise.race([apiPromise, timeoutPromise]) as any
 
     if (response && response.data && Array.isArray(response.data)) {
       deviceTypes.value = response.data
@@ -1499,7 +1500,7 @@ function getDeviceStatus(deviceData) {
   const timestamp = deviceData.timestamp || deviceData.ts
   const lastUpdate = new Date(timestamp)
   const now = new Date()
-  const diffMinutes = (now - lastUpdate) / (1000 * 60)
+  const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60)
 
   // 如果超过5分钟没有数据更新，认为离线
   if (diffMinutes > 5) {
@@ -1700,7 +1701,7 @@ function getFilteredDevices() {
     filtered = filtered.filter(
       (device) =>
         device.name.toLowerCase().includes(keyword) ||
-        device.id.toLowerCase().includes(keyword) ||
+        String(device.id).toLowerCase().includes(keyword) ||
         (device.location && device.location.toLowerCase().includes(keyword))
     )
   }
@@ -2161,6 +2162,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 分析设备按钮样式 - 强制使用橙色主题 */
+/* PermissionButton 直接渲染 n-button，所以 analyze-device-btn 类会在 n-button 上 */
+.analyze-device-btn.n-button {
+  background-color: rgba(244, 81, 30, 0.12) !important;
+  border-color: #F4511E !important;
+  color: #F4511E !important;
+}
+
+.analyze-device-btn.n-button:hover {
+  background-color: rgba(244, 81, 30, 0.2) !important;
+  border-color: #F4511E !important;
+}
+
+.analyze-device-btn.n-button:active {
+  background-color: rgba(244, 81, 30, 0.28) !important;
+}
+
+.analyze-device-btn :deep(.n-button__content) {
+  color: #F4511E !important;
+}
+
+.analyze-device-btn :deep(.n-icon),
+.analyze-device-btn :deep(svg) {
+  color: #F4511E !important;
+}
+
 /* 连接状态指示器 */
 .connection-indicator {
   width: 8px;

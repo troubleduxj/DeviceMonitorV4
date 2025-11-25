@@ -93,6 +93,38 @@ v2_router.include_router(device_process_router, prefix="/devices", tags=["设备
 # 注册报警管理模块路由
 v2_router.include_router(alarms_router, prefix="/alarms", tags=["报警管理 v2"])
 
+# 注册报警规则管理模块路由
+from .alarm_rules import router as alarm_rules_router
+v2_router.include_router(alarm_rules_router, prefix="/alarm-rules", tags=["报警规则管理 v2"])
+
+# 注册报警记录管理模块路由
+from .alarm_records import router as alarm_records_router
+v2_router.include_router(alarm_records_router, prefix="/alarm-records", tags=["报警记录管理 v2"])
+
+# 注册报警WebSocket路由
+from .alarm_websocket import router as alarm_websocket_router
+v2_router.include_router(alarm_websocket_router, prefix="/alarm-ws", tags=["报警WebSocket v2"])
+
+# 注册通知管理模块路由
+from .notifications import router as notifications_router
+v2_router.include_router(notifications_router, prefix="/notifications", tags=["通知管理 v2"])
+
+# 注册用户通知路由
+from .user_notifications import router as user_notifications_router
+v2_router.include_router(user_notifications_router, prefix="/user/notifications", tags=["用户通知 v2"])
+
+# 注册邮件服务器配置路由
+from .email_server import router as email_server_router
+v2_router.include_router(email_server_router, prefix="/email-servers", tags=["邮件服务器配置 v2"])
+
+# 注册邮件模板路由
+from .email_template import router as email_template_router
+v2_router.include_router(email_template_router, prefix="/email-templates", tags=["邮件模板 v2"])
+
+# 注册通知发送配置路由
+from .notification_config import router as notification_config_router
+v2_router.include_router(notification_config_router, prefix="/notification-configs", tags=["通知发送配置 v2"])
+
 # ⭐ 注册元数据管理模块路由（新增）
 v2_router.include_router(metadata_router, tags=["元数据管理 v2"])
 v2_router.include_router(metadata_sync_router, tags=["元数据同步 v2"])

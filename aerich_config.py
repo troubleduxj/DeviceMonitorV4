@@ -4,7 +4,15 @@ TORTOISE_ORM = {
     },
     "apps": {
         "models": {
-            "models": ["app.models.admin", "app.models.system", "app.models.device", "aerich.models"],
+            "models": [
+                "app.models.admin",
+                "app.models.system",
+                "app.models.device",
+                "app.models.notification",
+                "app.models.alarm",
+                "app.models.email",
+                "aerich.models"
+            ],
             "default_connection": "default"
         }
     }

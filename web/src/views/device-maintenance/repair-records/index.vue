@@ -152,6 +152,7 @@ import LoadingFeedback from './components/LoadingFeedback.vue'
 import { PermissionDataWrapper, PermissionButton } from '@/components/Permission'
 import { useDataExport } from './composables/useDataExport.js'
 import { useResponsiveLayout } from './composables/useResponsiveLayout.js'
+import { useRepairDictOptions } from './composables/useRepairDictOptions'
 
 const message = useMessage()
 const { exportToExcel, exportToCSV, exportToPDF, exportTemplate, exporting } = useDataExport()
@@ -185,44 +186,20 @@ const queryItems = reactive({
   phone: '',
 })
 
-// 选项数据
-const brandOptions = ref([
-  { label: '全部品牌', value: '' },
-  { label: '松下', value: '松下' },
-  { label: '林肯', value: '林肯' },
-  { label: '米勒', value: '米勒' },
-  { label: '奥太', value: '奥太' },
-  { label: '瑞凌', value: '瑞凌' },
-])
+// 选项数据 - 使用字典数据
+const {
+  categoryOptions,
+  brandOptions,
+  faultReasonOptions,
+  damageCategoryOptions,
+  loading: dictLoading,
+} = useRepairDictOptions({ withAllOption: true })
 
-const categoryOptions = ref([
-  { label: '全部类别', value: '' },
-  { label: '二氧化碳保护焊机', value: '二氧化碳保护焊机' },
-  { label: '氩弧焊机', value: '氩弧焊机' },
-  { label: '电焊机', value: '电焊机' },
-  { label: '等离子切割机', value: '等离子切割机' },
-])
-
+// 故障状态选项（固定值，不需要字典）
 const faultStatusOptions = ref([
   { label: '全部状态', value: null },
   { label: '故障', value: true },
   { label: '正常维护', value: false },
-])
-
-const faultReasonOptions = ref([
-  { label: '全部原因', value: '' },
-  { label: '操作不当', value: '操作不当' },
-  { label: '老化磨损', value: '老化磨损' },
-  { label: '环境因素', value: '环境因素' },
-  { label: '设备缺陷', value: '设备缺陷' },
-  { label: '维护不当', value: '维护不当' },
-])
-
-const damageCategoryOptions = ref([
-  { label: '全部类别', value: '' },
-  { label: '正常损坏', value: '正常损坏' },
-  { label: '非正常损坏', value: '非正常损坏' },
-  { label: '人为损坏', value: '人为损坏' },
 ])
 
 // 分页配置

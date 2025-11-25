@@ -88,7 +88,7 @@ export class AlarmApi {
    * 获取告警统计
    */
   async getAlarmStats(params?: { start_date?: string; end_date?: string }) {
-    return this.client.get<AlarmStats>('/alarms/stats', params);
+    return this.client.get<AlarmStats>('/alarms/statistics', params);
   }
 
   /**

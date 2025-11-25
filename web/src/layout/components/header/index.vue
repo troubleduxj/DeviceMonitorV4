@@ -23,6 +23,8 @@
           <ThemeColorPicker />
         </div>
       </div>
+      <!-- 通知铃铛 -->
+      <NotificationBell />
       <!-- 全屏切换 -->
       <FullScreen />
       <!-- 用户头像 -->
@@ -41,6 +43,7 @@ import ThemeMode from './components/ThemeMode.vue'
 import Languages from './components/Languages.vue'
 import SearchBox from './components/SearchBox.vue'
 import ThemeColorPicker from './components/ThemeColorPicker.vue'
+import NotificationBell from '@/components/common/NotificationBell.vue'
 import { getCachedConfig } from '@/api'
 
 // 控制按钮显示的响应式变量

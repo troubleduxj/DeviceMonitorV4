@@ -107,19 +107,24 @@ class DynamicRouteManager {
    * 添加权限路由
    */
   addAccessRoutes(routes) {
-    routes.forEach((route) => {
+    console.log('📋 开始添加权限路由，共', routes.length, '个')
+    routes.forEach((route, index) => {
       try {
+        console.log(`📋 [${index + 1}/${routes.length}] 处理路由:`, route.name, route.path)
         this.validateAndFixRoute(route)
 
         if (!this.router.hasRoute(route.name)) {
           this.router.addRoute(route)
           this.loadedRoutes.add(route.name)
-          console.log('添加权限路由:', route.name, route.path)
+          console.log('✅ 添加权限路由:', route.name, route.path)
+        } else {
+          console.log('⚠️ 路由已存在，跳过:', route.name, route.path)
         }
       } catch (error) {
-        console.error(`添加权限路由失败 ${route.name}:`, error)
+        console.error(`❌ 添加权限路由失败 ${route.name}:`, error)
       }
     })
+    console.log('📋 权限路由添加完成')
   }
 
   /**

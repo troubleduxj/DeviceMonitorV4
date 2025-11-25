@@ -183,4 +183,8 @@ Object.keys(modules).forEach((key) => {
 // 加载 views 下每个模块的 index.vue 文件
 const vueModules = import.meta.glob('@/views/**/index.vue')
 
+// 调试：打印所有可用的模块路径
+console.log('📦 vueModules 可用模块数量:', Object.keys(vueModules).length)
+console.log('📦 notification 相关模块:', Object.keys(vueModules).filter(k => k.includes('notification')))
+
 export { asyncRoutes, vueModules }

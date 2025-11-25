@@ -127,21 +127,40 @@ function findComponent(path: string | undefined | null) {
     return null
   }
 
-  // 构造两种可能的路径
-  const path1 = `/src/views/${cleanPath}/index.vue`
-  const path2 = `/src/views/${cleanPath}.vue`
+  // 构造多种可能的路径格式（兼容不同的 import.meta.glob 返回格式）
+  const possiblePaths = [
+    `/src/views/${cleanPath}/index.vue`,
+    `/src/views/${cleanPath}.vue`,
+    `@/views/${cleanPath}/index.vue`,
+    `@/views/${cleanPath}.vue`,
+    `../views/${cleanPath}/index.vue`,
+    `../views/${cleanPath}.vue`,
+  ]
 
   // 检查哪个路径存在于 vueModules 中
-  if (vueModules[path1]) {
-    return vueModules[path1]
-  }
-  if (vueModules[path2]) {
-    return vueModules[path2]
+  for (const tryPath of possiblePaths) {
+    if (vueModules[tryPath]) {
+      console.log(`✅ Found component for path: ${path} -> ${tryPath}`)
+      return vueModules[tryPath]
+    }
   }
 
-  // 如果都找不到，打印警告并返回 null
+  // 尝试模糊匹配：遍历所有模块，查找包含 cleanPath 的路径
+  const moduleKeys = Object.keys(vueModules)
+  for (const moduleKey of moduleKeys) {
+    // 检查模块路径是否以 cleanPath 结尾（忽略 /index.vue 后缀）
+    const normalizedKey = moduleKey.replace('/index.vue', '').replace('.vue', '')
+    if (normalizedKey.endsWith(cleanPath) || normalizedKey.endsWith(`/${cleanPath}`)) {
+      console.log(`✅ Found component via fuzzy match for path: ${path} -> ${moduleKey}`)
+      return vueModules[moduleKey]
+    }
+  }
+
+  // 如果都找不到，打印警告并返回 null（包含可用的模块列表用于调试）
+  const availableModules = Object.keys(vueModules).slice(0, 20)
   console.warn(
-    `Component not found for path: ${path}. Cleaned path: ${cleanPath}. Tried: ${path1} and ${path2}`
+    `Component not found for path: ${path}. Cleaned path: ${cleanPath}. Tried paths:`, possiblePaths,
+    `\nAvailable modules (first 20):`, availableModules
   )
   return null
 }
@@ -171,8 +190,21 @@ function buildRoutes(routes: BackendMenu[] = []): RouteRecordRaw[] {
     }
 
     if (e.children && e.children.length > 0) {
-      // 有子菜单
-      route.children = e.children.map((e_child) => {
+      // 有子菜单 - 过滤掉按钮类型的菜单项（button类型没有路由）
+      const menuChildren = e.children.filter((child) => {
+        // 过滤掉按钮类型（menu_type === 'button' 或 type === 'button'）
+        const menuType = child.menuType || child.type
+        if (menuType === 'button') {
+          return false
+        }
+        // 过滤掉没有路径的菜单项
+        if (!child.path) {
+          return false
+        }
+        return true
+      })
+
+      route.children = menuChildren.map((e_child) => {
         const component = findComponent(e_child.component)
         // 子路由路径：应该是相对路径，移除前导斜杠
         let childPath = e_child.path

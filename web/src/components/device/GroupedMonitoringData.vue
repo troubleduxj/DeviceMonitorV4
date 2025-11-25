@@ -25,7 +25,7 @@
           </NButton>
           
           <div class="group-info">
-            <span class="group-icon">{{ currentGroup?.icon }}</span>
+            <span v-if="currentGroup?.icon" class="group-icon">{{ currentGroup?.icon }}</span>
             <span class="group-title">{{ currentGroup?.title }}</span>
             <span class="group-count">({{ currentIndex + 1 }}/{{ carouselItems.length }})</span>
           </div>
@@ -141,39 +141,46 @@ const allFields = computed(() => {
 })
 
 /**
- * 核心字段（默认显示）
+ * 按 field_group 分组所有字段
+ * 优先使用 field_group 字段进行分组，如果没有则根据 is_default_visible 判断
  */
-const coreFields = computed(() => {
-  return allFields.value
-    .filter(f => f.is_default_visible !== false)
-    .sort((a, b) => a.sort_order - b.sort_order)
-})
-
-/**
- * 其他分组字段
- */
-const otherGroups = computed(() => {
+const groupedFields = computed(() => {
   const groups = new Map<string, { name: string; title: string; icon: string; fields: DeviceField[]; order: number }>()
   
-  allFields.value
-    .filter(f => f.is_default_visible === false)
-    .forEach(field => {
-      const groupName = field.field_group || 'other'
-      if (!groups.has(groupName)) {
-        groups.set(groupName, {
-          name: groupName,
-          title: getGroupTitle(groupName),
-          icon: getGroupIcon(groupName),
-          fields: [],
-          order: field.group_order || 999
-        })
-      }
-      groups.get(groupName)!.fields.push(field)
-    })
+  allFields.value.forEach(field => {
+    // 确定分组名称
+    let groupName: string
+    
+    if (field.field_group && field.field_group !== 'default') {
+      // 如果有明确的分组，使用该分组
+      groupName = field.field_group
+    } else if (field.is_default_visible === false) {
+      // 如果没有分组但标记为不默认显示，放入"其他"分组
+      groupName = 'other'
+    } else {
+      // 默认放入核心参数组
+      groupName = 'core'
+    }
+    
+    if (!groups.has(groupName)) {
+      groups.set(groupName, {
+        name: groupName,
+        title: getGroupTitle(groupName),
+        icon: getGroupIcon(groupName),
+        fields: [],
+        order: groupName === 'core' ? 0 : (field.group_order || 999)
+      })
+    }
+    groups.get(groupName)!.fields.push(field)
+  })
   
-  // 按 group_order 排序
+  // 按 group_order 排序，核心参数始终在最前面
   return Array.from(groups.values())
-    .sort((a, b) => a.order - b.order)
+    .sort((a, b) => {
+      if (a.name === 'core') return -1
+      if (b.name === 'core') return 1
+      return a.order - b.order
+    })
     .map(group => ({
       ...group,
       fields: group.fields.sort((a, b) => a.sort_order - b.sort_order)
@@ -181,25 +188,10 @@ const otherGroups = computed(() => {
 })
 
 /**
- * 轮播项目（包括核心参数和其他分组）
+ * 轮播项目
  */
 const carouselItems = computed(() => {
-  const items = []
-  
-  // 添加核心参数
-  if (coreFields.value.length > 0) {
-    items.push({
-      name: 'core',
-      title: '核心参数',
-      icon: '📊',
-      fields: coreFields.value
-    })
-  }
-  
-  // 添加其他分组
-  items.push(...otherGroups.value)
-  
-  return items
+  return groupedFields.value.filter(group => group.fields.length > 0)
 })
 
 /**
@@ -251,17 +243,11 @@ function getGroupTitle(groupName: string): string {
 
 /**
  * 获取分组图标
+ * 注意：图标已从字典数据中移除，此处返回空字符串
  */
 function getGroupIcon(groupName: string): string {
-  const icons: Record<string, string> = {
-    core: '📊',
-    temperature: '🌡️',
-    power: '⚡',
-    speed: '⚙️',
-    dimension: '📏',
-    other: '📋'
-  }
-  return icons[groupName] || '📁'
+  // 不再使用硬编码图标，由字典数据控制
+  return ''
 }
 
 /**
