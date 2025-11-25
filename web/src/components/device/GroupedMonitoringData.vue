@@ -340,20 +340,29 @@ function getFieldColor(field: DeviceField): string {
 }
 
 .nav-btn {
-  padding: 2px;
-  min-width: 22px;
-  height: 22px;
+  padding: 4px !important;
+  min-width: 24px !important;
+  height: 24px !important;
   border-radius: 4px;
   transition: all 0.2s ease;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  cursor: pointer;
   
   &:not(:disabled):hover {
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.15) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
   }
   
   &:disabled {
     opacity: 0.3;
     cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-color: transparent !important;
+  }
+
+  :deep(.n-icon) {
+    font-size: 14px !important;
   }
 }
 
