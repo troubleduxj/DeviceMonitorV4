@@ -248,7 +248,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   NPageHeader,
   NCard,
@@ -270,152 +271,289 @@ import {
   Warning as WarningIcon,
   CloseCircle as CloseCircleIcon,
 } from '@vicons/ionicons5'
+import deviceMaintenanceApi from '@/api/device-maintenance'
+import deviceV2Api from '@/api/device-v2'
+
+// 使用正确的 API 导出
+const deviceApi = deviceV2Api
 
 const message = useMessage()
+const router = useRouter()
 
-// 静态数据
-const totalDevices = ref(156)
-const normalDevices = ref(128)
-const warningDevices = ref(18)
-const errorDevices = ref(7)
-const maintenanceDevices = ref(3)
+// 数据加载状态
+const loading = ref(false)
+
+// 统计数据
+const totalDevices = ref(0)
+const normalDevices = ref(0)
+const warningDevices = ref(0)
+const errorDevices = ref(0)
+const maintenanceDevices = ref(0)
 
 // 维护趋势数据
-const maintenanceTrend = ref([
-  { month: '1月', count: 12, height: '60%' },
-  { month: '2月', count: 8, height: '40%' },
-  { month: '3月', count: 15, height: '75%' },
-  { month: '4月', count: 20, height: '100%' },
-  { month: '5月', count: 18, height: '90%' },
-  { month: '6月', count: 14, height: '70%' },
-])
+const maintenanceTrend = ref([])
 
 // 最近维护记录
-const recentRecords = ref([
-  {
-    id: 1,
-    deviceName: '生产线A-设备001',
-    status: '已完成',
-    type: '定期保养',
-    date: '2024-01-15',
-    description: '更换滤芯，检查传动系统',
-  },
-  {
-    id: 2,
-    deviceName: '包装机B-002',
-    status: '进行中',
-    type: '故障维修',
-    date: '2024-01-14',
-    description: '传感器故障，正在更换部件',
-  },
-  {
-    id: 3,
-    deviceName: '检测设备C-003',
-    status: '已完成',
-    type: '升级维护',
-    date: '2024-01-13',
-    description: '软件升级，校准精度',
-  },
-  {
-    id: 4,
-    deviceName: '输送带D-004',
-    status: '待处理',
-    type: '预防性维护',
-    date: '2024-01-12',
-    description: '润滑保养，检查磨损情况',
-  },
-])
+const recentRecords = ref([])
 
 // 待处理任务
-const pendingTasks = ref([
-  {
-    id: 1,
-    title: '生产线A设备年检',
-    deviceName: '生产线A-设备001',
-    priority: '高',
-    deadline: '2024-01-20',
-    assignee: '张工程师',
-  },
-  {
-    id: 2,
-    title: '包装机传感器更换',
-    deviceName: '包装机B-002',
-    priority: '紧急',
-    deadline: '2024-01-16',
-    assignee: '李技师',
-  },
-  {
-    id: 3,
-    title: '检测设备校准',
-    deviceName: '检测设备C-003',
-    priority: '中',
-    deadline: '2024-01-25',
-    assignee: '王师傅',
-  },
-  {
-    id: 4,
-    title: '输送带保养',
-    deviceName: '输送带D-004',
-    priority: '低',
-    deadline: '2024-01-30',
-    assignee: '赵技师',
-  },
-])
+const pendingTasks = ref([])
 
 // 设备健康度数据
-const topHealthDevices = ref([
-  { id: 1, name: '生产线A-001', location: '车间1', health: 98 },
-  { id: 2, name: '检测设备B-002', location: '车间2', health: 96 },
-  { id: 3, name: '包装机C-003', location: '车间3', health: 94 },
-])
+const topHealthDevices = ref([])
+const attentionDevices = ref([])
+const urgentDevices = ref([])
 
-const attentionDevices = ref([
-  { id: 4, name: '输送带D-004', location: '车间1', health: 75 },
-  { id: 5, name: '压缩机E-005', location: '车间2', health: 72 },
-  { id: 6, name: '冷却系统F-006', location: '车间3', health: 68 },
-])
+// 维修记录统计
+const repairStatistics = ref({
+  total_records: 0,
+  status_statistics: {},
+  priority_statistics: {},
+  device_type_statistics: {},
+  monthly_statistics: {}
+})
 
-const urgentDevices = ref([
-  { id: 7, name: '焊接机G-007', location: '车间1', health: 45 },
-  { id: 8, name: '切割机H-008', location: '车间2', health: 38 },
-  { id: 9, name: '打磨机I-009', location: '车间3', health: 32 },
-])
+// 加载设备统计数据
+const loadDeviceStatistics = async () => {
+  try {
+    const response = await deviceApi.getStatistics()
+    if (response && response.data) {
+      const stats = response.data
+      totalDevices.value = stats.total_devices || 0
+      normalDevices.value = stats.online_devices || 0
+      warningDevices.value = stats.warning_devices || 0
+      errorDevices.value = stats.offline_devices || 0
+      maintenanceDevices.value = stats.maintenance_devices || 0
+    }
+  } catch (error) {
+    console.error('加载设备统计数据失败:', error)
+  }
+}
 
-// 方法
-const refreshData = () => {
-  message.success('数据刷新成功')
+// 加载维护统计数据
+const loadMaintenanceStatistics = async () => {
+  try {
+    const response = await deviceMaintenanceApi.getMaintenanceStatistics()
+    if (response && response.data) {
+      const stats = response.data
+      
+      // 处理维护趋势数据（最近6个月）
+      if (stats.monthly_statistics) {
+        const months = Object.keys(stats.monthly_statistics).slice(0, 6).reverse()
+        const maxCount = Math.max(...Object.values(stats.monthly_statistics))
+        
+        maintenanceTrend.value = months.map(month => {
+          const count = stats.monthly_statistics[month]
+          return {
+            month: month.split('-')[1] + '月',
+            count,
+            height: maxCount > 0 ? `${(count / maxCount) * 100}%` : '0%'
+          }
+        })
+      }
+    }
+  } catch (error) {
+    console.error('加载维护统计数据失败:', error)
+  }
+}
+
+// 加载维修记录统计
+const loadRepairStatistics = async () => {
+  try {
+    const response = await deviceMaintenanceApi.getRepairStatistics()
+    if (response && response.data) {
+      repairStatistics.value = response.data
+    }
+  } catch (error) {
+    console.error('加载维修记录统计失败:', error)
+  }
+}
+
+// 加载最近维护记录
+const loadRecentRecords = async () => {
+  try {
+    const response = await deviceMaintenanceApi.getMaintenanceRecords({
+      page: 1,
+      page_size: 4
+    })
+    if (response && response.data) {
+      const records = response.data.records || response.data.data || []
+      recentRecords.value = records.map(record => ({
+        id: record.id,
+        deviceName: record.device_name || record.device_code,
+        status: getStatusText(record.maintenance_status),
+        type: getMaintenanceTypeText(record.maintenance_type),
+        date: formatDate(record.planned_start_time || record.created_at),
+        description: record.maintenance_description || record.maintenance_title || '-'
+      }))
+    }
+  } catch (error) {
+    console.error('加载最近维护记录失败:', error)
+  }
+}
+
+// 加载待处理任务
+const loadPendingTasks = async () => {
+  try {
+    const response = await deviceMaintenanceApi.getMaintenanceRecords({
+      maintenance_status: 'planned',
+      page: 1,
+      page_size: 4
+    })
+    if (response && response.data) {
+      const records = response.data.records || response.data.data || []
+      pendingTasks.value = records.map(record => ({
+        id: record.id,
+        title: record.maintenance_title,
+        deviceName: record.device_name || record.device_code,
+        priority: getPriorityText(record.priority),
+        deadline: formatDate(record.planned_end_time),
+        assignee: record.assigned_to || '未分配'
+      }))
+    }
+  } catch (error) {
+    console.error('加载待处理任务失败:', error)
+  }
+}
+
+// 加载设备健康度数据
+const loadDeviceHealth = async () => {
+  try {
+    const response = await deviceApi.list({ page: 1, page_size: 50 })
+    if (response && response.data) {
+      const devices = response.data.records || response.data.data || []
+      
+      // 计算设备健康度（基于设备状态）
+      const devicesWithHealth = devices.map(device => ({
+        id: device.id,
+        name: device.device_name || device.device_code,
+        location: device.location || device.team_name || '-',
+        health: calculateDeviceHealth(device)
+      })).sort((a, b) => b.health - a.health)
+      
+      // 分类设备
+      topHealthDevices.value = devicesWithHealth.filter(d => d.health >= 90).slice(0, 3)
+      attentionDevices.value = devicesWithHealth.filter(d => d.health >= 60 && d.health < 90).slice(0, 3)
+      urgentDevices.value = devicesWithHealth.filter(d => d.health < 60).slice(0, 3)
+    }
+  } catch (error) {
+    console.error('加载设备健康度数据失败:', error)
+  }
+}
+
+// 计算设备健康度
+const calculateDeviceHealth = (device) => {
+  // 基于设备状态计算健康度
+  const statusMap = {
+    'online': 95,
+    'running': 98,
+    'idle': 90,
+    'warning': 70,
+    'alarm': 50,
+    'offline': 30,
+    'fault': 20
+  }
+  return statusMap[device.device_status] || statusMap[device.status] || 85
+}
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('zh-CN')
+}
+
+// 获取状态文本
+const getStatusText = (status) => {
+  const statusMap = {
+    'planned': '待处理',
+    'in_progress': '进行中',
+    'completed': '已完成',
+    'cancelled': '已取消'
+  }
+  return statusMap[status] || status
+}
+
+// 获取维护类型文本
+const getMaintenanceTypeText = (type) => {
+  const typeMap = {
+    'preventive': '预防性维护',
+    'corrective': '故障维修',
+    'routine': '定期保养',
+    'upgrade': '升级维护'
+  }
+  return typeMap[type] || type
+}
+
+// 获取优先级文本
+const getPriorityText = (priority) => {
+  const priorityMap = {
+    'low': '低',
+    'medium': '中',
+    'high': '高',
+    'urgent': '紧急'
+  }
+  return priorityMap[priority] || priority
+}
+
+// 刷新所有数据
+const refreshData = async () => {
+  loading.value = true
+  try {
+    await Promise.all([
+      loadDeviceStatistics(),
+      loadMaintenanceStatistics(),
+      loadRepairStatistics(),
+      loadRecentRecords(),
+      loadPendingTasks(),
+      loadDeviceHealth()
+    ])
+    message.success('数据刷新成功')
+  } catch (error) {
+    console.error('刷新数据失败:', error)
+    message.error('数据刷新失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 const exportReport = () => {
   message.info('正在导出维护报告...')
+  // TODO: 实现导出功能
 }
 
 const viewAllRecords = () => {
-  message.info('跳转到维护记录页面')
+  router.push('/device-maintenance/repair-records')
 }
 
 const viewAllTasks = () => {
-  message.info('跳转到任务管理页面')
+  router.push('/device-maintenance/repair-records?status=planned')
 }
 
 const getRecordType = (status) => {
   const typeMap = {
-    已完成: 'success',
-    进行中: 'warning',
-    待处理: 'info',
+    '已完成': 'success',
+    '进行中': 'warning',
+    '待处理': 'info',
+    '已取消': 'default'
   }
   return typeMap[status] || 'default'
 }
 
 const getPriorityType = (priority) => {
   const typeMap = {
-    紧急: 'error',
-    高: 'warning',
-    中: 'info',
-    低: 'default',
+    '紧急': 'error',
+    '高': 'warning',
+    '中': 'info',
+    '低': 'default'
   }
   return typeMap[priority] || 'default'
 }
+
+// 页面加载时获取数据
+onMounted(() => {
+  refreshData()
+})
 </script>
 
 <style scoped>

@@ -98,9 +98,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { NButton, NCard, NInput, NDatePicker, NDataTable, NPagination, useMessage } from 'naive-ui'
+import { NButton, NCard, NInput, NDatePicker, NDataTable, NPagination, useMessage, NSelect } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/page/QueryBarItem.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
@@ -108,12 +108,18 @@ import ViewToggle from '@/components/common/ViewToggle.vue'
 import { formatDate, formatDateTime } from '@/utils'
 import * as echarts from 'echarts'
 import { compatibilityApi as deviceDataApi } from '@/api/device-v2'
+import { deviceFieldApi } from '@/api/device-field'
+import type { DeviceField } from '@/api/device-field'
+import { useDeviceFieldStore } from '@/store/modules/device-field'
 
 // 页面名称
 defineOptions({ name: '历史数据查询' })
 
 // 消息提示
 const message = useMessage()
+
+// 设备字段 Store
+const deviceFieldStore = useDeviceFieldStore()
 
 // 视图模式
 const viewMode = ref('chart')
@@ -141,9 +147,10 @@ const route = useRoute()
 const queryForm = reactive({
   device_code: route.query.device_code || '14323A0041',
   device_name: route.query.device_name || '',
+  device_type_code: route.query.device_type_code || '', // 设备类型代码
   start_time: route.query.start_time
     ? new Date(route.query.start_time).getTime()
-    : new Date(Date.now() - 30 * 60 * 1000).getTime(),
+    : new Date(Date.now() - 24 * 60 * 60 * 1000).getTime(), // 默认查询最近24小时
   end_time: route.query.end_time ? new Date(route.query.end_time).getTime() : new Date().getTime(),
 })
 
@@ -153,49 +160,79 @@ const selectedDeviceId = ref('14324G0216')
 // 加载状态
 const loading = ref(false)
 
-// 历史数据表格列定义
-const historyColumns = [
-  {
-    title: '时间',
-    key: 'ts',
-    width: 180,
-    render: (row) => {
-      return formatDateTime(row.ts, 'YYYY-MM-DD HH:mm:ss')
+// 设备类型字段配置
+const deviceFields = ref<DeviceField[]>([])
+
+// 动态生成表格列
+const historyColumns = computed(() => {
+  const columns = [
+    {
+      title: '时间',
+      key: 'ts',
+      width: 180,
+      fixed: 'left' as const,
+      render: (row: any) => {
+        return formatDateTime(row.ts, 'YYYY-MM-DD HH:mm:ss')
+      },
     },
-  },
-  {
-    title: '预设电流',
-    key: 'preset_current',
-    width: 100,
-    render: (row) => {
-      return `${row.preset_current}A`
-    },
-  },
-  {
-    title: '预设电压',
-    key: 'preset_voltage',
-    width: 100,
-    render: (row) => {
-      return `${row.preset_voltage}V`
-    },
-  },
-  {
-    title: '焊接电流',
-    key: 'weld_current',
-    width: 100,
-    render: (row) => {
-      return `${row.weld_current}A`
-    },
-  },
-  {
-    title: '焊接电压',
-    key: 'weld_voltage',
-    width: 100,
-    render: (row) => {
-      return `${row.weld_voltage}V`
-    },
-  },
-]
+  ]
+
+  // 根据设备字段配置动态添加列
+  if (deviceFields.value && deviceFields.value.length > 0) {
+    deviceFields.value.forEach((field) => {
+      columns.push({
+        title: field.field_name,
+        key: field.field_code,
+        width: 120,
+        render: (row: any) => {
+          const value = row[field.field_code]
+          if (value === null || value === undefined) {
+            return '-'
+          }
+          return field.unit ? `${value}${field.unit}` : value
+        },
+      })
+    })
+  } else {
+    // 如果没有字段配置，使用默认列（兼容旧数据）
+    columns.push(
+      {
+        title: '预设电流',
+        key: 'preset_current',
+        width: 100,
+        render: (row: any) => {
+          return row.preset_current ? `${row.preset_current}A` : '-'
+        },
+      },
+      {
+        title: '预设电压',
+        key: 'preset_voltage',
+        width: 100,
+        render: (row: any) => {
+          return row.preset_voltage ? `${row.preset_voltage}V` : '-'
+        },
+      },
+      {
+        title: '焊接电流',
+        key: 'weld_current',
+        width: 100,
+        render: (row: any) => {
+          return row.weld_current ? `${row.weld_current}A` : '-'
+        },
+      },
+      {
+        title: '焊接电压',
+        key: 'weld_voltage',
+        width: 100,
+        render: (row: any) => {
+          return row.weld_voltage ? `${row.weld_voltage}V` : '-'
+        },
+      }
+    )
+  }
+
+  return columns
+})
 
 // 模拟历史数据
 const historyData = ref([])
@@ -238,33 +275,61 @@ function initChart() {
 
   chartInstance = echarts.init(chartRef.value)
 
-  const option = {
-    title: {
-      text: '设备历史参数',
-      left: 'center',
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross',
-      },
-    },
-    legend: {
-      data: ['预设电流', '预设电压', '焊接电流', '焊接电压'],
-      top: 30,
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '15%',
-      containLabel: true,
-    },
-    xAxis: {
-      type: 'time',
-      boundaryGap: false,
-    },
-    yAxis: [
+  // 根据设备字段配置动态生成图表
+  const legendData: string[] = []
+  const series: any[] = []
+  const yAxisConfig: any[] = []
+
+  if (deviceFields.value && deviceFields.value.length > 0) {
+    // 按字段类型分组（用于多Y轴）
+    const fieldsByUnit = new Map<string, DeviceField[]>()
+    deviceFields.value.forEach((field) => {
+      const unit = field.unit || '无单位'
+      if (!fieldsByUnit.has(unit)) {
+        fieldsByUnit.set(unit, [])
+      }
+      fieldsByUnit.get(unit)!.push(field)
+    })
+
+    // 为每个单位创建一个Y轴
+    let yAxisIndex = 0
+    const colors = ['#ff4d4f', '#1890ff', '#52c41a', '#faad14', '#722ed1', '#eb2f96']
+    let colorIndex = 0
+
+    fieldsByUnit.forEach((fields, unit) => {
+      // 创建Y轴
+      yAxisConfig.push({
+        type: 'value',
+        name: unit !== '无单位' ? unit : '',
+        position: yAxisIndex % 2 === 0 ? 'left' : 'right',
+        offset: Math.floor(yAxisIndex / 2) * 60,
+        axisLabel: {
+          formatter: unit !== '无单位' ? `{value}${unit}` : '{value}',
+        },
+      })
+
+      // 为该单位的每个字段创建一条线
+      fields.forEach((field) => {
+        legendData.push(field.field_name)
+        series.push({
+          name: field.field_name,
+          type: 'line',
+          yAxisIndex: yAxisIndex,
+          data: (historyData.value || []).map((item: any) => [item.ts, item[field.field_code]]),
+          smooth: true,
+          lineStyle: {
+            color: colors[colorIndex % colors.length],
+          },
+        })
+        colorIndex++
+      })
+
+      yAxisIndex++
+    })
+  } else {
+    // 默认配置（兼容旧数据）
+    legendData.push('预设电流', '预设电压', '焊接电流', '焊接电压')
+    yAxisConfig.push(
       {
         type: 'value',
         name: '电流(A)',
@@ -280,50 +345,81 @@ function initChart() {
         axisLabel: {
           formatter: '{value}V',
         },
-      },
-    ],
-    series: [
+      }
+    )
+    series.push(
       {
         name: '预设电流',
         type: 'line',
         yAxisIndex: 0,
-        data: (historyData.value || []).map((item) => [item.ts, item.preset_current]),
+        data: (historyData.value || []).map((item: any) => [item.ts, item.preset_current]),
         smooth: true,
         lineStyle: {
-          color: '#ff4d4f', // 红色
+          color: '#ff4d4f',
         },
       },
       {
         name: '焊接电流',
         type: 'line',
         yAxisIndex: 0,
-        data: (historyData.value || []).map((item) => [item.ts, item.weld_current]),
+        data: (historyData.value || []).map((item: any) => [item.ts, item.weld_current]),
         smooth: true,
         lineStyle: {
-          color: '#ff7a45', // 橘红色
+          color: '#ff7a45',
         },
       },
       {
         name: '预设电压',
         type: 'line',
         yAxisIndex: 1,
-        data: (historyData.value || []).map((item) => [item.ts, item.preset_voltage]),
+        data: (historyData.value || []).map((item: any) => [item.ts, item.preset_voltage]),
         smooth: true,
         lineStyle: {
-          color: '#1890ff', // 蓝色
+          color: '#1890ff',
         },
       },
       {
         name: '焊接电压',
         type: 'line',
         yAxisIndex: 1,
-        data: (historyData.value || []).map((item) => [item.ts, item.weld_voltage]),
+        data: (historyData.value || []).map((item: any) => [item.ts, item.weld_voltage]),
         smooth: true,
         lineStyle: {
-          color: '#40a9ff', // 浅蓝色
+          color: '#40a9ff',
         },
+      }
+    )
+  }
+
+  const option = {
+    title: {
+      text: '设备历史参数',
+      left: 'center',
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
       },
-    ],
+    },
+    legend: {
+      data: legendData,
+      top: 30,
+      type: 'scroll',
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '15%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'time',
+      boundaryGap: false,
+    },
+    yAxis: yAxisConfig,
+    series: series,
   }
 
   chartInstance.setOption(option)
@@ -332,10 +428,37 @@ function initChart() {
 /**
  * 处理查询
  */
+/**
+ * 加载设备字段配置
+ */
+async function loadDeviceFields() {
+  if (!queryForm.device_type_code) {
+    console.warn('⚠️ 未指定设备类型代码，无法加载字段配置')
+    return
+  }
+
+  try {
+    console.log(`📋 加载设备类型字段配置: ${queryForm.device_type_code}`)
+    const fields = await deviceFieldStore.getMonitoringFields(queryForm.device_type_code)
+    
+    // 只显示监测关键字段
+    deviceFields.value = fields.filter((f) => f.is_monitoring_key && f.is_active)
+    
+    console.log(`✅ 加载到 ${deviceFields.value.length} 个监测字段`)
+  } catch (error) {
+    console.error('❌ 加载设备字段配置失败:', error)
+    // 失败时使用空数组，会回退到默认列
+    deviceFields.value = []
+  }
+}
+
 // 查询历史数据
 async function queryHistoryData() {
   loading.value = true
   try {
+    // 先加载字段配置
+    await loadDeviceFields()
+
     // 根据视图模式决定查询参数
     const queryParams = {
       device_code: queryForm.device_code,
@@ -349,7 +472,24 @@ async function queryHistoryData() {
       queryParams.offset = 0
 
       const response = await deviceDataApi.getDeviceHistoryData(queryParams)
-      historyData.value = response.data || []
+      console.log('📊 图表模式 - API响应:', response)
+      console.log('📊 图表模式 - 响应数据类型:', typeof response)
+      console.log('📊 图表模式 - 响应数据结构:', Object.keys(response))
+      
+      // 处理响应数据 - 兼容不同的响应格式
+      let dataArray = []
+      if (Array.isArray(response)) {
+        dataArray = response
+      } else if (response.data && Array.isArray(response.data)) {
+        dataArray = response.data
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        dataArray = response.data.data
+      }
+      
+      console.log('📊 图表模式 - 提取的数据数组:', dataArray)
+      console.log('📊 图表模式 - 数据数量:', dataArray.length)
+      
+      historyData.value = dataArray
       // 图表模式下不重置itemCount，保持表格模式的分页状态
 
       nextTick(() => {
@@ -357,7 +497,7 @@ async function queryHistoryData() {
         if (!chartInstance) {
           initChart()
         }
-        updateChart(response.data)
+        updateChart(dataArray)
       })
     } else {
       // 表格模式：使用正常分页
@@ -365,11 +505,34 @@ async function queryHistoryData() {
       queryParams.offset = (pagination.page - 1) * pagination.pageSize
 
       const response = await deviceDataApi.getDeviceHistoryData(queryParams)
-      // 后端返回SuccessExtra格式: { data, total, page, page_size }
-      historyData.value = response.data || []
-      pagination.itemCount = response.total || 0
+      console.log('📋 表格模式 - API响应:', response)
+      console.log('📋 表格模式 - 响应数据类型:', typeof response)
+      console.log('📋 表格模式 - 响应数据结构:', Object.keys(response))
+      
+      // 处理响应数据 - 兼容不同的响应格式
+      let dataArray = []
+      let total = 0
+      
+      if (Array.isArray(response)) {
+        dataArray = response
+        total = response.length
+      } else if (response.data && Array.isArray(response.data)) {
+        dataArray = response.data
+        total = response.total || response.data.length
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        dataArray = response.data.data
+        total = response.data.total || response.data.data.length
+      }
+      
+      console.log('📋 表格模式 - 提取的数据数组:', dataArray)
+      console.log('📋 表格模式 - 数据数量:', dataArray.length)
+      console.log('📋 表格模式 - 总数:', total)
+      
+      historyData.value = dataArray
+      pagination.itemCount = total
     }
   } catch (error) {
+    console.error('❌ 查询历史数据失败:', error)
     message.error(`查询失败: ${error.message}`)
   } finally {
     loading.value = false
@@ -457,58 +620,89 @@ onBeforeUnmount(() => {
 })
 
 // 更新图表数据
-function updateChart(data) {
+function updateChart(data: any[]) {
   if (!chartInstance || !data || !Array.isArray(data)) return
 
-  // 使用时间戳格式的数据，与初始化时的时间轴保持一致
-  const presetCurrentData = data.map((item) => [item.ts, item.preset_current])
-  const presetVoltageData = data.map((item) => [item.ts, item.preset_voltage])
-  const weldCurrentData = data.map((item) => [item.ts, item.weld_current])
-  const weldVoltageData = data.map((item) => [item.ts, item.weld_voltage])
+  const series: any[] = []
+  const colors = ['#ff4d4f', '#1890ff', '#52c41a', '#faad14', '#722ed1', '#eb2f96']
+  let colorIndex = 0
 
-  const option = {
-    series: [
+  if (deviceFields.value && deviceFields.value.length > 0) {
+    // 按字段类型分组（用于多Y轴）
+    const fieldsByUnit = new Map<string, DeviceField[]>()
+    deviceFields.value.forEach((field) => {
+      const unit = field.unit || '无单位'
+      if (!fieldsByUnit.has(unit)) {
+        fieldsByUnit.set(unit, [])
+      }
+      fieldsByUnit.get(unit)!.push(field)
+    })
+
+    let yAxisIndex = 0
+    fieldsByUnit.forEach((fields) => {
+      fields.forEach((field) => {
+        series.push({
+          name: field.field_name,
+          type: 'line',
+          yAxisIndex: yAxisIndex,
+          data: data.map((item) => [item.ts, item[field.field_code]]),
+          smooth: true,
+          lineStyle: {
+            color: colors[colorIndex % colors.length],
+          },
+        })
+        colorIndex++
+      })
+      yAxisIndex++
+    })
+  } else {
+    // 默认配置（兼容旧数据）
+    series.push(
       {
         name: '预设电流',
         type: 'line',
         yAxisIndex: 0,
-        data: presetCurrentData,
+        data: data.map((item) => [item.ts, item.preset_current]),
         smooth: true,
         lineStyle: {
-          color: '#ff4d4f', // 红色
+          color: '#ff4d4f',
         },
       },
       {
         name: '焊接电流',
         type: 'line',
         yAxisIndex: 0,
-        data: weldCurrentData,
+        data: data.map((item) => [item.ts, item.weld_current]),
         smooth: true,
         lineStyle: {
-          color: '#ff7a45', // 橘红色
+          color: '#ff7a45',
         },
       },
       {
         name: '预设电压',
         type: 'line',
         yAxisIndex: 1,
-        data: presetVoltageData,
+        data: data.map((item) => [item.ts, item.preset_voltage]),
         smooth: true,
         lineStyle: {
-          color: '#1890ff', // 蓝色
+          color: '#1890ff',
         },
       },
       {
         name: '焊接电压',
         type: 'line',
         yAxisIndex: 1,
-        data: weldVoltageData,
+        data: data.map((item) => [item.ts, item.weld_voltage]),
         smooth: true,
         lineStyle: {
-          color: '#40a9ff', // 浅蓝色
+          color: '#40a9ff',
         },
-      },
-    ],
+      }
+    )
+  }
+
+  const option = {
+    series: series,
   }
   chartInstance.setOption(option)
 }

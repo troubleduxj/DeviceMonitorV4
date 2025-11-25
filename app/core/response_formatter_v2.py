@@ -7,6 +7,8 @@ API v2 响应格式标准化器
 
 import time
 import uuid
+import json
+from decimal import Decimal
 from datetime import datetime
 from typing import Any, Optional, Dict, List, Union
 from urllib.parse import urlencode
@@ -14,6 +16,16 @@ from urllib.parse import urlencode
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """自定义JSON编码器，处理Decimal类型"""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 class HATEOASLinks(BaseModel):
@@ -41,7 +53,10 @@ class ResponseMeta(BaseModel):
 
 class APIv2Response(BaseModel):
     """API v2标准响应格式"""
-    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+    model_config = ConfigDict(json_encoders={
+        datetime: lambda v: v.isoformat(),
+        Decimal: lambda v: float(v)
+    })
     
     success: bool
     code: int
@@ -243,10 +258,13 @@ class ResponseFormatterV2:
         
         import json
         from datetime import datetime
+        from decimal import Decimal
         
         def datetime_serializer(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()
+            if isinstance(obj, Decimal):
+                return float(obj)
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
         
         try:

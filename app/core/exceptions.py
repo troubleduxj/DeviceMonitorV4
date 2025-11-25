@@ -326,7 +326,11 @@ async def ValidationErrorHandle(req: Request, exc: ValidationError) -> JSONRespo
     api_version = getattr(req.state, 'api_version', 'v1')
     
     # 添加详细的验证错误日志
-    logger.error(f"ValidationError for {req.method} {req.url.path}")
+    # 检查是否是WebSocket请求（WebSocket对象没有method属性）
+    if hasattr(req, 'method'):
+        logger.error(f"ValidationError for {req.method} {req.url.path}")
+    else:
+        logger.error(f"ValidationError for WebSocket {req.url.path}")
     logger.error(f"Raw validation errors: {exc.errors()}")
     
     # 提取验证错误详情

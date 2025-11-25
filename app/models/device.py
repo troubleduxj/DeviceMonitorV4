@@ -109,6 +109,11 @@ class DeviceField(TimestampMixin, BaseModel):
     alarm_threshold = fields.JSONField(null=True, description='报警阈值配置: {"warning": 80, "critical": 90}')
     display_config = fields.JSONField(null=True, description='前端显示配置: {"chart_type": "line", "color": "#1890ff"}')
     
+    # ⭐ 字段分组功能
+    field_group = fields.CharField(max_length=50, default="default", description="字段分组: core/temperature/power/speed/dimension/pressure/other/default")
+    is_default_visible = fields.BooleanField(default=True, description="是否默认显示（卡片上直接可见）")
+    group_order = fields.IntField(default=0, description="分组内排序顺序")
+    
     class Meta:
         table = "t_device_field"
         table_description = "设备字段定义表"

@@ -562,6 +562,129 @@ async def get_device_alarms(
         return formatter.internal_error(f"获取设备报警信息失败: {str(e)}")
 
 
+@router.get("/statistics", summary="设备统计信息", response_model=None)
+async def get_device_statistics(
+    request: Request,
+    device_type: Optional[str] = Query(None, description="设备类型筛选"),
+    team_name: Optional[str] = Query(None, description="班组名称筛选"),
+    current_user: User = DependAuth
+):
+    """
+    获取设备统计信息
+    
+    包括：
+    - 设备总数
+    - 锁定/未锁定设备数
+    - 在线/离线设备数
+    - 预警/故障设备数
+    - 维护中设备数
+    - 按类型统计
+    - 按班组统计
+    
+    可选参数：
+    - device_type: 按设备类型筛选统计
+    - team_name: 按班组名称筛选统计
+    """
+    try:
+        formatter = create_formatter(request)
+        
+        # 构建基础查询条件
+        base_query = Q()
+        if device_type:
+            base_query &= Q(device_type=device_type)
+        if team_name:
+            base_query &= Q(team_name=team_name)
+        
+        # 总设备数
+        total_devices = await device_controller.count(search=base_query)
+
+        # 锁定设备数
+        locked_query = base_query & Q(is_locked=True)
+        locked_count = await device_controller.count(search=locked_query)
+        unlocked_count = total_devices - locked_count
+
+        # 获取在线设备数（通过实时数据表统计）
+        from app.models.device import DeviceRealTimeData
+        from datetime import timedelta
+        
+        # 获取符合筛选条件的设备ID列表
+        filtered_device_ids = None
+        if device_type or team_name:
+            devices = await DeviceInfo.filter(base_query).values_list('id', flat=True)
+            filtered_device_ids = list(devices)
+        
+        # 最近5分钟有数据的设备视为在线
+        recent_time = datetime.now() - timedelta(minutes=5)
+        online_devices_query = DeviceRealTimeData.filter(
+            data_timestamp__gte=recent_time,
+            status="online"
+        )
+        if filtered_device_ids is not None:
+            online_devices_query = online_devices_query.filter(device_id__in=filtered_device_ids)
+        online_devices = await online_devices_query.distinct().values_list('device_id', flat=True)
+        online_count = len(set(online_devices))
+        offline_count = total_devices - online_count
+        
+        # 预警设备数（状态为warning）
+        warning_devices_query = DeviceRealTimeData.filter(
+            data_timestamp__gte=recent_time,
+            status="warning"
+        )
+        if filtered_device_ids is not None:
+            warning_devices_query = warning_devices_query.filter(device_id__in=filtered_device_ids)
+        warning_devices = await warning_devices_query.distinct().values_list('device_id', flat=True)
+        warning_count = len(set(warning_devices))
+        
+        # 故障设备数（状态为error或alarm）
+        error_devices_query = DeviceRealTimeData.filter(
+            data_timestamp__gte=recent_time,
+            status__in=["error", "alarm", "fault"]
+        )
+        if filtered_device_ids is not None:
+            error_devices_query = error_devices_query.filter(device_id__in=filtered_device_ids)
+        error_devices = await error_devices_query.distinct().values_list('device_id', flat=True)
+        error_count = len(set(error_devices))
+        
+        # 维护中设备数（状态为maintenance）
+        maintenance_devices_query = DeviceRealTimeData.filter(
+            data_timestamp__gte=recent_time,
+            status="maintenance"
+        )
+        if filtered_device_ids is not None:
+            maintenance_devices_query = maintenance_devices_query.filter(device_id__in=filtered_device_ids)
+        maintenance_devices = await maintenance_devices_query.distinct().values_list('device_id', flat=True)
+        maintenance_count = len(set(maintenance_devices))
+
+        # 按类型统计
+        type_stats = await device_controller.get_type_statistics()
+
+        # 按班组统计
+        team_stats = await device_controller.get_team_statistics()
+
+        statistics = {
+            "total_devices": total_devices,
+            "locked_devices": locked_count,
+            "unlocked_devices": unlocked_count,
+            "online_devices": online_count,
+            "offline_devices": offline_count,
+            "warning_devices": warning_count,
+            "error_devices": error_count,
+            "maintenance_devices": maintenance_count,
+            "device_types": type_stats,
+            "teams": team_stats
+        }
+
+        return formatter.success(
+            data=statistics,
+            message="获取设备统计信息成功",
+            resource_type="devices"
+        )
+
+    except Exception as e:
+        logger.error(f"获取设备统计信息失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="获取设备统计信息失败")
+
+
 @router.get("/{device_id}", summary="获取设备详情", response_model=None, dependencies=[DependAuth])
 async def get_device(
     request: Request,
@@ -882,55 +1005,6 @@ async def search_devices(
         logger.error(f"搜索设备失败: {str(e)}", exc_info=True)
         formatter = create_formatter(request)
         return formatter.internal_error(f"搜索设备失败: {str(e)}")
-
-
-@router.get("/statistics", summary="设备统计信息", response_model=None, dependencies=[DependAuth])
-async def get_device_statistics(
-    request: Request,
-    current_user: User = DependAuth
-):
-    """
-    获取设备统计信息
-    
-    包括：
-    - 设备总数
-    - 锁定/未锁定设备数
-    - 按类型统计
-    - 按班组统计
-    """
-    try:
-        formatter = create_formatter(request)
-        
-        # 总设备数
-        total_devices = await device_controller.count()
-
-        # 锁定设备数
-        locked_count = await device_controller.count(search=Q(is_locked=True))
-        unlocked_count = total_devices - locked_count
-
-        # 按类型统计
-        type_stats = await device_controller.get_type_statistics()
-
-        # 按班组统计
-        team_stats = await device_controller.get_team_statistics()
-
-        statistics = {
-            "total_devices": total_devices,
-            "locked_devices": locked_count,
-            "unlocked_devices": unlocked_count,
-            "device_types": type_stats,
-            "teams": team_stats
-        }
-
-        return formatter.success(
-            data=statistics,
-            message="获取设备统计信息成功",
-            resource_type="devices"
-        )
-
-    except Exception as e:
-        logger.error(f"获取设备统计信息失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="获取设备统计信息失败")
 
 
 @router.get("/statistics/dashboard/online-welding-rate", summary="获取在线率和焊接率统计数据", response_model=None)
@@ -2110,61 +2184,45 @@ async def get_device_history_data(
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     status: Optional[str] = Query(None, description="设备状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=10000, description="每页数量"),
     current_user: User = DependAuth
 ):
     """
-    获取设备历史数据
+    获取设备历史数据（从TDengine查询）
     
     - **device_id**: 设备ID
     - **start_time**: 开始时间（可选）
     - **end_time**: 结束时间（可选）
     - **status**: 设备状态筛选（可选）
     - **page**: 页码
-    - **page_size**: 每页数量
+    - **page_size**: 每页数量（图表模式可以设置为10000获取所有数据）
     """
+    logger.info(f"🔍 [历史数据API] 收到请求: device_id={device_id}, start_time={start_time}, end_time={end_time}, page={page}, page_size={page_size}")
     try:
         formatter = create_formatter(request)
         
-        # 检查设备是否存在
+        # 检查设备是否存在并获取device_code
         device_obj = await device_controller.get(id=device_id)
         if not device_obj:
             return formatter.not_found("设备不存在", "device")
 
-        # 构建查询条件
-        from app.models.device import DeviceHistoryData
-        query = DeviceHistoryData.filter(device_id=device_id)
-        
-        if start_time:
-            query = query.filter(data_timestamp__gte=start_time)
-        if end_time:
-            query = query.filter(data_timestamp__lte=end_time)
-        if status:
-            query = query.filter(status=status)
+        device_code = device_obj.device_code
+        logger.info(f"查询设备历史数据: device_id={device_id}, device_code={device_code}, start_time={start_time}, end_time={end_time}, page={page}, page_size={page_size}")
 
-        # 分页查询
-        offset = (page - 1) * page_size
-        history_data = await query.offset(offset).limit(page_size).order_by('-data_timestamp')
-        total = await query.count()
+        # 调用控制器方法从TDengine查询历史数据
+        from app.controllers.device_data import device_data_controller
         
-        # 转换数据格式
-        result = []
-        for data in history_data:
-            item = {
-                "id": data.id,
-                "device_id": data.device_id,
-                "voltage": data.voltage,
-                "current": data.current,
-                "power": data.power,
-                "temperature": data.temperature,
-                "pressure": data.pressure,
-                "vibration": data.vibration,
-                "status": data.status,
-                "error_code": data.error_code,
-                "error_message": data.error_message,
-                "data_timestamp": data.data_timestamp.isoformat() if data.data_timestamp else None
-            }
-            result.append(item)
+        total, history_data = await device_data_controller.get_device_history_data(
+            device_id=device_id,
+            device_code=device_code,
+            start_time=start_time,
+            end_time=end_time,
+            status=status,
+            page=page,
+            page_size=page_size
+        )
+        
+        logger.info(f"查询到 {len(history_data)} 条历史数据，总数: {total}")
 
         # 构建查询参数
         query_params = {}
@@ -2176,7 +2234,7 @@ async def get_device_history_data(
             query_params['status'] = status
 
         return formatter.paginated_success(
-            data=result,
+            data=history_data,
             total=total,
             page=page,
             page_size=page_size,

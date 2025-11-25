@@ -19,6 +19,8 @@ from .device_maintenance import router as device_maintenance_router
 from .device_repair_records import router as device_repair_records_router
 from .device_process import router as device_process_router
 from .device_field_config import router as device_field_config_router
+from .device_fields import router as device_fields_router  # 设备字段动态参数展示
+from .tdengine_fields import router as tdengine_fields_router  # TDengine 字段提取
 from .health import router as health_router
 from .docs import router as docs_router
 
@@ -84,6 +86,8 @@ v2_router.include_router(devices_router, prefix="/devices", tags=["设备管理 
 v2_router.include_router(device_maintenance_router, prefix="/device", tags=["设备维护管理 v2"])
 v2_router.include_router(device_repair_records_router, prefix="/device/maintenance", tags=["设备维修记录管理 v2"])
 v2_router.include_router(device_field_config_router, prefix="/device/config", tags=["设备字段配置管理 v2"])
+v2_router.include_router(device_fields_router, tags=["设备字段动态参数展示 v2"])  # 新增：元数据驱动的动态参数展示
+v2_router.include_router(tdengine_fields_router, tags=["TDengine字段提取 v2"])  # 新增：从TDengine自动提取字段
 v2_router.include_router(device_process_router, prefix="/devices", tags=["设备工艺管理 v2"])
 
 # 注册报警管理模块路由

@@ -115,6 +115,17 @@ const route: RouteRecordRaw = {
       },
     },
     {
+      name: 'DeviceFieldConfig',
+      path: '/system/device-field',
+      component: () => import('./device-field/index.vue'),
+      meta: {
+        title: '设备字段配置',
+        icon: 'mdi-ticket-percent-outline',
+        keepAlive: true,
+      },
+    },
+
+    {
       name: 'ComponentManagement',
       path: '/system/components',
       component: () => import('./components/index.vue'),

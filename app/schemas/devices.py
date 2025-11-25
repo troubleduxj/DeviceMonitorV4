@@ -306,7 +306,7 @@ class DeviceRealtimeQuery(BaseModel):
     end_time: Optional[datetime] = Field(None, description="结束时间")
     status: Optional[str] = Field(None, description="设备状态")
     page: int = Field(1, description="页码", ge=1)
-    page_size: int = Field(20, description="每页数量", ge=1, le=100)
+    page_size: int = Field(20, description="每页数量", ge=1, le=2000)
     use_dynamic_fields: bool = Field(False, description="是否使用动态字段支持")
     paged: bool = Field(True, description="是否启用分页")
 
@@ -673,12 +673,21 @@ class DeviceFieldConfigCreate(BaseModel):
     field_code: str = Field(..., description="字段代码")
     field_type: str = Field(..., description="字段类型")
     field_category: str = Field("maintenance_record", description="字段分类")
+    field_group: Optional[str] = Field("default", description="字段分组")  # ✅ 添加字段分组
+    is_default_visible: Optional[bool] = Field(True, description="是否默认显示")  # ✅ 添加默认显示
+    group_order: Optional[int] = Field(0, description="分组内排序")  # ✅ 添加分组排序
     is_required: bool = Field(False, description="是否必填")
     sort_order: int = Field(0, description="排序顺序")
     default_value: Optional[str] = Field(None, description="默认值")
     validation_rule: Optional[Dict[str, Any]] = Field(None, description="验证规则")
     unit: Optional[str] = Field(None, description="单位")
     description: Optional[str] = Field(None, description="字段描述")
+    is_monitoring_key: bool = Field(False, description="是否为实时监控关键字段")
+    is_ai_feature: bool = Field(False, description="是否为AI分析特征字段")
+    aggregation_method: Optional[str] = Field(None, description="聚合方法")
+    data_range: Optional[Dict[str, Any]] = Field(None, description="正常数据范围")
+    alarm_threshold: Optional[Dict[str, Any]] = Field(None, description="报警阈值配置")
+    display_config: Optional[Dict[str, Any]] = Field(None, description="前端显示配置")
 
 
 class DeviceFieldConfigUpdate(BaseModel):
@@ -687,6 +696,9 @@ class DeviceFieldConfigUpdate(BaseModel):
     field_name: Optional[str] = Field(None, description="字段名称")
     field_type: Optional[str] = Field(None, description="字段类型")
     field_category: Optional[str] = Field(None, description="字段分类")
+    field_group: Optional[str] = Field(None, description="字段分组")  # ✅ 添加字段分组
+    is_default_visible: Optional[bool] = Field(None, description="是否默认显示")  # ✅ 添加默认显示
+    group_order: Optional[int] = Field(None, description="分组内排序")  # ✅ 添加分组排序
     is_required: Optional[bool] = Field(None, description="是否必填")
     sort_order: Optional[int] = Field(None, description="排序顺序")
     default_value: Optional[str] = Field(None, description="默认值")
@@ -694,6 +706,12 @@ class DeviceFieldConfigUpdate(BaseModel):
     unit: Optional[str] = Field(None, description="单位")
     description: Optional[str] = Field(None, description="字段描述")
     is_active: Optional[bool] = Field(None, description="是否激活")
+    is_monitoring_key: Optional[bool] = Field(None, description="是否为实时监控关键字段")
+    is_ai_feature: Optional[bool] = Field(None, description="是否为AI分析特征字段")
+    aggregation_method: Optional[str] = Field(None, description="聚合方法")
+    data_range: Optional[Dict[str, Any]] = Field(None, description="正常数据范围")
+    alarm_threshold: Optional[Dict[str, Any]] = Field(None, description="报警阈值配置")
+    display_config: Optional[Dict[str, Any]] = Field(None, description="前端显示配置")
 
 
 # =====================================================

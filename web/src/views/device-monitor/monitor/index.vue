@@ -174,8 +174,6 @@
                 :key="device.id"
                 class="device-card"
                 :class="getDeviceCardClass(device.device_status)"
-                hoverable
-                @click="showDeviceDetails(device)"
               >
           <!-- 设备状态指示器 -->
           <div class="status-indicator" :class="getStatusClass(device.device_status)"></div>
@@ -193,20 +191,8 @@
             </div>
           </div>
 
-          <!-- 设备状态 -->
-          <div class="device-status">
-            <template v-if="realtimeDataLoading">
-              <NSkeleton text :repeat="1" style="width: 80px; height: 24px; border-radius: 12px" />
-            </template>
-            <template v-else>
-              <NTag :type="getStatusTagType(device.device_status)" size="medium">
-                {{ getStatusText(device.device_status) }}
-              </NTag>
-            </template>
-          </div>
-
-          <!-- 设备监控数据 - 动态参数展示 -->
-          <DynamicMonitoringData
+          <!-- 设备监控数据 - 分组动态参数展示 -->
+          <GroupedMonitoringData
             :monitoring-fields="getDeviceFields(device.device_type)"
             :realtime-data="getDeviceRealtimeData(device)"
             :loading="realtimeDataLoading"
@@ -227,8 +213,8 @@
               size="small"
               @click.stop="showDeviceCharts(device)"
             >
-              <TheIcon icon="material-symbols:monitoring" :size="14" class="mr-5" />
-              查看图表
+              <TheIcon icon="material-symbols:history" :size="14" class="mr-5" />
+              查看历史
             </PermissionButton>
             <PermissionButton
               permission="GET /api/v2/devices/{device_id}"
@@ -609,6 +595,7 @@ import ViewToggle from '@/components/common/ViewToggle.vue'
 import DeviceCardSkeleton from '@/components/card/DeviceCardSkeleton.vue'
 import FastPermissionWrapper from '@/components/Permission/FastPermissionWrapper.vue'
 import DynamicMonitoringData from '@/components/device/DynamicMonitoringData.vue'
+import GroupedMonitoringData from '@/components/device/GroupedMonitoringData.vue'
 import { useDeviceWebSocket } from '@/composables/useWebSocket'
 import { useDeviceFieldStore } from '@/store/modules/device-field'
 import {
@@ -1975,78 +1962,41 @@ function getDeviceStatusDescription(status) {
 }
 
 /**
- * 显示设备图表
+ * 显示设备历史数据
+ * 跳转到历史数据查询页面，携带设备编码和设备名称参数
  */
 async function showDeviceCharts(device) {
   console.log('showDeviceCharts 被调用，设备数据:', device)
 
-  // 检查用户登录状态和权限
-  console.log('用户登录状态:', {
-    userId: userStore.userId,
-    isLoggedIn: !!userStore.userId,
-    userInfo: userStore.userInfo,
-  })
-  console.log('权限状态:', {
-    accessRoutes: permissionStore.accessRoutes?.length || 0,
-    accessApis: permissionStore.accessApis?.length || 0,
-  })
-
-  const now = new Date()
-  const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000)
-
-  // 确保使用正确的设备编码字段
+  // 确保使用正确的设备编码和设备名称字段
   const deviceCode = device.id || device.device_code
+  const deviceName = device.name || device.device_name || ''
+  const deviceTypeCode = device.device_type || device.type_code || filterType.value
 
-  console.log('提取的设备编码:', deviceCode)
-  console.log('当前路由器实例:', router)
-  console.log(
-    '所有可用路由:',
-    router.getRoutes().map((r) => ({ name: r.name, path: r.path }))
-  )
+  console.log('提取的设备信息:', { deviceCode, deviceName, deviceTypeCode })
 
   if (!deviceCode) {
     console.error('设备编码不存在:', device)
-    message.error('设备编码不存在，无法查看图表')
+    message.error('设备编码不存在，无法查看历史数据')
     return
   }
 
-  // 检查目标路由是否存在
-  const targetRoute = router.resolve({ path: '/device-monitor/history' })
-  console.log('目标路由解析结果:', targetRoute)
-
-  // 检查是否有DeviceHistory路由
-  const deviceHistoryRoute = router.getRoutes().find((r) => r.name === 'DeviceHistory')
-  console.log('DeviceHistory路由是否存在:', deviceHistoryRoute)
-
-  // 如果路由解析为NotFound，尝试强制重新加载动态路由
-  if (targetRoute.name === 'NotFound') {
-    console.log('检测到路由解析为NotFound，尝试重新加载动态路由')
-    try {
-      const { addDynamicRoutes } = await import('@/router')
-      await addDynamicRoutes()
-      console.log('动态路由重新加载完成')
-
-      // 重新检查路由
-      const newTargetRoute = router.resolve({ path: '/device-monitor/history' })
-      console.log('重新加载后的路由解析结果:', newTargetRoute)
-    } catch (error) {
-      console.error('重新加载动态路由失败:', error)
-    }
-  }
-
+  // 准备跳转参数：携带设备编码、设备名称和设备类型代码
   const routeParams = {
     path: '/device-monitor/history',
     query: {
       device_code: deviceCode,
-      device_name: device.name || '',
-      start_time: halfHourAgo.toISOString(),
-      end_time: now.toISOString(),
+      device_name: deviceName,
+      device_type_code: deviceTypeCode,
     },
   }
 
-  console.log('准备跳转到历史页面，路由参数:', routeParams)
+  console.log('准备跳转到历史数据查询页面，路由参数:', routeParams)
 
   try {
+    // 检查目标路由是否存在
+    const targetRoute = router.resolve({ path: '/device-monitor/history' })
+    
     // 如果路由解析为NotFound，使用name方式跳转
     if (targetRoute.name === 'NotFound') {
       console.log('使用路由名称方式跳转')
@@ -2061,13 +2011,7 @@ async function showDeviceCharts(device) {
     console.log('路由跳转成功')
   } catch (error) {
     console.error('路由跳转失败:', error)
-    console.error('错误详情:', error.message, error.stack)
-
-    // 如果跳转失败，尝试直接使用window.location
-    console.log('尝试使用window.location进行跳转')
-    const queryString = new URLSearchParams(routeParams.query).toString()
-    const url = `/device/history?${queryString}`
-    window.location.href = url
+    message.error('跳转到历史数据查询页面失败')
   }
 }
 

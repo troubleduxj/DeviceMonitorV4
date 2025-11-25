@@ -13,6 +13,7 @@ from fastapi import APIRouter, Query, Body, HTTPException, Request, Depends
 from tortoise.expressions import Q
 from tortoise.exceptions import DoesNotExist
 from tortoise.transactions import in_transaction
+from tortoise.functions import Count
 
 from app.controllers.device import device_controller
 from app.core.dependency import DependAuth
@@ -134,8 +135,8 @@ async def get_maintenance_records(
                 "actual_end_time": record.actual_end_time.isoformat() if record.actual_end_time else None,
                 "assigned_to": record.assigned_to,
                 "maintenance_team": record.maintenance_team,
-                "estimated_cost": record.estimated_cost,
-                "actual_cost": record.actual_cost,
+                "estimated_cost": float(record.estimated_cost) if record.estimated_cost else None,
+                "actual_cost": float(record.actual_cost) if record.actual_cost else None,
                 "maintenance_result": record.maintenance_result,
                 "parts_replaced": record.parts_replaced,
                 "next_maintenance_date": record.next_maintenance_date.isoformat() if record.next_maintenance_date else None,
@@ -220,8 +221,8 @@ async def get_maintenance_record(
             "actual_end_time": record.actual_end_time.isoformat() if record.actual_end_time else None,
             "assigned_to": record.assigned_to,
             "maintenance_team": record.maintenance_team,
-            "estimated_cost": record.estimated_cost,
-            "actual_cost": record.actual_cost,
+            "estimated_cost": float(record.estimated_cost) if record.estimated_cost else None,
+            "actual_cost": float(record.actual_cost) if record.actual_cost else None,
             "maintenance_result": record.maintenance_result,
             "parts_replaced": record.parts_replaced,
             "next_maintenance_date": record.next_maintenance_date.isoformat() if record.next_maintenance_date else None,
@@ -675,19 +676,19 @@ async def get_maintenance_statistics(
         
         # 按维护类型统计
         maintenance_types = {}
-        type_records = await record_query.group_by('maintenance_type').values('maintenance_type', count=Count('id'))
+        type_records = await record_query.group_by('maintenance_type').annotate(count=Count('id')).values('maintenance_type', 'count')
         for record in type_records:
             maintenance_types[record['maintenance_type']] = record['count']
         
         # 按优先级统计
         priority_distribution = {}
-        priority_records = await record_query.group_by('priority').values('priority', count=Count('id'))
+        priority_records = await record_query.group_by('priority').annotate(count=Count('id')).values('priority', 'count')
         for record in priority_records:
             priority_distribution[record['priority']] = record['count']
         
         # 按团队统计工作量
         team_workload = {}
-        team_records = await record_query.filter(maintenance_team__not_isnull=True).group_by('maintenance_team').values('maintenance_team', count=Count('id'))
+        team_records = await record_query.filter(maintenance_team__not_isnull=True).group_by('maintenance_team').annotate(count=Count('id')).values('maintenance_team', 'count')
         for record in team_records:
             team_workload[record['maintenance_team']] = record['count']
         
@@ -696,22 +697,24 @@ async def get_maintenance_statistics(
             maintenance_status="completed",
             actual_start_time__not_isnull=True,
             actual_end_time__not_isnull=True
-        )
+        ).all()
         
         total_completion_time = 0
         total_cost = 0
         cost_count = 0
+        time_count = 0
         
         for record in completed_with_times:
             if record.actual_start_time and record.actual_end_time:
                 duration = (record.actual_end_time - record.actual_start_time).total_seconds() / 3600  # 转换为小时
                 total_completion_time += duration
+                time_count += 1
             
             if record.actual_cost:
-                total_cost += record.actual_cost
+                total_cost += float(record.actual_cost)
                 cost_count += 1
         
-        avg_completion_time = total_completion_time / len(completed_with_times) if completed_with_times else None
+        avg_completion_time = total_completion_time / time_count if time_count > 0 else None
         avg_cost = total_cost / cost_count if cost_count > 0 else None
         
         # 构建统计结果
@@ -726,8 +729,8 @@ async def get_maintenance_statistics(
             "priority_distribution": priority_distribution,
             "team_workload": team_workload,
             "average_completion_time": avg_completion_time,
-            "total_maintenance_cost": total_cost,
-            "average_maintenance_cost": avg_cost
+            "total_maintenance_cost": float(total_cost) if total_cost else 0,
+            "average_maintenance_cost": float(avg_cost) if avg_cost else None
         }
 
         return formatter.success(

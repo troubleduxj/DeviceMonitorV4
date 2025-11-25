@@ -5,6 +5,7 @@
 
 import { createDeviceApis, apiV2Client } from '@/utils/api-v2-migration'
 import { createSafeApiCall } from '@/utils/error-handler'
+import { deviceFieldApi } from './device-field'
 
 // 创建设备管理API实例
 const deviceApis = createDeviceApis()
@@ -307,6 +308,9 @@ export const repairRecordsApi = {
   }),
 }
 
+// 设备字段动态参数展示API (TASK-7)
+// 已从 device-field.ts 导入，不需要重复声明
+
 // 设备工艺API
 export const processApi = {
   // 获取工艺列表
@@ -411,6 +415,8 @@ export default {
   deviceTypes: deviceTypeApi,
   deviceData: deviceDataApi,
   deviceAlarm: deviceAlarmApi,
+  deviceField: deviceFieldApi, // 新增：设备字段动态参数展示
+  deviceFields: deviceFieldApi, // 别名：设备字段配置管理（复数形式）
   maintenance: maintenanceApi,
   repairRecords: repairRecordsApi,
   processes: processApi,

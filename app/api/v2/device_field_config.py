@@ -148,21 +148,34 @@ async def get_device_field_config(
             query = query.filter(field_category=field_category)
         
         # 获取字段配置
-        fields = await query.order_by('sort_order', 'field_name')
+        fields = await query.order_by('sort_order', 'field_name').all()
+        
+        logger.info(f"查询到 {len(fields)} 个字段")
         
         field_configs = []
         for field in fields:
             field_config = {
+                "id": field.id,
                 "field_code": field.field_code,
                 "field_name": field.field_name,
                 "field_type": field.field_type,
                 "field_category": field.field_category,
+                "field_group": field.field_group,  # ✅ 添加字段分组
+                "is_default_visible": field.is_default_visible,  # ✅ 添加默认显示
+                "group_order": field.group_order,  # ✅ 添加分组排序
                 "is_required": field.is_required,
                 "sort_order": field.sort_order,
                 "default_value": field.default_value,
                 "validation_rule": json.loads(field.validation_rule) if field.validation_rule else None,
                 "unit": field.unit,
                 "description": field.description,
+                "is_monitoring_key": field.is_monitoring_key,
+                "is_ai_feature": field.is_ai_feature,
+                "is_active": field.is_active,
+                "aggregation_method": field.aggregation_method,
+                "data_range": field.data_range,
+                "alarm_threshold": field.alarm_threshold,
+                "display_config": field.display_config,
                 "options": None
             }
             
@@ -254,7 +267,7 @@ async def get_all_device_field_configs(
                 )
         
         # 获取所有激活的设备类型
-        device_types = await DeviceType.filter(is_active=True).order_by('type_name')
+        device_types = await DeviceType.filter(is_active=True).order_by('type_name').all()
         
         result = {}
         for device_type in device_types:
@@ -268,11 +281,12 @@ async def get_all_device_field_configs(
                 query = query.filter(field_category=field_category)
             
             # 获取字段配置
-            fields = await query.order_by('sort_order', 'field_name')
+            fields = await query.order_by('sort_order', 'field_name').all()
             
             field_configs = []
             for field in fields:
                 field_config = {
+                    "id": field.id,
                     "field_code": field.field_code,
                     "field_name": field.field_name,
                     "field_type": field.field_type,
@@ -283,6 +297,13 @@ async def get_all_device_field_configs(
                     "validation_rule": json.loads(field.validation_rule) if field.validation_rule else None,
                     "unit": field.unit,
                     "description": field.description,
+                    "is_monitoring_key": field.is_monitoring_key,
+                    "is_ai_feature": field.is_ai_feature,
+                    "is_active": field.is_active,
+                    "aggregation_method": field.aggregation_method,
+                    "data_range": field.data_range,
+                    "alarm_threshold": field.alarm_threshold,
+                    "display_config": field.display_config,
                     "options": None
                 }
                 
@@ -348,19 +369,28 @@ async def create_device_field_config(
             return formatter.bad_request("字段代码已存在")
         
         # 创建字段配置
-        async with in_transaction():
+        async with in_transaction("default"):
             field_config = await DeviceField.create(
                 device_type_code=field_data.device_type_code,
                 field_name=field_data.field_name,
                 field_code=field_data.field_code,
                 field_type=field_data.field_type,
                 field_category=field_data.field_category,
+                field_group=field_data.field_group,  # ✅ 添加字段分组
+                is_default_visible=field_data.is_default_visible,  # ✅ 添加默认显示
+                group_order=field_data.group_order,  # ✅ 添加分组排序
                 is_required=field_data.is_required,
                 sort_order=field_data.sort_order,
                 default_value=field_data.default_value,
                 validation_rule=json.dumps(field_data.validation_rule) if field_data.validation_rule else None,
                 unit=field_data.unit,
                 description=field_data.description,
+                is_monitoring_key=field_data.is_monitoring_key,
+                is_ai_feature=field_data.is_ai_feature,
+                aggregation_method=field_data.aggregation_method,
+                data_range=field_data.data_range,  # JSONField自动处理
+                alarm_threshold=field_data.alarm_threshold,  # JSONField自动处理
+                display_config=field_data.display_config,  # JSONField自动处理
                 is_active=True
             )
         
@@ -374,6 +404,9 @@ async def create_device_field_config(
             "field_name": field_config.field_name,
             "field_type": field_config.field_type,
             "field_category": field_config.field_category,
+            "field_group": field_config.field_group,  # ✅ 添加字段分组
+            "is_default_visible": field_config.is_default_visible,  # ✅ 添加默认显示
+            "group_order": field_config.group_order,  # ✅ 添加分组排序
             "is_required": field_config.is_required,
             "sort_order": field_config.sort_order,
             "default_value": field_config.default_value,
@@ -419,11 +452,11 @@ async def update_device_field_config(
         # 更新字段配置
         update_data = field_data.model_dump(exclude_unset=True)
         if update_data:
-            # 处理validation_rule字段
+            # 只处理validation_rule字段（字符串类型），其他JSON字段由Tortoise ORM自动处理
             if 'validation_rule' in update_data and update_data['validation_rule'] is not None:
                 update_data['validation_rule'] = json.dumps(update_data['validation_rule'])
             
-            async with in_transaction():
+            async with in_transaction("default"):
                 await DeviceField.filter(id=field_id).update(**update_data)
         
         # 清除相关缓存
@@ -439,6 +472,9 @@ async def update_device_field_config(
             "field_name": updated_field.field_name,
             "field_type": updated_field.field_type,
             "field_category": updated_field.field_category,
+            "field_group": updated_field.field_group,  # ✅ 添加字段分组
+            "is_default_visible": updated_field.is_default_visible,  # ✅ 添加默认显示
+            "group_order": updated_field.group_order,  # ✅ 添加分组排序
             "is_required": updated_field.is_required,
             "sort_order": updated_field.sort_order,
             "default_value": updated_field.default_value,
@@ -456,8 +492,10 @@ async def update_device_field_config(
         )
         
     except Exception as e:
-        logger.error(f"更新设备字段配置失败: {str(e)}")
-        return formatter.internal_error("更新设备字段配置失败")
+        logger.error(f"更新设备字段配置失败: {str(e)}", exc_info=True)
+        logger.error(f"字段ID: {field_id}")
+        logger.error(f"更新数据: {field_data.model_dump(exclude_unset=True)}")
+        return formatter.internal_error(f"更新设备字段配置失败: {str(e)}")
 
 
 @router.delete("/device-fields/{field_id}", summary="删除设备字段配置", response_model=None)
@@ -482,7 +520,7 @@ async def delete_device_field_config(
         device_type_code = field_config.device_type_code
         
         # 删除字段配置（软删除，设置is_active=False）
-        async with in_transaction():
+        async with in_transaction("default"):
             await DeviceField.filter(id=field_id).update(is_active=False)
         
         # 清除相关缓存

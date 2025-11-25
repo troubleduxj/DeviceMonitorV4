@@ -151,6 +151,96 @@ const deviceMaintenanceApi = {
       },
     })
   },
+
+  // =====================================================
+  // 设备维护看板相关API
+  // =====================================================
+
+  /**
+   * 获取维护记录列表
+   */
+  getMaintenanceRecords(params = {}) {
+    return request({
+      url: `${API_BASE}/records`,
+      method: 'GET',
+      params,
+    })
+  },
+
+  /**
+   * 获取维护记录详情
+   */
+  getMaintenanceRecord(id) {
+    return request({
+      url: `${API_BASE}/records/${id}`,
+      method: 'GET',
+    })
+  },
+
+  /**
+   * 创建维护记录
+   */
+  createMaintenanceRecord(data) {
+    return request({
+      url: `${API_BASE}/records`,
+      method: 'POST',
+      data,
+    })
+  },
+
+  /**
+   * 更新维护记录
+   */
+  updateMaintenanceRecord(id, data) {
+    return request({
+      url: `${API_BASE}/records/${id}`,
+      method: 'PUT',
+      data,
+    })
+  },
+
+  /**
+   * 删除维护记录
+   */
+  deleteMaintenanceRecord(id) {
+    return request({
+      url: `${API_BASE}/records/${id}`,
+      method: 'DELETE',
+    })
+  },
+
+  /**
+   * 获取维护统计信息
+   */
+  getMaintenanceStatistics(params = {}) {
+    return request({
+      url: `${API_BASE}/statistics`,
+      method: 'GET',
+      params,
+    })
+  },
+
+  /**
+   * 获取维护计划列表
+   */
+  getMaintenancePlans(params = {}) {
+    return request({
+      url: `${API_BASE}/plans`,
+      method: 'GET',
+      params,
+    })
+  },
+
+  /**
+   * 获取维护提醒列表
+   */
+  getMaintenanceReminders(params = {}) {
+    return request({
+      url: `${API_BASE}/reminders`,
+      method: 'GET',
+      params,
+    })
+  },
 }
 
 export default deviceMaintenanceApi
