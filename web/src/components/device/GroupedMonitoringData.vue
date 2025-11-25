@@ -314,205 +314,157 @@ function getFieldColor(field: DeviceField): string {
 
 <style scoped lang="scss">
 .grouped-monitoring-data {
-  padding: 12px 0;
+  padding: 4px 0;
 }
 
 .loading-skeleton {
-  padding: 16px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
-  border-radius: 12px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
 }
 
-// 轮播头部 - 美化版本
+// 轮播头部 - 紧凑版本 (60%高度)
 .carousel-header {
-  margin-bottom: 16px;
+  margin-bottom: 6px;
 }
 
 .group-navigation {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
-  backdrop-filter: blur(8px);
-  transition: all 0.3s ease;
-  
-  &:hover {
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.12);
-    border-color: rgba(59, 130, 246, 0.3);
-  }
+  padding: 4px 8px;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .nav-btn {
-  padding: 6px;
-  min-width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(255, 255, 255, 0.8);
+  padding: 2px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background: transparent;
   
   &:not(:disabled):hover {
-    transform: scale(1.15);
-    background: rgba(59, 130, 246, 0.15);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.1);
   }
   
   &:disabled {
-    opacity: 0.25;
+    opacity: 0.3;
     cursor: not-allowed;
-    background: rgba(0, 0, 0, 0.03);
   }
 }
 
 .group-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 15px;
+  gap: 6px;
+  font-size: 11px;
   font-weight: 600;
-  color: #1f2937;
+  color: #374151;
   flex: 1;
   justify-content: center;
 
   .group-icon {
-    font-size: 22px;
-    animation: iconBounce 2s ease-in-out infinite;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    font-size: 12px;
   }
 
   .group-title {
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-weight: 600;
+    color: #374151;
   }
 
   .group-count {
-    font-size: 11px;
-    color: #6b7280;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 4px 10px;
-    border-radius: 20px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 9px;
+    color: #9ca3af;
+    font-weight: 500;
   }
 }
 
-@keyframes iconBounce {
-  0%, 100% {
-    transform: scale(1) translateY(0);
-  }
-  50% {
-    transform: scale(1.1) translateY(-2px);
-  }
-}
-
-// 轮播容器 - 美化版本
+// 轮播容器 - 紧凑版本 (60%高度)
 .carousel-container {
   position: relative;
-  padding-bottom: 36px;
+  padding-bottom: 16px;
 }
 
 .monitoring-carousel {
   :deep(.n-carousel__dots) {
-    bottom: 4px;
-    gap: 10px;
+    bottom: 2px;
+    gap: 4px;
   }
   
   :deep(.n-carousel__dot) {
-    width: 10px;
-    height: 10px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.12);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
   }
   
   :deep(.n-carousel__dot--active) {
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-    width: 28px;
-    border-radius: 5px;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    background: #3b82f6;
+    width: 12px;
+    border-radius: 2px;
   }
 
   :deep(.n-carousel__slides) {
-    min-height: 150px;
+    min-height: 60px;
   }
 }
 
 .carousel-item {
-  padding: 18px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 14px;
-  min-height: 130px;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 6px 8px;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+  min-height: 50px;
+  transition: all 0.2s ease;
   
-  &:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    border-color: rgba(59, 130, 246, 0.25);
-    transform: translateY(-2px);
-  }
 }
 
 .field-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .data-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 10px 14px;
-  border-radius: 10px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid transparent;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  background: transparent;
 
   &:hover {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.04) 100%);
-    border-color: rgba(59, 130, 246, 0.15);
-    transform: translateX(4px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.05);
   }
 }
 
 .data-label {
-  color: #4b5563;
-  font-weight: 600;
+  color: #6b7280;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  gap: 4px;
+  font-size: 10px;
 
   .field-icon {
-    font-size: 18px;
+    font-size: 11px;
     line-height: 1;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
   }
 }
 
 .data-value {
-  font-weight: 700;
-  font-size: 15px;
-  font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
-  transition: all 0.3s ease;
-  padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: 6px;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  font-size: 11px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  color: #1f2937;
 }
 
 .empty-state {
@@ -520,64 +472,51 @@ function getFieldColor(field: DeviceField): string {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 20px;
+  padding: 16px 10px;
   color: #9ca3af;
   text-align: center;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.01) 100%);
-  border-radius: 16px;
-  border: 2px dashed rgba(0, 0, 0, 0.08);
+  background: #f9fafb;
+  border-radius: 6px;
 
   .empty-icon {
-    margin-bottom: 16px;
-    opacity: 0.5;
+    margin-bottom: 6px;
+    opacity: 0.4;
     color: #d1d5db;
     animation: emptyPulse 3s ease-in-out infinite;
   }
 
   .empty-text {
-    font-size: 14px;
+    font-size: 10px;
     font-weight: 500;
-    opacity: 0.7;
-    letter-spacing: 0.01em;
+    opacity: 0.6;
   }
 }
 
-@keyframes emptyPulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.7;
-  }
-}
-
-// 响应式设计
+// 响应式设计 - 紧凑版本
 @media (max-width: 768px) {
   .carousel-item {
-    padding: 12px;
+    padding: 4px 6px;
   }
 
   .data-row {
-    font-size: 12px;
-    padding: 5px 6px;
+    font-size: 9px;
+    padding: 2px 4px;
   }
 
   .data-value {
-    font-size: 13px;
+    font-size: 10px;
   }
   
   .group-navigation {
-    padding: 8px 10px;
+    padding: 3px 6px;
   }
   
   .group-info {
-    font-size: 13px;
-    gap: 6px;
+    font-size: 10px;
+    gap: 4px;
     
     .group-icon {
-      font-size: 16px;
+      font-size: 10px;
     }
   }
 }

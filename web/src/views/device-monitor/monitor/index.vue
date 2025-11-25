@@ -2197,46 +2197,45 @@ onUnmounted(() => {
 /* 设备网格布局 - 紧凑简洁版本 */
 .device-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
   padding: 2px;
 }
 
 @media (max-width: 1400px) {
   .device-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
   }
 }
 
 @media (max-width: 768px) {
   .device-grid {
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 10px;
   }
 }
 
-/* 设备卡片样式 - 紧凑简洁版本 */
+/* 设备卡片样式 - 紧凑简洁版本 (60%高度) */
 .device-card {
   position: relative;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 3px solid #e0e0e0;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   background: #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .device-card :deep(.n-card__content) {
-  padding: 12px !important;
+  padding: 8px 10px !important;
 }
 
 .device-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-  border-left-width: 4px;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .device-card--welding {
@@ -2276,10 +2275,10 @@ onUnmounted(() => {
 /* 状态指示器 - 紧凑版本 */
 .status-indicator {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   z-index: 10;
 }
@@ -2320,14 +2319,14 @@ onUnmounted(() => {
   50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2); }
 }
 
-/* 设备头部信息 - 紧凑版本 */
+/* 设备头部信息 - 紧凑版本 (60%高度) */
 .device-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .device-info {
@@ -2336,32 +2335,33 @@ onUnmounted(() => {
 }
 
 .device-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  margin: 0 0 4px 0;
+  margin: 0 0 2px 0;
   color: #1f2937;
-  line-height: 1.3;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .device-id {
-  font-size: 11px;
-  color: #6b7280;
+  font-size: 10px;
+  color: #9ca3af;
   margin: 0;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
 
 .device-type {
-  margin-left: 8px;
+  margin-left: 6px;
   flex-shrink: 0;
 }
 
 .device-type :deep(.n-tag) {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  line-height: 1.3;
 }
 
 /* 设备状态 */
@@ -2410,51 +2410,48 @@ onUnmounted(() => {
   transition: all 0.3s ease;
 }
 
-/* 设备位置 - 紧凑版本 */
+/* 设备位置 - 紧凑版本 (60%高度) */
 .device-location {
   display: flex;
   align-items: center;
-  font-size: 11px;
+  font-size: 10px;
   color: #9ca3af;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+  padding: 3px 0;
 }
 
-/* 设备操作 - 美化版本 */
+/* 设备操作 - 紧凑版本 (60%高度) */
 .device-actions {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 2px solid rgba(0, 0, 0, 0.05);
+  flex-direction: row;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .device-actions :deep(.n-button) {
-  width: 100%;
+  flex: 1;
   justify-content: center;
-  border-radius: 10px;
-  font-weight: 600;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0 8px;
+  height: 26px;
+  transition: all 0.2s ease;
 }
 
 .device-actions :deep(.n-button:hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
 .device-actions :deep(.n-button--default-type) {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-  border: 1px solid #d1d5db;
+  background: #f5f5f5;
+  border: 1px solid #e5e5e5;
 }
 
 .device-actions :deep(.n-button--primary-type) {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-}
-
-.device-actions :deep(.n-button--primary-type:hover) {
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+  background: #3b82f6;
 }
 
 .n-card {
