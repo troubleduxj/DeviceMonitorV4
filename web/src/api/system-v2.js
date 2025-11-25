@@ -274,7 +274,18 @@ export const compatibilityApi = {
   getApiList: wrapApiWithErrorHandler((params = {}) => systemApis.apis.list(params)),
   getApis: wrapApiWithErrorHandler((params = {}) => systemApis.apis.list(params)), // v1兼容别名
   createApi: wrapApiWithErrorHandler((data = {}) => systemApis.apis.create(data)),
-  updateApi: wrapApiWithErrorHandler((id, data = {}) => systemApis.apis.update(id, data)),
+  updateApi: wrapApiWithErrorHandler((data = {}) => {
+    // 修复：与updateMenu保持一致的调用格式，从data对象中提取id
+    const { id, ...updateData } = data
+
+    // 验证ID是否存在且有效
+    if (!id || isNaN(id) || id <= 0) {
+      console.error('API更新失败：ID无效', { id, data })
+      throw new Error(`API ID无效: ${id}`)
+    }
+
+    return systemApis.apis.update(id, updateData)
+  }),
   deleteApi: wrapApiWithErrorHandler((id) => systemApis.apis.delete(id)),
   batchDeleteApis: createStandardBatchDeleteApi('apis'),
   refreshApi: wrapApiWithErrorHandler(() => systemApis.apis.refresh()),
@@ -285,7 +296,18 @@ export const compatibilityApi = {
   // 字典类型管理 - 使用真正的v2接口
   getDictTypeList: wrapApiWithErrorHandler((params = {}) => systemApis.dictTypes.list(params)),
   createDictType: wrapApiWithErrorHandler((data = {}) => systemApis.dictTypes.create(data)),
-  updateDictType: wrapApiWithErrorHandler((id, data = {}) => systemApis.dictTypes.update(id, data)),
+  updateDictType: wrapApiWithErrorHandler((data = {}) => {
+    // 修复：与updateMenu保持一致的调用格式，从data对象中提取id
+    const { id, ...updateData } = data
+
+    // 验证ID是否存在且有效
+    if (!id || isNaN(id) || id <= 0) {
+      console.error('字典类型更新失败：ID无效', { id, data })
+      throw new Error(`字典类型ID无效: ${id}`)
+    }
+
+    return systemApis.dictTypes.update(id, updateData)
+  }),
   deleteDictType: wrapApiWithErrorHandler((params) => {
     // 支持直接传入ID或包含type_id的对象
     const id = typeof params === 'object' ? params.type_id || params.id : params
@@ -296,7 +318,18 @@ export const compatibilityApi = {
   // 字典数据管理 - 使用真正的v2接口
   getDictDataList: wrapApiWithErrorHandler((params = {}) => systemApis.dictData.list(params)),
   createDictData: wrapApiWithErrorHandler((data = {}) => systemApis.dictData.create(data)),
-  updateDictData: wrapApiWithErrorHandler((id, data = {}) => systemApis.dictData.update(id, data)),
+  updateDictData: wrapApiWithErrorHandler((data = {}) => {
+    // 修复：与updateMenu保持一致的调用格式，从data对象中提取id
+    const { id, ...updateData } = data
+
+    // 验证ID是否存在且有效
+    if (!id || isNaN(id) || id <= 0) {
+      console.error('字典数据更新失败：ID无效', { id, data })
+      throw new Error(`字典数据ID无效: ${id}`)
+    }
+
+    return systemApis.dictData.update(id, updateData)
+  }),
   deleteDictData: wrapApiWithErrorHandler((params) => {
     // 支持直接传入ID或包含data_id的对象
     const id = typeof params === 'object' ? params.data_id || params.id : params
@@ -325,9 +358,18 @@ export const compatibilityApi = {
     return response
   }),
   createSystemParam: wrapApiWithErrorHandler((data = {}) => systemApis.systemParams.create(data)),
-  updateSystemParam: wrapApiWithErrorHandler((id, data = {}) =>
-    systemApis.systemParams.update(id, data)
-  ),
+  updateSystemParam: wrapApiWithErrorHandler((data = {}) => {
+    // 修复：与updateMenu保持一致的调用格式，从data对象中提取id
+    const { id, ...updateData } = data
+
+    // 验证ID是否存在且有效
+    if (!id || isNaN(id) || id <= 0) {
+      console.error('系统参数更新失败：ID无效', { id, data })
+      throw new Error(`系统参数ID无效: ${id}`)
+    }
+
+    return systemApis.systemParams.update(id, updateData)
+  }),
   deleteSystemParam: wrapApiWithErrorHandler((params) => {
     // 支持直接传入ID或包含param_id/config_id的对象
     const id =
@@ -340,7 +382,18 @@ export const compatibilityApi = {
   getApiGroupList: wrapApiWithErrorHandler((params = {}) => systemApis.apiGroups.list(params)),
   getAllApiGroups: wrapApiWithErrorHandler(() => systemApis.apiGroups.all()),
   createApiGroup: wrapApiWithErrorHandler((data = {}) => systemApis.apiGroups.create(data)),
-  updateApiGroup: wrapApiWithErrorHandler((id, data = {}) => systemApis.apiGroups.update(id, data)),
+  updateApiGroup: wrapApiWithErrorHandler((data = {}) => {
+    // 修复：与updateMenu保持一致的调用格式，从data对象中提取id
+    const { id, ...updateData } = data
+
+    // 验证ID是否存在且有效
+    if (!id || isNaN(id) || id <= 0) {
+      console.error('API分组更新失败：ID无效', { id, data })
+      throw new Error(`API分组ID无效: ${id}`)
+    }
+
+    return systemApis.apiGroups.update(id, updateData)
+  }),
   deleteApiGroup: wrapApiWithErrorHandler((id) => systemApis.apiGroups.delete(id)),
   batchDeleteApiGroups: createStandardBatchDeleteApi('api-groups'),
   moveApisToGroup: wrapApiWithErrorHandler((groupId, apiIds) =>
