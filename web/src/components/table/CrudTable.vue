@@ -136,8 +136,8 @@ const emit = defineEmits([
   'update:checkedRowKeys',
 ])
 
-// 是否启用分页
-const isPagination = computed(() => props.pagination !== false)
+// 是否启用分页 - 直接使用props.isPagination
+// 注意：不再使用computed，因为props.isPagination已经是响应式的
 
 // 监听外部checkedRowKeys变化，同步到内部状态
 watch(
@@ -160,7 +160,7 @@ watch(
 )
 
 const internalPagination = computed(() => {
-  if (!isPagination.value) return false
+  if (!props.isPagination) return false
 
   // 优先使用外部传入的itemCount，如果没有则使用内部total
   const itemCount = props.pagination?.itemCount ?? total.value

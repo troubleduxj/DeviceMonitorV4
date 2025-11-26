@@ -125,6 +125,10 @@ v2_router.include_router(email_template_router, prefix="/email-templates", tags=
 from .notification_config import router as notification_config_router
 v2_router.include_router(notification_config_router, prefix="/notification-configs", tags=["通知发送配置 v2"])
 
+# 注册工作流管理路由
+from .workflows import router as workflows_router
+v2_router.include_router(workflows_router, prefix="/workflows", tags=["工作流管理 v2"])
+
 # ⭐ 注册元数据管理模块路由（新增）
 v2_router.include_router(metadata_router, tags=["元数据管理 v2"])
 v2_router.include_router(metadata_sync_router, tags=["元数据同步 v2"])

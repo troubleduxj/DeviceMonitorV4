@@ -243,6 +243,9 @@ const route = useRoute()
 // Store
 const workflowStore = useWorkflowStore()
 
+// 导入工作流API
+import { getWorkflowDetail, saveWorkflowDesign, updateWorkflow } from '@/api/workflow'
+
 // 响应式数据
 const workflowCanvas = ref(null)
 const currentTool = ref('select')
@@ -526,6 +529,13 @@ function handleOpenWorkflow() {
 }
 
 function handleSaveWorkflow() {
+  // 如果有当前工作流ID，保存到服务器
+  if (currentWorkflowId.value) {
+    saveWorkflowToServer()
+    return
+  }
+  
+  // 否则本地保存
   if (!workflowValidation.value.isValid) {
     showError('工作流验证失败，无法保存')
     return
@@ -537,7 +547,7 @@ function handleSaveWorkflow() {
   // 模拟保存
   setTimeout(() => {
     loading.value = false
-    workflowStore.markAsSaved()
+    workflowStore.markClean()
     showSuccess('工作流已保存')
     emit('save', workflowData.value)
   }, 1000)
@@ -859,16 +869,93 @@ function handleKeyDown(event) {
   }
 }
 
+// 当前工作流ID
+const currentWorkflowId = ref<number | null>(null)
+const currentWorkflowInfo = ref<any>(null)
+
+// 加载工作流数据
+async function loadWorkflowById(workflowId: number) {
+  loading.value = true
+  loadingText.value = '加载工作流...'
+  
+  try {
+    const res = await getWorkflowDetail(workflowId)
+    if (res.code === 200 && res.data) {
+      const workflow = res.data
+      currentWorkflowId.value = workflow.id
+      currentWorkflowInfo.value = workflow
+      
+      // 加载到store
+      workflowStore.loadWorkflow({
+        nodes: workflow.nodes || [],
+        connections: workflow.connections || [],
+        info: {
+          id: workflow.id,
+          name: workflow.name,
+          description: workflow.description,
+          version: workflow.version,
+        }
+      })
+      
+      showSuccess(`已加载工作流: ${workflow.name}`)
+    } else {
+      showError(res.message || '加载工作流失败')
+    }
+  } catch (err) {
+    console.error('加载工作流失败:', err)
+    showError('加载工作流失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 保存工作流设计
+async function saveWorkflowToServer() {
+  if (!currentWorkflowId.value) {
+    showError('请先选择或创建工作流')
+    return
+  }
+  
+  loading.value = true
+  loadingText.value = '保存中...'
+  
+  try {
+    const designData = {
+      nodes: workflowStore.nodes,
+      connections: workflowStore.connections
+    }
+    
+    const res = await saveWorkflowDesign(currentWorkflowId.value, designData)
+    if (res.code === 200) {
+      workflowStore.markClean()
+      showSuccess('工作流设计已保存')
+      emit('save', designData)
+    } else {
+      showError(res.message || '保存失败')
+    }
+  } catch (err) {
+    console.error('保存工作流失败:', err)
+    showError('保存失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   // 初始化
   updateViewportSize()
 
+  // 从路由参数获取工作流ID
+  const workflowIdFromRoute = route.query.id
+  
   // 加载初始数据
   if (props.initialData) {
-    workflowStore.loadWorkflowData(props.initialData)
+    workflowStore.loadWorkflow(props.initialData)
   } else if (props.workflowId) {
-    // TODO: 根据ID加载工作流
+    await loadWorkflowById(Number(props.workflowId))
+  } else if (workflowIdFromRoute) {
+    await loadWorkflowById(Number(workflowIdFromRoute))
   }
 
   // 监听窗口大小变化

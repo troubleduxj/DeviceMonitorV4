@@ -554,6 +554,16 @@ export const useWorkflowStore = defineStore('workflow', () => {
     editState.value.lastSaved = new Date().toISOString()
   }
 
+  // 别名方法，保持兼容性
+  function markAsSaved(): void {
+    markClean()
+  }
+
+  // 加载工作流数据（别名）
+  function loadWorkflowData(data: WorkflowLoadData): void {
+    loadWorkflow(data)
+  }
+
   function getNodeById(nodeId: string): WorkflowNode | undefined {
     return nodeMap.value.get(nodeId)
   }
@@ -613,6 +623,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     workflowValidation,
     canUndo,
     canRedo,
+    isDirty: computed(() => editState.value.isDirty),
+    canPaste: computed(() => false), // TODO: 实现剪贴板功能
 
     // 方法
     addNode,
@@ -648,6 +660,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     getSelectedNodesData,
     getSelectedConnectionsData,
     markClean,
+    markAsSaved,
+    loadWorkflowData,
     initialize,
   }
 })

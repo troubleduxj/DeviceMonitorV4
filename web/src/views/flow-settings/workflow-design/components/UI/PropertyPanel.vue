@@ -49,6 +49,16 @@
               <span>{{ nodeTypeConfig?.name || '节点' }}属性</span>
             </div>
 
+            <!-- 动态属性表单（暂时禁用） -->
+            <!-- <div v-if="nodePropertySchema" class="dynamic-form-wrapper">
+              <DynamicPropertyForm
+                :schema="nodePropertySchema"
+                :model-value="nodeProperties"
+                @update:model-value="nodeProperties = $event"
+                @change="handleDynamicPropertyChange"
+              />
+            </div> -->
+
             <!-- 基础信息 -->
             <div class="property-group">
               <div class="group-title">基础信息</div>
@@ -592,6 +602,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
 import { NODE_TYPES } from '../../utils/nodeTypes'
+// 暂时注释掉动态表单导入，避免加载问题
+// import DynamicPropertyForm from './DynamicPropertyForm.vue'
+// import { getNodePropertySchema, type NodePropertySchema } from '../../utils/nodePropertySchemas'
 
 // 简单的防抖函数实现
 function debounce(func, wait) {
@@ -667,6 +680,50 @@ const nodeTypeConfig = computed(() => {
   if (!editingNode.value) return null
   return NODE_TYPES[editingNode.value.type] || null
 })
+
+// 暂时注释掉动态表单相关代码
+// const nodePropertySchema = computed<NodePropertySchema | null>(() => {
+//   if (!editingNode.value) return null
+//   return getNodePropertySchema(editingNode.value.type)
+// })
+const nodePropertySchema = computed(() => null)
+
+// 节点属性数据
+const nodeProperties = computed({
+  get: () => {
+    if (!editingNode.value) return {}
+    return {
+      name: editingNode.value.name,
+      description: editingNode.value.description,
+      ...editingNode.value.properties
+    }
+  },
+  set: (value) => {
+    if (editingNode.value) {
+      editingNode.value.name = value.name || editingNode.value.name
+      editingNode.value.description = value.description || ''
+      editingNode.value.properties = { ...editingNode.value.properties, ...value }
+    }
+  }
+})
+
+// 处理动态表单属性变化
+function handleDynamicPropertyChange(field: string, value: any) {
+  if (!editingNode.value) return
+  
+  if (field === 'name') {
+    editingNode.value.name = value
+  } else if (field === 'description') {
+    editingNode.value.description = value
+  } else {
+    if (!editingNode.value.properties) {
+      editingNode.value.properties = {}
+    }
+    editingNode.value.properties[field] = value
+  }
+  
+  handleNodeChange()
+}
 
 const sourceNodeName = computed(() => {
   if (!editingConnection.value) return ''

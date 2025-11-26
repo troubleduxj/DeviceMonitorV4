@@ -76,6 +76,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"⚠️ 权限系统性能优化失败: {e}")
         
+        # 初始化工作流调度器 (可选)
+        logger.info("检查工作流调度器配置...")
+        try:
+            from app.services.workflow_scheduler import start_scheduler
+            await start_scheduler()
+            logger.info("✅ 工作流调度器启动完成")
+        except Exception as e:
+            logger.warning(f"⚠️ 工作流调度器启动失败: {e}")
+        
         # 初始化AI模块 (可选)
         logger.info("检查AI模块配置...")
         try:
@@ -114,6 +123,14 @@ async def lifespan(app: FastAPI):
     logger.info("应用关闭中...")
     
     try:
+        # 停止工作流调度器
+        try:
+            from app.services.workflow_scheduler import stop_scheduler
+            await stop_scheduler()
+            logger.info("✅ 工作流调度器已停止")
+        except Exception as e:
+            logger.warning(f"⚠️ 工作流调度器停止失败: {e}")
+        
         # 卸载AI模块
         try:
             from app.ai_module.loader import ai_loader

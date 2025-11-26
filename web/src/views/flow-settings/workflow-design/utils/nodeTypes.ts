@@ -6,7 +6,7 @@
 // ========== 类型定义 ==========
 
 /** 节点类别 */
-type NodeCategory = 'basic' | 'control' | 'integration'
+type NodeCategory = 'basic' | 'control' | 'integration' | 'device' | 'alarm' | 'notification'
 
 /** 节点状态 */
 type NodeStatus = 'idle' | 'running' | 'success' | 'error' | 'warning'
@@ -224,10 +224,125 @@ export const integrationNodes: NodeDefinition[] = [
     description: '执行数据库操作',
     category: 'integration',
   },
+  {
+    type: 'script',
+    label: '脚本执行',
+    icon: 'material-symbols:code',
+    color: '#00bcd4',
+    description: '执行自定义脚本代码',
+    category: 'integration',
+  },
+  {
+    type: 'email',
+    label: '邮件发送',
+    icon: 'material-symbols:mail-outline',
+    color: '#ff5722',
+    description: '发送邮件通知',
+    category: 'integration',
+  },
+  {
+    type: 'webhook',
+    label: 'Webhook',
+    icon: 'material-symbols:webhook',
+    color: '#795548',
+    description: '调用Webhook接口',
+    category: 'integration',
+  },
+]
+
+// 设备节点类型
+export const deviceNodes: NodeDefinition[] = [
+  {
+    type: 'device_query',
+    label: '设备查询',
+    icon: 'material-symbols:search',
+    color: '#2196f3',
+    description: '查询设备信息和状态',
+    category: 'device' as NodeCategory,
+  },
+  {
+    type: 'device_control',
+    label: '设备控制',
+    icon: 'material-symbols:settings-remote',
+    color: '#4caf50',
+    description: '发送设备控制指令',
+    category: 'device' as NodeCategory,
+  },
+  {
+    type: 'device_data',
+    label: '数据采集',
+    icon: 'material-symbols:analytics',
+    color: '#9c27b0',
+    description: '采集设备实时数据',
+    category: 'device' as NodeCategory,
+  },
+  {
+    type: 'device_status',
+    label: '状态检测',
+    icon: 'material-symbols:monitor-heart',
+    color: '#ff9800',
+    description: '检测设备运行状态',
+    category: 'device' as NodeCategory,
+  },
+]
+
+// 报警节点类型
+export const alarmNodes: NodeDefinition[] = [
+  {
+    type: 'alarm_trigger',
+    label: '触发报警',
+    icon: 'material-symbols:notification-important',
+    color: '#f44336',
+    description: '触发报警通知',
+    category: 'alarm' as NodeCategory,
+  },
+  {
+    type: 'alarm_check',
+    label: '报警检测',
+    icon: 'material-symbols:fact-check',
+    color: '#ff5722',
+    description: '检测是否满足报警条件',
+    category: 'alarm' as NodeCategory,
+  },
+  {
+    type: 'alarm_clear',
+    label: '清除报警',
+    icon: 'material-symbols:notifications-off',
+    color: '#4caf50',
+    description: '清除已有报警',
+    category: 'alarm' as NodeCategory,
+  },
+]
+
+// 通知节点类型
+export const notificationNodes: NodeDefinition[] = [
+  {
+    type: 'notification',
+    label: '站内通知',
+    icon: 'material-symbols:notifications',
+    color: '#2196f3',
+    description: '发送站内消息通知',
+    category: 'notification' as NodeCategory,
+  },
+  {
+    type: 'sms',
+    label: '短信通知',
+    icon: 'material-symbols:sms',
+    color: '#4caf50',
+    description: '发送短信通知',
+    category: 'notification' as NodeCategory,
+  },
 ]
 
 // 所有节点类型
-export const allNodes: NodeDefinition[] = [...basicNodes, ...controlNodes, ...integrationNodes]
+export const allNodes: NodeDefinition[] = [
+  ...basicNodes, 
+  ...controlNodes, 
+  ...integrationNodes,
+  ...deviceNodes,
+  ...alarmNodes,
+  ...notificationNodes,
+]
 
 // NODE_TYPES 对象，以类型为键
 export const NODE_TYPES: Record<string, NodeTypeConfig> = {}
@@ -268,16 +383,32 @@ function getNodeDisplayIcon(iconName: string): string {
     'material-symbols:hourglass-empty': '⏳',
     'material-symbols:api': '🌐',
     'material-symbols:database': '🗄️',
+    // 新增节点图标
+    'material-symbols:code': '💻',
+    'material-symbols:mail-outline': '📧',
+    'material-symbols:webhook': '🔗',
+    'material-symbols:search': '🔍',
+    'material-symbols:settings-remote': '🎮',
+    'material-symbols:analytics': '📊',
+    'material-symbols:monitor-heart': '💓',
+    'material-symbols:notification-important': '🚨',
+    'material-symbols:fact-check': '✅',
+    'material-symbols:notifications-off': '🔕',
+    'material-symbols:notifications': '🔔',
+    'material-symbols:sms': '📱',
   }
   return iconMap[iconName] || '📦'
 }
 
 // 获取节点标签
 function getNodeTags(category: NodeCategory, type: string): string[] {
-  const categoryTags: Record<NodeCategory, string[]> = {
+  const categoryTags: Record<string, string[]> = {
     basic: ['基础', '核心'],
     control: ['控制', '流程'],
     integration: ['集成', '外部'],
+    device: ['设备', 'IoT'],
+    alarm: ['报警', '监控'],
+    notification: ['通知', '消息'],
   }
 
   const typeTags: Record<string, string[]> = {
@@ -286,6 +417,13 @@ function getNodeTags(category: NodeCategory, type: string): string[] {
     condition: ['判断'],
     api: ['网络'],
     database: ['存储'],
+    script: ['代码'],
+    email: ['邮件'],
+    device_query: ['查询'],
+    device_control: ['控制'],
+    alarm_trigger: ['触发'],
+    notification: ['站内'],
+    sms: ['短信'],
   }
 
   return [...(categoryTags[category] || []), ...(typeTags[type] || [])]

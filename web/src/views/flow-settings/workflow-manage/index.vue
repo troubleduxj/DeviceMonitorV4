@@ -25,19 +25,35 @@ import ViewToggle from '@/components/common/ViewToggle.vue'
 
 import { formatDate, renderIcon } from '@/utils'
 import { useCRUD } from '@/composables/useCRUD'
+import { useRouter } from 'vue-router'
+import { useMessage } from 'naive-ui'
 
 defineOptions({ name: '工作流管理' })
 
-const $table = ref(null)
-const queryItems = ref({})
+const router = useRouter()
+const message = useMessage()
+
+const $table = ref<any>(null)
+const queryItems = ref<{
+  name?: string
+  type?: string
+  is_active?: string
+}>({})
 const vPermission = resolveDirective('permission')
 const viewMode = ref('card') // 视图模式：'card' 或 'table'
-const workflowList = ref([]) // 卡片视图的工作流列表
+const workflowList = ref<any[]>([]) // 卡片视图的工作流列表
 const cardPagination = ref({
   page: 1,
   pageSize: 12,
   total: 0,
 })
+
+// 模板相关状态
+const templateModalVisible = ref(false)
+const templateLoading = ref(false)
+const templateList = ref<any[]>([])
+const selectedTemplate = ref<any>(null)
+const newWorkflowName = ref('')
 
 // 视图切换选项
 const viewOptions = [
@@ -55,8 +71,8 @@ const viewOptions = [
 
 // 工作流状态选项
 const statusOptions = [
-  { label: '启用', value: true },
-  { label: '禁用', value: false },
+  { label: '启用', value: 'true' },
+  { label: '禁用', value: 'false' },
 ]
 
 // 工作流类型选项
@@ -76,18 +92,32 @@ const priorityOptions = [
   { label: '紧急', value: 'urgent' },
 ]
 
-const {
-  modalVisible,
-  modalTitle,
-  modalAction,
-  modalLoading,
-  handleSave,
-  modalForm,
-  modalFormRef,
-  handleEdit,
-  handleDelete,
-  handleAdd,
-} = useCRUD({
+// 导入工作流API
+import {
+  getWorkflowList,
+  createWorkflow,
+  updateWorkflow,
+  deleteWorkflow,
+  toggleWorkflow,
+  publishWorkflow,
+  executeWorkflow,
+  getWorkflowTemplates,
+  useWorkflowTemplate,
+} from '@/api/workflow'
+
+// 工作流表单类型
+interface WorkflowForm {
+  id?: number
+  name: string
+  description: string
+  type: string
+  priority: string
+  is_active: boolean
+  trigger_type: string
+  config: string
+}
+
+const crudResult = useCRUD({
   name: '工作流',
   initForm: {
     name: '',
@@ -95,25 +125,43 @@ const {
     type: 'custom',
     priority: 'medium',
     is_active: true,
-    config: '{}',
+    trigger_type: 'manual',
+    config: '',
   },
   doCreate: async (data) => {
-    // 模拟API调用
-    console.log('创建工作流:', data)
-    return { code: 200, message: '创建成功' }
+    const res = await createWorkflow(data)
+    return res
   },
   doUpdate: async (data) => {
-    // 模拟API调用
-    console.log('更新工作流:', data)
-    return { code: 200, message: '更新成功' }
+    const res = await updateWorkflow(data.id, data)
+    return res
   },
   doDelete: async (data) => {
-    // 模拟API调用
-    console.log('删除工作流:', data)
-    return { code: 200, message: '删除成功' }
+    const res = await deleteWorkflow(data.id)
+    return res
   },
-  refresh: () => $table.value?.handleSearch(),
+  refresh: () => {
+    if (viewMode.value === 'table') {
+      $table.value?.handleSearch()
+    } else {
+      loadWorkflowCards()
+    }
+  },
 })
+
+// 解构并添加类型
+const {
+  modalVisible,
+  modalTitle,
+  modalAction,
+  modalLoading,
+  handleSave,
+  modalFormRef,
+  handleEdit,
+  handleDelete,
+  handleAdd,
+} = crudResult
+const modalForm = crudResult.modalForm as unknown as WorkflowForm
 
 onMounted(() => {
   console.log('工作流管理页面已挂载')
@@ -228,6 +276,20 @@ const columns = [
     },
   },
   {
+    title: '发布',
+    key: 'is_published',
+    width: 80,
+    align: 'center',
+    render(row) {
+      return h(NTag, { 
+        type: row.is_published ? 'success' : 'default', 
+        size: 'small' 
+      }, { 
+        default: () => row.is_published ? '已发布' : '未发布' 
+      })
+    },
+  },
+  {
     title: '创建时间',
     key: 'created_at',
     width: 150,
@@ -258,28 +320,39 @@ const columns = [
   {
     title: '操作',
     key: 'actions',
-    width: 150,
+    width: 220,
     align: 'center',
     fixed: 'right',
     render(row) {
-      return [
+      return h(NSpace, { size: 4 }, () => [
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: 'info',
+            onClick: () => handleDesign(row),
+          },
+          {
+            default: () => '设计',
+            icon: renderIcon('material-symbols:design-services', { size: 14 }),
+          }
+        ),
         h(
           NButton,
           {
             size: 'small',
             type: 'primary',
-            style: 'margin-right: 8px;',
             onClick: () => handleEdit(row),
           },
           {
             default: () => '编辑',
-            icon: renderIcon('material-symbols:edit', { size: 16 }),
+            icon: renderIcon('material-symbols:edit', { size: 14 }),
           }
         ),
         h(
           NPopconfirm,
           {
-            onPositiveClick: () => handleDelete({ id: row.id }, false),
+            onPositiveClick: () => handleDelete({ id: row.id }),
             onNegativeClick: () => {},
           },
           {
@@ -292,36 +365,90 @@ const columns = [
                 },
                 {
                   default: () => '删除',
-                  icon: renderIcon('material-symbols:delete-outline', { size: 16 }),
+                  icon: renderIcon('material-symbols:delete-outline', { size: 14 }),
                 }
               ),
             default: () => h('div', {}, '确定删除该工作流吗？'),
           }
         ),
-      ]
+      ])
     },
   },
 ]
 
 // 修改工作流状态
-async function handleUpdateStatus(row) {
+async function handleUpdateStatus(row: any) {
   try {
-    row.is_active = !row.is_active
-    // 模拟API调用
-    console.log('更新工作流状态:', row)
-    $message?.success(row.is_active ? '已启用该工作流' : '已禁用该工作流')
-    $table.value?.handleSearch()
+    const res: any = await toggleWorkflow(row.id)
+    if (res.code === 200) {
+      row.is_active = res.data?.is_active ?? !row.is_active
+      message.success(row.is_active ? '已启用该工作流' : '已禁用该工作流')
+      if (viewMode.value === 'table') {
+        $table.value?.handleSearch()
+      } else {
+        loadWorkflowCards()
+      }
+    } else {
+      message.error(res.message || '状态更新失败')
+    }
   } catch (err) {
-    // 有异常恢复原来的状态
-    row.is_active = !row.is_active
-    $message?.error('状态更新失败')
+    console.error('更新工作流状态失败:', err)
+    message.error('状态更新失败')
   }
 }
 
-// 查看工作流详情
+// 查看工作流详情 - 跳转到设计页面
 function handleView(row) {
   console.log('查看工作流详情:', row)
-  $message.info('查看功能开发中...')
+  // 跳转到工作流设计页面
+  router.push({
+    path: '/flow-settings/workflow-design',
+    query: { id: row.id }
+  })
+}
+
+// 设计工作流 - 跳转到设计页面
+function handleDesign(row: any) {
+  console.log('设计工作流:', row)
+  router.push({
+    path: '/flow-settings/workflow-design',
+    query: { id: row.id }
+  })
+}
+
+// 发布工作流
+async function handlePublish(row: any) {
+  try {
+    const res: any = await publishWorkflow(row.id)
+    if (res.code === 200) {
+      message.success('工作流发布成功')
+      if (viewMode.value === 'table') {
+        $table.value?.handleSearch()
+      } else {
+        loadWorkflowCards()
+      }
+    } else {
+      message.error(res.message || '发布失败')
+    }
+  } catch (err) {
+    console.error('发布工作流失败:', err)
+    message.error('发布失败')
+  }
+}
+
+// 执行工作流
+async function handleExecute(row: any) {
+  try {
+    const res: any = await executeWorkflow(row.id, { async_mode: true })
+    if (res.code === 200) {
+      message.success('工作流已开始执行')
+    } else {
+      message.error(res.message || '执行失败')
+    }
+  } catch (err) {
+    console.error('执行工作流失败:', err)
+    message.error('执行失败')
+  }
 }
 
 // 重置查询条件
@@ -332,6 +459,99 @@ function handleReset() {
   } else {
     loadWorkflowCards()
   }
+}
+
+// =====================================================
+// 模板相关方法
+// =====================================================
+
+// 显示模板选择弹窗
+async function showTemplateModal() {
+  templateModalVisible.value = true
+  selectedTemplate.value = null
+  newWorkflowName.value = ''
+  await loadTemplates()
+}
+
+// 加载模板列表
+async function loadTemplates() {
+  templateLoading.value = true
+  try {
+    const res: any = await getWorkflowTemplates()
+    if (res.code === 200) {
+      templateList.value = res.data || []
+    } else {
+      message.error(res.message || '加载模板失败')
+    }
+  } catch (err) {
+    console.error('加载模板失败:', err)
+    message.error('加载模板失败')
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+// 选择模板
+function selectTemplate(template: any) {
+  selectedTemplate.value = template
+  if (!newWorkflowName.value) {
+    newWorkflowName.value = `${template.name} - 副本`
+  }
+}
+
+// 从模板创建工作流
+async function handleCreateFromTemplate() {
+  if (!selectedTemplate.value) {
+    message.warning('请选择一个模板')
+    return
+  }
+  if (!newWorkflowName.value.trim()) {
+    message.warning('请输入工作流名称')
+    return
+  }
+
+  templateLoading.value = true
+  try {
+    const res: any = await useWorkflowTemplate(selectedTemplate.value.id, newWorkflowName.value)
+    if (res.code === 200) {
+      message.success('工作流创建成功')
+      templateModalVisible.value = false
+      
+      // 刷新列表
+      if (viewMode.value === 'table') {
+        $table.value?.handleSearch()
+      } else {
+        loadWorkflowCards()
+      }
+      
+      // 跳转到设计页面
+      if (res.data?.id) {
+        router.push({
+          path: '/flow-settings/workflow-design',
+          query: { id: res.data.id }
+        })
+      }
+    } else {
+      message.error(res.message || '创建失败')
+    }
+  } catch (err) {
+    console.error('从模板创建工作流失败:', err)
+    message.error('创建失败')
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+// 获取模板图标
+function getTemplateIcon(type: string) {
+  const iconMap: Record<string, string> = {
+    device_monitor: 'material-symbols:monitor-heart',
+    alarm_process: 'material-symbols:warning',
+    data_collection: 'material-symbols:database',
+    maintenance: 'material-symbols:build',
+    custom: 'material-symbols:account-tree',
+  }
+  return iconMap[type] || 'material-symbols:account-tree'
 }
 
 // 获取类型标签颜色
@@ -411,98 +631,29 @@ function handleCardPageSizeChange(pageSize) {
 }
 
 // 获取工作流列表数据
-const getWorkflowListData = async (params) => {
+const getWorkflowListData = async (params: any) => {
   try {
     console.log('获取工作流列表，参数:', params)
 
-    // 模拟数据
-    const mockData = [
-      {
-        id: 1,
-        name: '设备状态监控流程',
-        description: '实时监控设备运行状态，异常时自动触发报警',
-        type: 'device_monitor',
-        priority: 'high',
-        is_active: true,
-        config: JSON.stringify({
-          trigger: 'device_status_change',
-          actions: ['send_alert', 'log_event'],
-          conditions: { status: 'error' },
-        }),
-        created_at: '2024-01-15 10:30:00',
-        updated_at: '2024-01-20 14:20:00',
-      },
-      {
-        id: 2,
-        name: '报警处理流程',
-        description: '自动处理设备报警，包括通知相关人员和记录处理过程',
-        type: 'alarm_process',
-        priority: 'urgent',
-        is_active: true,
-        config: JSON.stringify({
-          trigger: 'alarm_received',
-          actions: ['notify_admin', 'create_ticket'],
-          escalation: { timeout: 300 },
-        }),
-        created_at: '2024-01-10 09:15:00',
-        updated_at: '2024-01-18 16:45:00',
-      },
-      {
-        id: 3,
-        name: '数据采集流程',
-        description: '定时采集设备数据并存储到数据库',
-        type: 'data_collection',
-        priority: 'medium',
-        is_active: false,
-        config: JSON.stringify({
-          schedule: '*/5 * * * *',
-          sources: ['sensor_1', 'sensor_2'],
-          storage: 'database',
-        }),
-        created_at: '2024-01-05 08:00:00',
-        updated_at: '2024-01-15 12:30:00',
-      },
-      {
-        id: 4,
-        name: '设备维护提醒流程',
-        description: '根据设备使用时间和状态，自动生成维护提醒',
-        type: 'maintenance',
-        priority: 'low',
-        is_active: true,
-        config: JSON.stringify({
-          schedule: '0 9 * * 1',
-          criteria: { runtime_hours: 1000 },
-          notification: 'email',
-        }),
-        created_at: '2024-01-01 00:00:00',
-        updated_at: '2024-01-10 10:00:00',
-      },
-    ]
+    // 调用真实API
+    const res: any = await getWorkflowList({
+      page: params.page || 1,
+      page_size: params.page_size || 10,
+      search: params.name,
+      type: params.type,
+      is_active: params.is_active === 'true' ? true : params.is_active === 'false' ? false : undefined,
+    })
 
-    // 模拟搜索过滤
-    let filteredData = mockData
-    if (params.name) {
-      filteredData = filteredData.filter((item) =>
-        item.name.toLowerCase().includes(params.name.toLowerCase())
-      )
+    if (res.code === 200 && res.data) {
+      return {
+        data: res.data.items || res.data.data || [],
+        total: res.data.total || 0,
+      }
     }
-    if (params.type) {
-      filteredData = filteredData.filter((item) => item.type === params.type)
-    }
-    if (params.is_active !== undefined && params.is_active !== null) {
-      filteredData = filteredData.filter((item) => item.is_active === params.is_active)
-    }
-
-    // 模拟分页
-    const page = params.page || 1
-    const pageSize = params.page_size || 10
-    const start = (page - 1) * pageSize
-    const end = start + pageSize
-    const paginatedData = filteredData.slice(start, end)
 
     return {
-      data: paginatedData,
-      total: filteredData.length,
+      data: [],
+      total: 0,
     }
   } catch (err) {
     console.error('获取工作流列表失败:', err)
@@ -548,6 +699,9 @@ const validateWorkflow = {
           :icon-size="16"
           align="right"
         />
+        <NButton type="default" @click="showTemplateModal">
+          <TheIcon icon="material-symbols:content-copy" :size="18" class="mr-5" />从模板创建
+        </NButton>
         <NButton type="primary" @click="handleAdd">
           <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建工作流
         </NButton>
@@ -632,14 +786,47 @@ const validateWorkflow = {
               <NTag :type="getPriorityColor(workflow.priority)" size="small" :bordered="false">
                 {{ getPriorityLabel(workflow.priority) }}
               </NTag>
+              <NTag 
+                :type="workflow.is_published ? 'success' : 'default'" 
+                size="small" 
+                :bordered="false"
+              >
+                {{ workflow.is_published ? '已发布' : '未发布' }}
+              </NTag>
             </div>
 
             <!-- 工作流操作按钮 -->
             <div class="workflow-actions">
-              <NButton size="small" type="primary" ghost @click.stop="handleEdit(workflow)">
-                <TheIcon icon="material-symbols:edit" :size="14" class="mr-1" />
-                编辑
-              </NButton>
+              <NSpace :size="8">
+                <NButton size="small" type="info" ghost @click.stop="handleDesign(workflow)">
+                  <TheIcon icon="material-symbols:design-services" :size="14" class="mr-1" />
+                  设计
+                </NButton>
+                <NButton size="small" type="primary" ghost @click.stop="handleEdit(workflow)">
+                  <TheIcon icon="material-symbols:edit" :size="14" class="mr-1" />
+                  编辑
+                </NButton>
+                <NButton 
+                  v-if="workflow.is_active && !workflow.is_published" 
+                  size="small" 
+                  type="success" 
+                  ghost 
+                  @click.stop="handlePublish(workflow)"
+                >
+                  <TheIcon icon="material-symbols:publish" :size="14" class="mr-1" />
+                  发布
+                </NButton>
+                <NButton 
+                  v-if="workflow.is_active && workflow.is_published" 
+                  size="small" 
+                  type="warning" 
+                  ghost 
+                  @click.stop="handleExecute(workflow)"
+                >
+                  <TheIcon icon="material-symbols:play-arrow" :size="14" class="mr-1" />
+                  执行
+                </NButton>
+              </NSpace>
               <NSwitch
                 :value="workflow.is_active"
                 size="small"
@@ -727,6 +914,64 @@ const validateWorkflow = {
           />
         </NFormItem>
       </NForm>
+    </CrudModal>
+
+    <!-- 模板选择弹窗 -->
+    <CrudModal
+      v-model:visible="templateModalVisible"
+      title="从模板创建工作流"
+      :loading="templateLoading"
+      width="800px"
+      @save="handleCreateFromTemplate"
+    >
+      <div class="template-modal-content">
+        <!-- 工作流名称输入 -->
+        <NFormItem label="工作流名称" :label-width="100" required>
+          <NInput
+            v-model:value="newWorkflowName"
+            placeholder="请输入新工作流名称"
+            clearable
+          />
+        </NFormItem>
+
+        <!-- 模板列表 -->
+        <div class="template-list">
+          <div class="template-list-header">
+            <span>选择模板</span>
+            <NTag v-if="selectedTemplate" type="success" size="small">
+              已选择: {{ selectedTemplate.name }}
+            </NTag>
+          </div>
+          
+          <div v-if="templateList.length === 0" class="template-empty">
+            <TheIcon icon="material-symbols:inbox" :size="48" class="empty-icon" />
+            <p>暂无可用模板</p>
+            <p class="empty-hint">请先执行数据库迁移导入模板数据</p>
+          </div>
+          
+          <div v-else class="template-grid">
+            <div
+              v-for="template in templateList"
+              :key="template.id"
+              class="template-card"
+              :class="{ selected: selectedTemplate?.id === template.id }"
+              @click="selectTemplate(template)"
+            >
+              <div class="template-card-header">
+                <TheIcon :icon="getTemplateIcon(template.type)" :size="24" />
+                <span class="template-name">{{ template.name }}</span>
+              </div>
+              <p class="template-description">{{ template.description }}</p>
+              <div class="template-meta">
+                <NTag :type="getTypeColor(template.type)" size="small">
+                  {{ getTypeLabel(template.type) }}
+                </NTag>
+                <span class="template-usage">使用 {{ template.usage_count || 0 }} 次</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </CrudModal>
   </CommonPage>
 </template>
@@ -855,6 +1100,7 @@ const validateWorkflow = {
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -976,5 +1222,101 @@ const validateWorkflow = {
 .workflow-empty .empty-description {
   font-size: 14px;
   opacity: 0.7;
+}
+
+/* 模板弹窗样式 */
+.template-modal-content {
+  padding: 8px 0;
+}
+
+.template-list {
+  margin-top: 16px;
+}
+
+.template-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: var(--n-text-color-1);
+}
+
+.template-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--n-text-color-3);
+}
+
+.template-empty .empty-icon {
+  color: var(--n-text-color-disabled);
+  margin-bottom: 12px;
+}
+
+.template-empty .empty-hint {
+  font-size: 12px;
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.template-card {
+  padding: 16px;
+  border: 2px solid var(--n-border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--n-card-color);
+}
+
+.template-card:hover {
+  border-color: var(--n-primary-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.template-card.selected {
+  border-color: var(--n-primary-color);
+  background: var(--n-primary-color-hover);
+}
+
+.template-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.template-card-header .template-name {
+  font-weight: 600;
+  color: var(--n-text-color-1);
+  font-size: 14px;
+}
+
+.template-description {
+  font-size: 12px;
+  color: var(--n-text-color-2);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.template-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.template-usage {
+  font-size: 11px;
+  color: var(--n-text-color-3);
 }
 </style>

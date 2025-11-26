@@ -287,7 +287,7 @@ const columns = [
     width: 50,
     align: 'center',
   },
-  { title: 'ID', key: 'id', width: 50, ellipsis: { tooltip: true }, align: 'center' },
+  { title: 'ID', key: 'id', width: 70, ellipsis: { tooltip: true }, align: 'center' },
   { title: '菜单名称', key: 'name', width: 80, ellipsis: { tooltip: true }, align: 'center' },
   {
     title: '菜单类型',
@@ -322,9 +322,8 @@ const columns = [
     },
   },
   { title: '排序', key: 'order', width: 40, ellipsis: { tooltip: true }, align: 'center' },
-  { title: '访问路径', key: 'path', width: 80, ellipsis: { tooltip: true }, align: 'center' },
-  { title: '跳转路径', key: 'redirect', width: 80, ellipsis: { tooltip: true }, align: 'center' },
-  { title: '组件路径', key: 'component', width: 80, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '访问路径', key: 'path', width: 100, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '组件路径', key: 'component', width: 100, ellipsis: { tooltip: true }, align: 'center' },
   {
     title: '保活',
     key: 'keepalive',
@@ -351,15 +350,6 @@ const columns = [
         value: row.is_hidden,
         onUpdateValue: () => handleUpdateHidden(row),
       })
-    },
-  },
-  {
-    title: '创建日期',
-    key: 'created_at',
-    width: 80,
-    align: 'center',
-    render(row) {
-      return h('span', formatDate(row.created_at))
     },
   },
   {
