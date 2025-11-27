@@ -3,13 +3,13 @@
     <!-- 查询条件 -->
     <NCard class="mb-15" rounded-10>
       <div class="flex flex-wrap items-center gap-4">
-        <QueryBarItem label="设备分类" :label-width="70">
+        <QueryBarItem label="设备类型" :label-width="70">
           <NSelect
             v-model:value="filterType"
             :options="deviceTypeOptions"
-            placeholder="请选择设备分类"
+            placeholder="请选择设备类型"
             clearable
-            style="width: 120px"
+            style="width: 200px"
           />
         </QueryBarItem>
         <QueryBarItem label="设备编码" :label-width="70">

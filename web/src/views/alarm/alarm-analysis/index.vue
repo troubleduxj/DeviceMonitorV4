@@ -126,13 +126,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, nextTick, h } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick, h, computed } from 'vue'
 import { NCard, NDatePicker, NSelect, NButton, NSpin, NDataTable, NProgress } from 'naive-ui'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/page/QueryBarItem.vue'
 import * as echarts from 'echarts'
 import { alarmApi } from '@/api/alarm-shared'
+import { deviceTypeApi } from '@/api/device-v2'
 
 // 查询参数
 const dateRange = ref(null)
@@ -157,13 +158,45 @@ const typeChartRef = ref(null)
 let trendChart = null
 let typeChart = null
 
+// 设备类型数据
+const deviceTypes = ref([])
+
+// 加载设备类型数据
+const loadDeviceTypes = async () => {
+  try {
+    const response = await deviceTypeApi.list({ page_size: 100 })
+    if (response.data) {
+      deviceTypes.value = response.data
+    }
+  } catch (error) {
+    console.error('Failed to load device types', error)
+  }
+}
+
 // 设备类型选项
-const deviceTypeOptions = [
-  { label: '全部', value: null },
-  { label: '焊接设备', value: 'welding' },
-  { label: '传感器', value: 'sensor' },
-  { label: '控制器', value: 'controller' },
-]
+const deviceTypeOptions = computed(() => {
+  const baseOptions = [{ label: '全部', value: null }]
+  
+  if (deviceTypes.value && deviceTypes.value.length > 0) {
+    return [
+      ...baseOptions,
+      ...deviceTypes.value.map(type => ({
+        label: type.type_name,
+        value: type.type_code
+      }))
+    ]
+  }
+  
+  // 降级选项
+  return [
+    { label: '全部', value: null },
+    { label: '焊接设备', value: 'welding' },
+    { label: '传感器', value: 'sensor' },
+    { label: '控制器', value: 'controller' },
+  ]
+})
+
+// 设备排行表格列
 
 // 设备排行表格列
 const deviceRankColumns = [
@@ -204,10 +237,14 @@ const loadStatistics = async () => {
   loading.value = true
   try {
     // 构建查询参数
-    const params: { start_date?: string; end_date?: string } = {}
+    const params: { start_date?: string; end_date?: string; device_type?: string } = {}
     if (dateRange.value && dateRange.value.length === 2) {
       params.start_date = new Date(dateRange.value[0]).toISOString()
       params.end_date = new Date(dateRange.value[1]).toISOString()
+    }
+
+    if (deviceType.value) {
+      params.device_type = deviceType.value
     }
 
     // 调用API获取统计数据
@@ -401,6 +438,7 @@ const handleResize = () => {
 
 // 生命周期
 onMounted(() => {
+  loadDeviceTypes()
   loadStatistics()
   window.addEventListener('resize', handleResize)
 })
