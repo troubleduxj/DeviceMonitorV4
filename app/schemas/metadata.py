@@ -86,10 +86,16 @@ class DeviceFieldResponse(DeviceFieldBase):
 class SelectedField(BaseModel):
     """选中的字段配置"""
     field_code: str = Field(..., description="字段代码")
-    alias: str = Field(..., description="字段别名")
+    alias: Optional[str] = Field(None, description="字段别名")
     weight: float = Field(default=1.0, ge=0, le=10, description="权重（0-10）")
     is_required: bool = Field(default=False, description="是否必填")
     transform: Optional[str] = Field(None, description="转换方法：normalize/standardize/log等")
+
+    @validator('alias', always=True)
+    def set_default_alias(cls, v, values):
+        if v is None and 'field_code' in values:
+            return values['field_code']
+        return v
 
 
 class AggregationConfig(BaseModel):
