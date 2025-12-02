@@ -137,11 +137,14 @@ class MetadataService:
             if model_data.ai_config:
                 model_dict['ai_config'] = model_data.ai_config.model_dump()
             
-            model = await DeviceDataModel.create(**model_dict)
+            logger.info(f"Creating model with data: {model_dict}")
+            model = DeviceDataModel(**model_dict)
+            await model.save()
+
             logger.info(f"创建数据模型成功: {model.model_name} ({model.model_code})")
             return model
         except Exception as e:
-            logger.error(f"创建数据模型失败: {str(e)}")
+            logger.error(f"创建数据模型失败: {str(e)}", exc_info=True)
             raise
     
     @staticmethod
