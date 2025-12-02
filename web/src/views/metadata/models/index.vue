@@ -556,7 +556,8 @@ const handleDeviceTypeChange = async (deviceTypeCode) => {
     if (response.success) {
       availableFields.value = (response.data || []).map(field => ({
         label: `${field.field_name} (${field.field_code})`,
-        value: field.field_code
+        value: field.field_code,
+        field_name: field.field_name
       }))
     } else {
       message.error(response.message || '获取字段列表失败')
@@ -575,11 +576,15 @@ const handleSave = async () => {
     // 构建请求数据
     const requestData = {
       ...formData,
-      selected_fields: selectedFieldCodes.value.map(code => ({
-        field_code: code,
-        is_required: false,
-        weight: 1.0
-      }))
+      selected_fields: selectedFieldCodes.value.map(code => {
+        const field = availableFields.value.find(f => f.value === code)
+        return {
+          field_code: code,
+          alias: field ? field.field_name : code,
+          is_required: false,
+          weight: 1.0
+        }
+      })
     }
     
     const response = formData.id 
