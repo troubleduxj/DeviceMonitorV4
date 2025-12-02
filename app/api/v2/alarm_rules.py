@@ -45,10 +45,12 @@ class AlarmRuleCreate(BaseModel):
     rule_code: str = Field(..., description="规则代码")
     description: Optional[str] = Field(None, description="规则描述")
     device_type_code: str = Field(..., description="设备类型代码")
+    device_code: Optional[str] = Field(None, description="关联设备编码，为空则为通用规则")
     field_code: str = Field(..., description="监测字段代码")
     field_name: Optional[str] = Field(None, description="字段名称")
     threshold_config: dict = Field(..., description="阈值配置")
     trigger_condition: Optional[dict] = Field(None, description="触发条件")
+    trigger_config: Optional[dict] = Field(None, description="高级触发配置")
     alarm_level: str = Field("warning", description="默认报警级别")
     notification_config: Optional[dict] = Field(None, description="通知配置")
     is_enabled: bool = Field(True, description="是否启用")
@@ -59,10 +61,12 @@ class AlarmRuleUpdate(BaseModel):
     """更新报警规则"""
     rule_name: Optional[str] = None
     description: Optional[str] = None
+    device_code: Optional[str] = None
     field_code: Optional[str] = None
     field_name: Optional[str] = None
     threshold_config: Optional[dict] = None
     trigger_condition: Optional[dict] = None
+    trigger_config: Optional[dict] = None
     alarm_level: Optional[str] = None
     notification_config: Optional[dict] = None
     is_enabled: Optional[bool] = None
@@ -76,6 +80,7 @@ class AlarmRuleUpdate(BaseModel):
 @router.get("", summary="获取报警规则列表")
 async def get_alarm_rules(
     device_type_code: Optional[str] = Query(None, description="设备类型代码"),
+    device_code: Optional[str] = Query(None, description="设备编码"),
     field_code: Optional[str] = Query(None, description="字段代码"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     search: Optional[str] = Query(None, description="搜索关键词"),
@@ -87,6 +92,8 @@ async def get_alarm_rules(
         
         if device_type_code:
             query = query.filter(device_type_code=device_type_code)
+        if device_code:
+            query = query.filter(device_code=device_code)
         if field_code:
             query = query.filter(field_code=field_code)
         if is_enabled is not None:
@@ -106,10 +113,12 @@ async def get_alarm_rules(
                 "rule_code": rule.rule_code,
                 "description": rule.description,
                 "device_type_code": rule.device_type_code,
+                "device_code": rule.device_code,
                 "field_code": rule.field_code,
                 "field_name": rule.field_name,
                 "threshold_config": rule.threshold_config,
                 "trigger_condition": rule.trigger_condition,
+                "trigger_config": rule.trigger_config,
                 "alarm_level": rule.alarm_level,
                 "notification_config": rule.notification_config,
                 "is_enabled": rule.is_enabled,
@@ -131,7 +140,7 @@ async def get_alarm_rules(
     except Exception as e:
         logger.error(f"获取报警规则列表失败: {str(e)}", exc_info=True)
         formatter = create_formatter()
-        return formatter.error(message="获取报警规则列表失败")
+        return formatter.error(message=f"获取报警规则列表失败: {str(e)}")
 
 
 @router.get("/device-types", summary="获取可配置的设备类型列表")
@@ -166,7 +175,8 @@ async def get_fields_for_device_type(device_type_code: str):
         fields = await DeviceField.filter(
             device_type_code=device_type_code,
             is_active=True,
-            is_monitoring_key=True
+            # is_monitoring_key=True, # 旧逻辑：仅监控字段
+            is_alarm_enabled=True     # 新逻辑：仅允许报警的字段
         ).order_by("sort_order")
         
         items = [
@@ -178,6 +188,7 @@ async def get_fields_for_device_type(device_type_code: str):
                 "unit": f.unit,
                 "data_range": f.data_range,
                 "alarm_threshold": f.alarm_threshold,
+                "is_monitoring_key": f.is_monitoring_key, # 返回此标志供前端参考
             }
             for f in fields
         ]
@@ -206,10 +217,12 @@ async def get_alarm_rule(rule_id: int):
             "rule_code": rule.rule_code,
             "description": rule.description,
             "device_type_code": rule.device_type_code,
+            "device_code": rule.device_code,
             "field_code": rule.field_code,
             "field_name": rule.field_name,
             "threshold_config": rule.threshold_config,
             "trigger_condition": rule.trigger_condition,
+            "trigger_config": rule.trigger_config,
             "alarm_level": rule.alarm_level,
             "notification_config": rule.notification_config,
             "is_enabled": rule.is_enabled,
@@ -243,10 +256,12 @@ async def create_alarm_rule(rule_data: AlarmRuleCreate):
             rule_code=rule_data.rule_code,
             description=rule_data.description,
             device_type_code=rule_data.device_type_code,
+            device_code=rule_data.device_code,
             field_code=rule_data.field_code,
             field_name=rule_data.field_name,
             threshold_config=rule_data.threshold_config,
             trigger_condition=rule_data.trigger_condition or {"consecutive_count": 1},
+            trigger_config=rule_data.trigger_config,
             alarm_level=rule_data.alarm_level,
             notification_config=rule_data.notification_config or {"channels": ["websocket"]},
             is_enabled=rule_data.is_enabled,

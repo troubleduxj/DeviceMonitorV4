@@ -101,6 +101,7 @@ class WorkflowCreate(BaseModel):
     related_alarm_rules: Optional[List[int]] = Field(default_factory=list, description="关联报警规则ID")
     
     is_active: bool = Field(True, description="是否启用")
+    accent_color: Optional[str] = Field(None, description="卡片强调色(HEX)")
 
 
 class WorkflowUpdate(BaseModel):
@@ -123,6 +124,7 @@ class WorkflowUpdate(BaseModel):
     related_alarm_rules: Optional[List[int]] = Field(None, description="关联报警规则ID")
     
     is_active: Optional[bool] = Field(None, description="是否启用")
+    accent_color: Optional[str] = Field(None, description="卡片强调色(HEX)")
 
 
 class WorkflowDesignSave(BaseModel):
@@ -156,6 +158,7 @@ class WorkflowResponse(BaseModel):
     is_active: bool
     is_published: bool
     version: str
+    accent_color: Optional[str]
     
     execution_count: int
     success_count: int

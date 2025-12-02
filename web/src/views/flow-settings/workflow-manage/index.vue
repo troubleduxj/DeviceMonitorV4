@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, ref, resolveDirective, withDirectives, watch } from 'vue'
+import { h, onMounted, ref, resolveDirective, withDirectives, watch, computed, type Ref } from 'vue'
 import {
   NButton,
   NForm,
@@ -14,6 +14,8 @@ import {
   NDescriptions,
   NDescriptionsItem,
   NPagination,
+  NTooltip,
+  NColorPicker,
 } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -23,7 +25,7 @@ import CrudTable from '@/components/table/CrudTable.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import ViewToggle from '@/components/common/ViewToggle.vue'
 
-import { formatDate, renderIcon } from '@/utils'
+import { formatDate, formatDateTime, renderIcon } from '@/utils'
 import { useCRUD } from '@/composables/useCRUD'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -32,6 +34,13 @@ defineOptions({ name: '工作流管理' })
 
 const router = useRouter()
 const message = useMessage()
+
+function sanitizeHex(hex?: string): string {
+  const v = (hex || '').trim()
+  if (!v) return ''
+  const m = v.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+  return m ? v : ''
+}
 
 const $table = ref<any>(null)
 const queryItems = ref<{
@@ -115,6 +124,8 @@ interface WorkflowForm {
   is_active: boolean
   trigger_type: string
   config: string
+  trigger_config: Record<string, any>
+  accent_color?: string
 }
 
 const crudResult = useCRUD({
@@ -126,7 +137,9 @@ const crudResult = useCRUD({
     priority: 'medium',
     is_active: true,
     trigger_type: 'manual',
+    trigger_config: {},
     config: '',
+    accent_color: '',
   },
   doCreate: async (data) => {
     const res = await createWorkflow(data)
@@ -161,7 +174,8 @@ const {
   handleDelete,
   handleAdd,
 } = crudResult
-const modalForm = crudResult.modalForm as unknown as WorkflowForm
+// modalForm 是一个 Ref，我们需要正确地使用它
+const modalForm = crudResult.modalForm as Ref<WorkflowForm>
 
 onMounted(() => {
   console.log('工作流管理页面已挂载')
@@ -171,12 +185,42 @@ onMounted(() => {
   }
 })
 
+watch(() => modalVisible.value, (visible) => {
+  if (visible) {
+    if (!modalForm.value.trigger_config || typeof modalForm.value.trigger_config !== 'object') {
+      modalForm.value.trigger_config = {}
+    }
+    modalForm.value.trigger_type = (modalForm.value.trigger_type || 'manual').toString().trim().toLowerCase()
+    modalForm.value.accent_color = sanitizeHex(modalForm.value.accent_color)
+  }
+})
+
+watch(() => modalForm.value.trigger_type, (t) => {
+  const tt = (t || '').toLowerCase()
+  if (!modalForm.value.trigger_config || typeof modalForm.value.trigger_config !== 'object') {
+    modalForm.value.trigger_config = {}
+  }
+  if (tt === 'webhook') {
+    if (modalForm.value.trigger_config.webhook_path === undefined) modalForm.value.trigger_config.webhook_path = ''
+    if (modalForm.value.trigger_config.webhook_secret === undefined) modalForm.value.trigger_config.webhook_secret = ''
+  } else if (tt === 'schedule') {
+    if (!modalForm.value.trigger_config.schedule_type) modalForm.value.trigger_config.schedule_type = 'cron'
+  } else if (tt === 'event') {
+    if (modalForm.value.trigger_config.event_type === undefined) modalForm.value.trigger_config.event_type = ''
+    if (modalForm.value.trigger_config.event_source === undefined) modalForm.value.trigger_config.event_source = ''
+    if (modalForm.value.trigger_config.event_filter === undefined) modalForm.value.trigger_config.event_filter = ''
+  }
+})
+
 // 监听视图模式变化
 watch(viewMode, (newMode) => {
   if (newMode === 'card') {
     loadWorkflowCards()
   }
 })
+
+// 归一化触发类型（用于模板条件展示）
+const triggerTypeNormalized = computed(() => (modalForm.value.trigger_type || '').toString().trim().toLowerCase())
 
 // 表格列配置
 const columns = [
@@ -566,6 +610,29 @@ function getTypeColor(type) {
   return typeMap[type] || 'default'
 }
 
+// 颜色工具：将HEX颜色适度变亮
+function lightenColor(hex, amount = 30) {
+  try {
+    const h = hex.replace('#', '')
+    const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16)
+    let r = (bigint >> 16) & 255
+    let g = (bigint >> 8) & 255
+    let b = bigint & 255
+    r = Math.min(255, r + amount)
+    g = Math.min(255, g + amount)
+    b = Math.min(255, b + amount)
+    const toHex = (n) => n.toString(16).padStart(2, '0')
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+  } catch (e) {
+    return hex
+  }
+}
+
+// 获取强调色（优先使用后端 accent_color）
+function getAccentColor(workflow) {
+  return workflow.accent_color || ''
+}
+
 // 获取类型标签文本
 function getTypeLabel(type) {
   const typeMap = {
@@ -684,6 +751,89 @@ const validateWorkflow = {
       trigger: ['change', 'blur'],
     },
   ],
+  accent_color: [
+    {
+      validator: (rule, value) => {
+        if (!value) return true
+        return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)
+      },
+      message: '请输入合法的HEX颜色，如 #667eea',
+      trigger: ['input', 'blur'],
+    },
+  ],
+  trigger_type: [
+    {
+      required: true,
+      message: '请选择触发类型',
+      trigger: ['change', 'blur'],
+    },
+  ],
+  'trigger_config.webhook_path': [
+    {
+      validator: (rule, value) => {
+        if (modalForm.value.trigger_type === 'webhook' && !value) {
+          return new Error('请输入Webhook路径')
+        }
+        return true
+      },
+      trigger: ['input', 'blur'],
+    },
+  ],
+  'trigger_config.webhook_secret': [
+    {
+      validator: (rule, value) => {
+        if (modalForm.value.trigger_type === 'webhook' && !value) {
+          return new Error('请输入密钥')
+        }
+        return true
+      },
+      trigger: ['input', 'blur'],
+    },
+  ],
+  'trigger_config.cron_expression': [
+    {
+      validator: (rule, value) => {
+        if (modalForm.value.trigger_type === 'schedule' && modalForm.value.trigger_config?.schedule_type === 'cron' && !value) {
+          return new Error('请输入Cron表达式')
+        }
+        return true
+      },
+      trigger: ['input', 'blur'],
+    },
+  ],
+  'trigger_config.interval_seconds': [
+    {
+      validator: (rule, value) => {
+        if (modalForm.value.trigger_type === 'schedule' && modalForm.value.trigger_config?.schedule_type === 'interval' && !value) {
+          return new Error('请输入间隔秒数')
+        }
+        return true
+      },
+      trigger: ['input', 'blur'],
+    },
+  ],
+  'trigger_config.execute_at': [
+    {
+      validator: (rule, value) => {
+        if (modalForm.value.trigger_type === 'schedule' && modalForm.value.trigger_config?.schedule_type === 'once' && !value) {
+          return new Error('请输入执行时间')
+        }
+        return true
+      },
+      trigger: ['input', 'blur'],
+    },
+  ],
+  'trigger_config.event_type': [
+    {
+      validator: (rule, value) => {
+        if (modalForm.value.trigger_type === 'event' && !value) {
+          return new Error('请输入事件类型')
+        }
+        return true
+      },
+      trigger: ['input', 'blur'],
+    },
+  ],
 }
 </script>
 
@@ -761,7 +911,12 @@ const validateWorkflow = {
     <div v-else class="workflow-cards">
       <div class="workflow-grid">
         <div v-for="workflow in workflowList" :key="workflow.id" class="workflow-card-item">
-          <NCard class="workflow-card" hoverable @click="handleView(workflow)">
+          <NCard
+            :class="['workflow-card', `workflow-type--${workflow.type}`]"
+            :style="getAccentColor(workflow) ? { borderLeftColor: getAccentColor(workflow) } : {}"
+            hoverable
+            @click="handleView(workflow)"
+          >
             <!-- 状态指示器 -->
             <div
               class="status-indicator"
@@ -769,7 +924,12 @@ const validateWorkflow = {
             ></div>
 
             <div class="workflow-card-header">
-              <div class="workflow-icon-wrapper">
+              <div
+                class="workflow-icon-wrapper"
+                :style="getAccentColor(workflow)
+                  ? { background: `linear-gradient(135deg, ${getAccentColor(workflow)} 0%, ${lightenColor(getAccentColor(workflow), 60)} 100%)` }
+                  : {}"
+              >
                 <TheIcon icon="material-symbols:account-tree" :size="24" class="workflow-icon" />
               </div>
               <div class="workflow-info">
@@ -793,6 +953,39 @@ const validateWorkflow = {
               >
                 {{ workflow.is_published ? '已发布' : '未发布' }}
               </NTag>
+            </div>
+
+            <!-- 工作流统计信息 -->
+            <div class="workflow-stats">
+              <div class="stat-item">
+                <TheIcon icon="material-symbols:play-circle" :size="16" class="stat-icon" />
+                <span class="stat-value">{{ workflow.execution_count ?? 0 }}</span>
+                <span class="stat-label">执行</span>
+              </div>
+              <div class="stat-item">
+                <TheIcon icon="material-symbols:check-circle" :size="16" class="stat-icon success" />
+                <span class="stat-value">{{ workflow.success_count ?? 0 }}</span>
+                <span class="stat-label">成功</span>
+              </div>
+              <div class="stat-item">
+                <TheIcon icon="material-symbols:cancel" :size="16" class="stat-icon failure" />
+                <span class="stat-value">{{ workflow.failure_count ?? 0 }}</span>
+                <span class="stat-label">失败</span>
+              </div>
+              <div class="stats-spacer"></div>
+              <div class="stats-last-run">
+                <TheIcon icon="material-symbols:schedule" :size="16" class="mr-2" />
+                <span class="last-run-label">最近执行：</span>
+                <template v-if="workflow.last_executed_at">
+                  <NTooltip trigger="hover">
+                    <template #trigger>
+                      <span class="last-run-text">{{ formatDateTime(workflow.last_executed_at, 'YYYY-MM-DD HH:mm') }}</span>
+                    </template>
+                    {{ formatDateTime(workflow.last_executed_at, 'YYYY-MM-DD HH:mm:ss') }}
+                  </NTooltip>
+                </template>
+                <span v-else class="last-run-text">—</span>
+              </div>
             </div>
 
             <!-- 工作流操作按钮 -->
@@ -903,6 +1096,114 @@ const validateWorkflow = {
             <template #checked>启用</template>
             <template #unchecked>禁用</template>
           </NSwitch>
+        </NFormItem>
+        <NFormItem label="触发类型" path="trigger_type">
+          <NSelect
+            v-model:value="modalForm.trigger_type"
+            :options="[
+              { label: '手动', value: 'manual' },
+              { label: '定时', value: 'schedule' },
+              { label: '事件', value: 'event' },
+              { label: 'Webhook', value: 'webhook' },
+            ]"
+            placeholder="请选择触发类型"
+            style="width: 180px"
+          />
+        </NFormItem>
+        <div v-if="triggerTypeNormalized === 'schedule'" :key="'schedule-'+triggerTypeNormalized" class="flex flex-col gap-3">
+          <NFormItem label="调度方式">
+          <NSelect
+              v-model:value="modalForm.trigger_config.schedule_type"
+              :options="[
+                { label: 'Cron', value: 'cron' },
+                { label: '间隔', value: 'interval' },
+                { label: '单次', value: 'once' },
+                { label: '每日', value: 'daily' },
+                { label: '每周', value: 'weekly' },
+                { label: '每月', value: 'monthly' },
+              ]"
+              placeholder="选择调度方式"
+              style="width: 180px"
+            />
+          </NFormItem>
+          <div v-if="modalForm.trigger_config?.schedule_type === 'cron'" class="flex items-center gap-3">
+            <NFormItem label="Cron表达式" path="trigger_config.cron_expression">
+              <NInput v-model:value="modalForm.trigger_config.cron_expression" placeholder="*/5 * * * *" style="max-width: 220px" />
+            </NFormItem>
+          </div>
+          <div v-if="modalForm.trigger_config?.schedule_type === 'interval'" class="flex items-center gap-3">
+            <NFormItem label="间隔秒数" path="trigger_config.interval_seconds">
+              <NInput v-model:value="modalForm.trigger_config.interval_seconds" placeholder="300" style="max-width: 160px" />
+            </NFormItem>
+          </div>
+          <div v-if="modalForm.trigger_config?.schedule_type === 'once'" class="flex items-center gap-3">
+            <NFormItem label="执行时间(ISO)" path="trigger_config.execute_at">
+              <NInput v-model:value="modalForm.trigger_config.execute_at" placeholder="2025-01-01T08:00:00" style="max-width: 240px" />
+            </NFormItem>
+          </div>
+          <div v-if="modalForm.trigger_config?.schedule_type === 'daily'" class="flex items-center gap-3">
+            <NFormItem label="小时">
+              <NInput v-model:value="modalForm.trigger_config.hour" placeholder="8" style="max-width: 100px" />
+            </NFormItem>
+            <NFormItem label="分钟">
+              <NInput v-model:value="modalForm.trigger_config.minute" placeholder="0" style="max-width: 100px" />
+            </NFormItem>
+          </div>
+          <div v-if="modalForm.trigger_config?.schedule_type === 'weekly'" class="flex items-center gap-3">
+            <NFormItem label="周几">
+              <NSelect v-model:value="modalForm.trigger_config.day_of_week" :options="[
+                { label: '周一', value: 'mon' },
+                { label: '周二', value: 'tue' },
+                { label: '周三', value: 'wed' },
+                { label: '周四', value: 'thu' },
+                { label: '周五', value: 'fri' },
+                { label: '周六', value: 'sat' },
+                { label: '周日', value: 'sun' },
+              ]" style="max-width: 140px" />
+            </NFormItem>
+            <NFormItem label="小时">
+              <NInput v-model:value="modalForm.trigger_config.hour" placeholder="8" style="max-width: 100px" />
+            </NFormItem>
+            <NFormItem label="分钟">
+              <NInput v-model:value="modalForm.trigger_config.minute" placeholder="0" style="max-width: 100px" />
+            </NFormItem>
+          </div>
+          <div v-if="modalForm.trigger_config?.schedule_type === 'monthly'" class="flex items-center gap-3">
+            <NFormItem label="日">
+              <NInput v-model:value="modalForm.trigger_config.day" placeholder="1" style="max-width: 100px" />
+            </NFormItem>
+            <NFormItem label="小时">
+              <NInput v-model:value="modalForm.trigger_config.hour" placeholder="8" style="max-width: 100px" />
+            </NFormItem>
+            <NFormItem label="分钟">
+              <NInput v-model:value="modalForm.trigger_config.minute" placeholder="0" style="max-width: 100px" />
+            </NFormItem>
+          </div>
+        </div>
+        <div v-if="triggerTypeNormalized === 'event'" :key="'event-'+triggerTypeNormalized" class="flex flex-col gap-3">
+          <NFormItem label="事件类型" path="trigger_config.event_type">
+            <NInput v-model:value="modalForm.trigger_config.event_type" placeholder="alarm.raised" style="max-width: 220px" />
+          </NFormItem>
+          <NFormItem label="事件来源">
+            <NInput v-model:value="modalForm.trigger_config.event_source" placeholder="device-service" style="max-width: 220px" />
+          </NFormItem>
+          <NFormItem label="事件过滤(JSON)">
+            <NInput v-model:value="modalForm.trigger_config.event_filter" type="textarea" placeholder='{"level":"high"}' :rows="3" />
+          </NFormItem>
+        </div>
+        <div v-if="triggerTypeNormalized === 'webhook'" :key="'webhook-'+triggerTypeNormalized" class="flex flex-col gap-3">
+          <NFormItem label="Webhook路径" path="trigger_config.webhook_path">
+            <NInput v-model:value="modalForm.trigger_config.webhook_path" placeholder="/hooks/workflows/exec" style="max-width: 240px" />
+          </NFormItem>
+          <NFormItem label="密钥" path="trigger_config.webhook_secret">
+            <NInput v-model:value="modalForm.trigger_config.webhook_secret" placeholder="secret-token" style="max-width: 240px" />
+          </NFormItem>
+        </div>
+        <NFormItem label="卡片颜色" path="accent_color">
+          <div class="flex items-center gap-3">
+            <NColorPicker v-model:value="modalForm.accent_color" size="small" :modes="['hex']" />
+            <NInput v-model:value="modalForm.accent_color" placeholder="#667eea" style="max-width: 140px" />
+          </div>
         </NFormItem>
         <NFormItem label="配置" path="config">
           <NInput
@@ -1122,6 +1423,105 @@ const validateWorkflow = {
   border-top: 1px solid var(--n-divider-color);
 }
 
+/* 工作流统计信息 */
+.workflow-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.workflow-stats .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--n-text-color-2);
+}
+
+.workflow-stats .stat-item .stat-value {
+  font-weight: 600;
+  color: var(--n-text-color-1);
+}
+
+.workflow-stats .stat-item .stat-icon {
+  color: var(--n-text-color-3);
+}
+
+.workflow-stats .stat-item .stat-icon.success {
+  color: #18a058;
+}
+
+.workflow-stats .stat-item .stat-icon.failure {
+  color: #d03050;
+}
+
+.workflow-stats .stats-spacer {
+  flex: 1;
+}
+
+.workflow-stats .stats-last-run {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--n-text-color-3);
+}
+
+.workflow-stats .stats-last-run .last-run-label {
+  color: var(--n-text-color-3);
+}
+
+.workflow-stats .stats-last-run .last-run-text {
+  display: inline-block;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .workflow-stats .stats-last-run .last-run-text {
+    max-width: 120px;
+  }
+}
+
+/* 类型配色：左边框与图标块联动 */
+.workflow-type--device_monitor {
+  border-left-color: #2f54eb;
+}
+.workflow-type--device_monitor .workflow-icon-wrapper {
+  background: linear-gradient(135deg, #2f54eb 0%, #597ef7 100%);
+}
+
+.workflow-type--alarm_process {
+  border-left-color: #722ed1;
+}
+.workflow-type--alarm_process .workflow-icon-wrapper {
+  background: linear-gradient(135deg, #722ed1 0%, #9254de 100%);
+}
+
+.workflow-type--data_collection {
+  border-left-color: #13c2c2;
+}
+.workflow-type--data_collection .workflow-icon-wrapper {
+  background: linear-gradient(135deg, #13c2c2 0%, #36cfc9 100%);
+}
+
+.workflow-type--maintenance {
+  border-left-color: #faad14;
+}
+.workflow-type--maintenance .workflow-icon-wrapper {
+  background: linear-gradient(135deg, #faad14 0%, #ffd666 100%);
+}
+
+.workflow-type--custom {
+  border-left-color: #1890ff;
+}
+.workflow-type--custom .workflow-icon-wrapper {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+}
+
 /* 分页样式 */
 .workflow-pagination {
   display: flex;
@@ -1320,3 +1720,10 @@ const validateWorkflow = {
   color: var(--n-text-color-3);
 }
 </style>
+function sanitizeHex(hex: string | undefined): string {
+  const v = (hex || '').toString().trim()
+  if (!v) return ''
+  // allow #RGB or #RRGGBB
+  const m = v.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+  return m ? v : ''
+}

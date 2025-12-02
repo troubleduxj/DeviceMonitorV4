@@ -3,12 +3,14 @@
 提供设备字段定义、数据模型、字段映射的RESTful API
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, Query, Path, Body
 from fastapi.responses import JSONResponse
 
 from app.core.response_formatter_v2 import create_formatter
 from app.core.dependency import DependAuth
+from app.core.exceptions import APIException
+from app.core.tdengine_config import TDengineConfigManager
 from app.models.admin import User
 from app.services.metadata_service import MetadataService
 from app.schemas.metadata import (
@@ -68,7 +70,7 @@ async def get_fields(
     is_active: Optional[bool] = Query(None, description="是否激活"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
     current_user: User = DependAuth
 ):
     """
@@ -498,6 +500,7 @@ async def delete_mapping(
 async def get_execution_logs(
     request: Request,
     model_id: Optional[int] = Query(None, description="模型ID"),
+    model_code: Optional[str] = Query(None, description="模型编码"),
     execution_type: Optional[str] = Query(None, description="执行类型"),
     status: Optional[str] = Query(None, description="执行状态"),
     page: int = Query(1, ge=1, description="页码"),
@@ -509,6 +512,7 @@ async def get_execution_logs(
     try:
         logs, total = await MetadataService.get_execution_logs(
             model_id=model_id,
+            model_code=model_code,
             execution_type=execution_type,
             status=status,
             page=page,
@@ -557,4 +561,101 @@ async def get_statistics(
     except Exception as e:
         logger.error(f"获取统计信息失败: {str(e)}", exc_info=True)
         return formatter.internal_error(f"获取统计信息失败: {str(e)}")
+
+
+@router.get("/schema/diff", summary="获取TDengine表结构差异", response_model=None)
+async def get_schema_diff(
+    request: Request,
+    device_type_code: str = Query(..., description="设备类型代码"),
+    current_user: User = DependAuth
+):
+    """
+    获取TDengine表结构与系统定义的差异
+    """
+    formatter = create_formatter(request)
+    try:
+        diff_result = await MetadataService.compare_schema(device_type_code)
+        
+        if diff_result.get('status') == 'error':
+             return formatter.error(message=diff_result.get('message'), code=500)
+             
+        return formatter.success(
+            data=diff_result,
+            message="获取结构差异成功"
+        )
+    except APIException as e:
+         return formatter.error(message=e.message, code=e.code)
+    except Exception as e:
+        logger.error(f"获取结构差异失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"获取结构差异失败: {str(e)}")
+
+
+# =====================================================
+# 配置 API
+# =====================================================
+
+@router.get("/config/tdengine-default", summary="获取默认TDengine配置")
+async def get_tdengine_default_config(request: Request, current_user: User = DependAuth):
+    """
+    获取默认TDengine配置
+    
+    返回当前后端使用的TDengine连接配置，用于前端同步默认值
+    """
+    formatter = create_formatter(request)
+    try:
+        manager = TDengineConfigManager()
+        config = manager.get_server_config()
+        
+        return formatter.success(
+            data={
+                "database": config.database,
+                "host": config.host,
+                "port": config.port,
+                "user": config.user
+            },
+            message="获取TDengine配置成功"
+        )
+    except Exception as e:
+        logger.error(f"获取TDengine配置失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"获取TDengine配置失败: {str(e)}")
+
+
+# =====================================================
+# 导入导出 API
+# =====================================================
+
+@router.get("/export", summary="导出元数据配置")
+async def export_metadata(
+    request: Request,
+    device_type_code: Optional[str] = Query(None, description="设备类型代码"),
+    current_user: User = DependAuth
+):
+    """
+    导出元数据配置（JSON格式）
+    包括设备类型、字段定义、数据模型和字段映射
+    """
+    formatter = create_formatter(request)
+    try:
+        data = await MetadataService.export_metadata(device_type_code)
+        return formatter.success(data, "导出成功")
+    except Exception as e:
+        logger.error(f"导出元数据失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"导出失败: {str(e)}")
+
+@router.post("/import", summary="导入元数据配置")
+async def import_metadata(
+    request: Request,
+    data: Dict[str, Any] = Body(..., description="元数据配置JSON"),
+    current_user: User = DependAuth
+):
+    """
+    导入元数据配置
+    """
+    formatter = create_formatter(request)
+    try:
+        stats = await MetadataService.import_metadata(data, user_id=current_user.id)
+        return formatter.success(stats, "导入成功")
+    except Exception as e:
+        logger.error(f"导入元数据失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"导入失败: {str(e)}")
 

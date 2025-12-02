@@ -273,5 +273,116 @@ async def get_field_suggestions(
         )
         
     except Exception as e:
-        logger.error(f"获取字段配置建议失败: {str(e)}")
-        return formatter.internal_error(f"获取字段配置建议失败: {str(e)}")
+        logger.error(f"获取字段建议失败: {str(e)}")
+        return formatter.internal_error(f"获取字段建议失败: {str(e)}")
+
+from pydantic import BaseModel
+
+class SyncFieldsRequest(BaseModel):
+    device_type_code: str
+    field_codes: List[str]
+
+@router.post("/tdengine/sync-fields", summary="同步TDengine字段到配置")
+async def sync_fields(
+    request: Request,
+    sync_data: SyncFieldsRequest,
+    current_user: User = DependAuth
+):
+    """
+    同步 TDengine 字段到设备字段配置
+    
+    - **device_type_code**: 设备类型代码
+    - **field_codes**: 要同步的字段代码列表
+    """
+    try:
+        formatter = create_formatter(request)
+        device_type_code = sync_data.device_type_code
+        field_codes = sync_data.field_codes
+        
+        if not field_codes:
+            return formatter.bad_request("请选择要同步的字段")
+            
+        # 1. 获取设备类型
+        device_type = await DeviceType.get_or_none(type_code=device_type_code)
+        if not device_type:
+            return formatter.not_found(f"设备类型不存在: {device_type_code}")
+            
+        # 2. 获取 TDengine 字段信息
+        connector = TDengineConnector()
+        try:
+            stable_name = device_type.tdengine_stable_name
+            if '.' not in stable_name:
+                stable_name = f"{connector.database}.{stable_name}"
+                
+            result = await connector.execute_sql(f"DESCRIBE {stable_name}")
+            if not result or 'data' not in result:
+                return formatter.internal_error("无法获取TDengine表结构")
+                
+            # 构建字段映射
+            td_fields = {}
+            for row in result['data']:
+                # row: [field_name, type, length, note]
+                name = row[0]
+                type_ = row[1]
+                note = row[3] if len(row) > 3 else ''
+                if name != 'ts' and note != 'TAG':
+                    td_fields[name] = {
+                        'type': type_,
+                        'field_type': map_tdengine_type_to_field_type(type_)
+                    }
+        finally:
+            await connector.close()
+            
+        # 3. 创建或更新字段
+        from app.models.device import DeviceField
+        
+        created_count = 0
+        updated_count = 0
+        errors = []
+        
+        for code in field_codes:
+            if code not in td_fields:
+                errors.append(f"字段 {code} 在TDengine中不存在")
+                continue
+                
+            td_info = td_fields[code]
+            
+            # 检查是否存在
+            field = await DeviceField.get_or_none(
+                device_type_code=device_type_code,
+                field_code=code
+            )
+            
+            if field:
+                # 更新现有字段 (可选，这里主要用于补全信息)
+                # field.field_type = td_info['field_type']
+                # await field.save()
+                updated_count += 1
+            else:
+                # 创建新字段
+                await DeviceField.create(
+                    device_type_code=device_type_code,
+                    field_code=code,
+                    field_name=code,  # 默认使用代码作为名称
+                    field_type=td_info['field_type'],
+                    field_category='data_collection',
+                    is_active=True,
+                    is_monitoring_key=True, # 默认作为监控字段
+                    is_alarm_enabled=False,
+                    description=f"From TDengine {td_info['type']}"
+                )
+                created_count += 1
+                
+        return formatter.success(
+            data={
+                'created': created_count,
+                'updated': updated_count,
+                'errors': errors
+            },
+            message=f"同步完成: 新增 {created_count}, 更新 {updated_count}"
+        )
+        
+    except Exception as e:
+        logger.error(f"同步字段失败: {str(e)}")
+        return formatter.internal_error(f"同步字段失败: {str(e)}")
+

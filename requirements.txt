@@ -65,3 +65,5 @@ uvloop==0.21.0; sys_platform != 'win32'
 watchfiles==1.0.4
 websockets==14.1
 psutil==5.9.8
+apscheduler==3.10.4
+

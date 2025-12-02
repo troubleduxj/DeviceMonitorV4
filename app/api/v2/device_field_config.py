@@ -170,6 +170,7 @@ async def get_device_field_config(
                 "unit": field.unit,
                 "description": field.description,
                 "is_monitoring_key": field.is_monitoring_key,
+                "is_alarm_enabled": field.is_alarm_enabled,
                 "is_ai_feature": field.is_ai_feature,
                 "is_active": field.is_active,
                 "aggregation_method": field.aggregation_method,
@@ -298,6 +299,7 @@ async def get_all_device_field_configs(
                     "unit": field.unit,
                     "description": field.description,
                     "is_monitoring_key": field.is_monitoring_key,
+                    "is_alarm_enabled": field.is_alarm_enabled,
                     "is_ai_feature": field.is_ai_feature,
                     "is_active": field.is_active,
                     "aggregation_method": field.aggregation_method,
@@ -386,6 +388,7 @@ async def create_device_field_config(
                 unit=field_data.unit,
                 description=field_data.description,
                 is_monitoring_key=field_data.is_monitoring_key,
+                is_alarm_enabled=field_data.is_alarm_enabled,
                 is_ai_feature=field_data.is_ai_feature,
                 aggregation_method=field_data.aggregation_method,
                 data_range=field_data.data_range,  # JSONField自动处理
@@ -413,6 +416,7 @@ async def create_device_field_config(
             "validation_rule": json.loads(field_config.validation_rule) if field_config.validation_rule else None,
             "unit": field_config.unit,
             "description": field_config.description,
+            "is_alarm_enabled": field_config.is_alarm_enabled,
             "is_active": field_config.is_active,
             "created_at": field_config.created_at,
             "updated_at": field_config.updated_at
@@ -481,6 +485,7 @@ async def update_device_field_config(
             "validation_rule": json.loads(updated_field.validation_rule) if updated_field.validation_rule else None,
             "unit": updated_field.unit,
             "description": updated_field.description,
+            "is_alarm_enabled": updated_field.is_alarm_enabled,
             "is_active": updated_field.is_active,
             "created_at": updated_field.created_at,
             "updated_at": updated_field.updated_at

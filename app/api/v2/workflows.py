@@ -100,6 +100,7 @@ async def get_workflows(
                 "is_active": wf.is_active,
                 "is_published": wf.is_published,
                 "version": wf.version,
+                "accent_color": getattr(wf, "accent_color", None),
                 "execution_count": wf.execution_count,
                 "success_count": wf.success_count,
                 "failure_count": wf.failure_count,
@@ -400,6 +401,7 @@ async def get_workflow(workflow_id: int):
             "is_active": wf.is_active,
             "is_published": wf.is_published,
             "version": wf.version,
+            "accent_color": getattr(wf, "accent_color", None),
             "timeout_seconds": wf.timeout_seconds,
             "retry_count": wf.retry_count,
             "retry_interval": wf.retry_interval,
@@ -466,6 +468,7 @@ async def create_workflow(workflow_data: WorkflowCreate):
             related_device_types=workflow_data.related_device_types or [],
             related_alarm_rules=workflow_data.related_alarm_rules or [],
             is_active=workflow_data.is_active,
+            accent_color=getattr(workflow_data, "accent_color", None),
         )
         
         logger.info(f"创建工作流成功: {wf.code}")

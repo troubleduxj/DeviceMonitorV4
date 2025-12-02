@@ -18,6 +18,7 @@ class AlarmRule(TimestampMixin, BaseModel):
     
     # 关联信息
     device_type_code = fields.CharField(max_length=50, description="设备类型代码")
+    device_code = fields.CharField(max_length=64, null=True, description="关联设备编码，为空则为通用规则")
     device_field_id = fields.BigIntField(null=True, description="关联的设备字段ID")
     field_code = fields.CharField(max_length=50, description="监测字段代码")
     field_name = fields.CharField(max_length=100, null=True, description="字段名称")
@@ -27,6 +28,7 @@ class AlarmRule(TimestampMixin, BaseModel):
     
     # 触发条件
     trigger_condition = fields.JSONField(default=dict, description="触发条件配置")
+    trigger_config = fields.JSONField(null=True, description="高级触发配置")
     
     # 报警级别
     alarm_level = fields.CharField(max_length=20, default="warning", description="默认报警级别")
@@ -78,8 +80,10 @@ class AlarmRecord(TimestampMixin, BaseModel):
     
     # 时间信息
     triggered_at = fields.DatetimeField(description="触发时间")
+    last_triggered_at = fields.DatetimeField(null=True, description="最近一次触发时间")
     recovered_at = fields.DatetimeField(null=True, description="恢复时间")
     duration_seconds = fields.IntField(null=True, description="持续时间(秒)")
+    trigger_count = fields.IntField(default=1, description="触发次数")
     
     # 处理信息
     status = fields.CharField(max_length=20, default="active", description="状态")

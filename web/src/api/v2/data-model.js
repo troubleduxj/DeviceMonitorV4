@@ -204,6 +204,50 @@ export const dataModelApi = {
    */
   getCacheStats: () => requestV2.get('/dynamic-models/cache/stats'),
   
+  /**
+   * 预览TDengine字段
+   * @param {Object} params - 参数
+   * @param {string} params.device_type_code - 设备类型代码
+   * @returns {Promise}
+   */
+  previewTDengineFields: async (params) => {
+    try {
+      const response = await requestV2.get(`/tdengine/field-suggestions/${params.device_type_code}`)
+      if (response.success) {
+        // 转换数据格式以适配前端组件
+        const { matched_fields, missing_fields, extra_fields, statistics } = response.data
+        
+        const fields = [
+          ...missing_fields.map(f => ({ ...f, status: 'new' })),
+          ...matched_fields.map(f => ({ ...f, status: 'exist' })),
+          ...extra_fields.map(f => ({ ...f, status: 'invalid' }))
+        ]
+        
+        return {
+          success: true,
+          data: {
+            fields,
+            total_fields: statistics.total_tdengine_fields,
+            new_fields: statistics.missing_count,
+            skip_fields: statistics.matched_count
+          }
+        }
+      }
+      return response
+    } catch (error) {
+      return { success: false, message: error.message }
+    }
+  },
+
+  /**
+   * 从TDengine同步字段
+   * @param {Object} data - 同步数据
+   * @param {string} data.device_type_code - 设备类型代码
+   * @param {Array} data.field_codes - 字段代码列表
+   * @returns {Promise}
+   */
+  syncFromTDengine: (data) => requestV2.post('/tdengine/sync-fields', data),
+
   // ==================== 数据查询 ====================
   
   /**
@@ -274,6 +318,39 @@ export const dataModelApi = {
    * @returns {Promise}
    */
   getStatistics: () => requestV2.get('/metadata/statistics'),
+
+  // ==================== 配置信息 ====================
+  
+  /**
+   * 获取TDengine默认配置
+   * @returns {Promise}
+   */
+  getTDengineDefaultConfig: () => requestV2.get('/metadata/config/tdengine-default'),
+
+  /**
+   * 获取TDengine结构差异
+   * @param {string} deviceTypeCode - 设备类型代码
+   * @returns {Promise}
+   */
+  getSchemaDiff: (deviceTypeCode) => requestV2.get('/metadata/schema/diff', {
+    params: { device_type_code: deviceTypeCode }
+  }),
+
+  // ==================== TDengine 同步 ====================
+
+  /**
+   * 预览TDengine字段
+   * @param {Object} params - 同步参数
+   * @returns {Promise}
+   */
+  previewTDengineFields: (params) => requestV2.get('/metadata-sync/preview-tdengine-fields', { params }),
+
+  /**
+   * 执行TDengine同步
+   * @param {Object} data - 同步数据
+   * @returns {Promise}
+   */
+  syncFromTDengine: (data) => requestV2.post('/metadata-sync/sync-from-tdengine', data),
 }
 
 /**

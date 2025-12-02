@@ -507,6 +507,14 @@ const nodeCategories = [
     ]
   },
   {
+    key: 'integration',
+    name: '集成节点',
+    icon: '🔌',
+    nodes: [
+      { type: 'metadata_analysis', name: '元数据分析', icon: '📈', color: '#722ed1', description: '执行元数据模型分析' },
+    ]
+  },
+  {
     key: 'device',
     name: '设备节点',
     icon: '🔧',
@@ -694,6 +702,8 @@ const nodeColorMap: Record<string, string> = {
   start: '#52c41a', end: '#ff4d4f',
   // 逻辑控制
   condition: '#faad14', loop: '#722ed1', parallel: '#13c2c2', switch: '#9254de',
+  // 集成节点
+  metadata_analysis: '#722ed1',
   // 设备节点
   device_query: '#1890ff', device_control: '#52c41a', device_data: '#13c2c2', device_status: '#faad14',
   // 报警节点
@@ -710,6 +720,8 @@ const nodeIconMap: Record<string, string> = {
   start: '▶', end: '⏹',
   // 逻辑控制
   condition: '❓', loop: '🔄', parallel: '⫘', switch: '🔀',
+  // 集成节点
+  metadata_analysis: '📈',
   // 设备节点
   device_query: '🔍', device_control: '🎮', device_data: '📊', device_status: '📡',
   // 报警节点
@@ -725,6 +737,8 @@ const nodeNameMap: Record<string, string> = {
   start: '开始', end: '结束',
   // 逻辑控制
   condition: '条件判断', loop: '循环', parallel: '并行', switch: '多路分支',
+  // 集成节点
+  metadata_analysis: '元数据分析',
   // 设备节点
   device_query: '设备查询', device_control: '设备控制', device_data: '数据采集', device_status: '状态检测',
   // 报警节点

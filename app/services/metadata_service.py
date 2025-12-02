@@ -4,11 +4,13 @@
 """
 
 from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime
 from tortoise.exceptions import DoesNotExist
 from tortoise.expressions import Q
 from tortoise.queryset import QuerySet
 
-from app.models.device import DeviceField, DeviceDataModel, DeviceFieldMapping, ModelExecutionLog
+from app.models.device import DeviceField, DeviceDataModel, DeviceFieldMapping, ModelExecutionLog, DeviceType, DeviceDataModelHistory
+from app.models.notification import Notification
 from app.schemas.metadata import (
     DeviceFieldCreate, DeviceFieldUpdate,
     DeviceDataModelCreate, DeviceDataModelUpdate,
@@ -16,7 +18,9 @@ from app.schemas.metadata import (
     ModelExecutionLogCreate
 )
 from app.core.exceptions import APIException
+from app.core.tdengine_connector import TDengineConnector
 import logging
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -195,12 +199,68 @@ class MetadataService:
         models = await query.order_by('-created_at').offset(offset).limit(page_size)
         
         return models, total
+
+    @staticmethod
+    async def execute_model(model_code: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        执行数据模型分析
+        TODO: 实现真实的模型执行逻辑 (统计/AI)
+        """
+        model = await DeviceDataModel.get_or_none(model_code=model_code)
+        if not model:
+            raise Exception(f"模型 {model_code} 不存在")
+            
+        # 模拟执行结果
+        return {
+            "model": model_code,
+            "timestamp": datetime.now().isoformat(),
+            "result": "success",
+            "score": 0.95,
+            "anomalies": []
+        }
     
     @staticmethod
-    async def update_model(model_id: int, model_data: DeviceDataModelUpdate) -> Optional[DeviceDataModel]:
+    async def create_snapshot(model: DeviceDataModel, change_type: str, change_reason: str = None, user_id: int = None):
+        """创建模型快照"""
+        try:
+            content = {
+                "model_name": model.model_name,
+                "model_code": model.model_code,
+                "model_type": model.model_type,
+                "selected_fields": model.selected_fields,
+                "aggregation_config": model.aggregation_config,
+                "ai_config": model.ai_config,
+                "is_active": model.is_active,
+                "version": model.version
+            }
+            
+            await DeviceDataModelHistory.create(
+                model=model,
+                version=model.version,
+                content=content,
+                change_type=change_type,
+                change_reason=change_reason,
+                created_by=user_id
+            )
+            logger.info(f"创建模型快照成功: {model.model_code} v{model.version}")
+        except Exception as e:
+            logger.error(f"创建模型快照失败: {str(e)}")
+            # 快照失败不应阻断主流程
+
+    @staticmethod
+    async def update_model(model_id: int, model_data: DeviceDataModelUpdate, user_id: int = None) -> Optional[DeviceDataModel]:
         """更新数据模型"""
         try:
             model = await DeviceDataModel.get(id=model_id)
+            
+            # 创建更新前的快照
+            await MetadataService.create_snapshot(
+                model=model, 
+                change_type="update", 
+                change_reason="Update via API",
+                user_id=user_id
+            )
+            
             update_dict = model_data.model_dump(exclude_unset=True)
             
             # 处理嵌套的 Pydantic 模型
@@ -313,6 +373,119 @@ class MetadataService:
         mappings = await query.order_by('device_type_code', 'tdengine_stable', 'tdengine_column').offset(offset).limit(page_size)
         
         return mappings, total
+
+    # =====================================================
+    # 导入导出管理
+    # =====================================================
+    
+    @staticmethod
+    async def export_metadata(device_type_code: Optional[str] = None) -> Dict[str, Any]:
+        """导出元数据配置"""
+        
+        # 1. 获取设备类型
+        type_query = DeviceType.all()
+        if device_type_code:
+            type_query = type_query.filter(type_code=device_type_code)
+        device_types = await type_query.values()
+        
+        # 2. 获取字段定义
+        field_query = DeviceField.all()
+        if device_type_code:
+            field_query = field_query.filter(device_type_code=device_type_code)
+        fields = await field_query.values()
+        
+        # 3. 获取数据模型
+        model_query = DeviceDataModel.all()
+        if device_type_code:
+            model_query = model_query.filter(device_type_code=device_type_code)
+        models = await model_query.values()
+        
+        # 4. 获取字段映射
+        mapping_query = DeviceFieldMapping.all()
+        if device_type_code:
+            mapping_query = mapping_query.filter(device_type_code=device_type_code)
+        mappings = await mapping_query.values()
+        
+        return {
+            "version": "1.0",
+            "exported_at": datetime.now().isoformat(),
+            "device_types": device_types,
+            "fields": fields,
+            "models": models,
+            "mappings": mappings
+        }
+
+    @staticmethod
+    async def import_metadata(data: Dict[str, Any], user_id: int = None) -> Dict[str, Any]:
+        """导入元数据配置"""
+        stats = {"created": 0, "updated": 0, "errors": 0, "details": []}
+        
+        try:
+            # 1. 导入设备类型
+            for item in data.get("device_types", []):
+                try:
+                    type_code = item.get("type_code")
+                    if not type_code: continue
+                    
+                    # 移除 id
+                    item.pop("id", None)
+                    
+                    obj, created = await DeviceType.update_or_create(
+                        type_code=type_code,
+                        defaults=item
+                    )
+                    stats["created" if created else "updated"] += 1
+                except Exception as e:
+                    stats["errors"] += 1
+                    stats["details"].append(f"Type {type_code}: {str(e)}")
+
+            # 2. 导入字段定义
+            for item in data.get("fields", []):
+                try:
+                    device_type = item.get("device_type_code")
+                    field_name = item.get("field_name")
+                    if not device_type or not field_name: continue
+                    
+                    item.pop("id", None)
+                    
+                    obj, created = await DeviceField.update_or_create(
+                        device_type_code=device_type,
+                        field_name=field_name,
+                        defaults=item
+                    )
+                    stats["created" if created else "updated"] += 1
+                except Exception as e:
+                    stats["errors"] += 1
+                    stats["details"].append(f"Field {field_name}: {str(e)}")
+
+            # 3. 导入数据模型
+            for item in data.get("models", []):
+                try:
+                    model_code = item.get("model_code")
+                    version = item.get("version", "1.0")
+                    if not model_code: continue
+                    
+                    item.pop("id", None)
+                    
+                    # 查找是否存在
+                    model = await DeviceDataModel.filter(model_code=model_code, version=version).first()
+                    if model:
+                        # 创建快照
+                        await MetadataService.create_snapshot(model, "import", "Import via API", user_id)
+                        await model.update_from_dict(item).save()
+                        stats["updated"] += 1
+                    else:
+                        await DeviceDataModel.create(**item)
+                        stats["created"] += 1
+                except Exception as e:
+                    stats["errors"] += 1
+                    stats["details"].append(f"Model {model_code}: {str(e)}")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"导入元数据失败: {str(e)}")
+            raise APIException(f"导入失败: {str(e)}")
     
     @staticmethod
     async def update_mapping(mapping_id: int, mapping_data: DeviceFieldMappingUpdate) -> Optional[DeviceFieldMapping]:
@@ -362,6 +535,7 @@ class MetadataService:
     @staticmethod
     async def get_execution_logs(
         model_id: Optional[int] = None,
+        model_code: Optional[str] = None,
         execution_type: Optional[str] = None,
         status: Optional[str] = None,
         page: int = 1,
@@ -373,6 +547,8 @@ class MetadataService:
         # 构建查询条件
         if model_id:
             query = query.filter(model_id=model_id)
+        if model_code:
+            query = query.filter(model__model_code=model_code)
         if execution_type:
             query = query.filter(execution_type=execution_type)
         if status:
@@ -425,4 +601,193 @@ class MetadataService:
             'success_rate': round(success_rate, 2),
             'avg_execution_time_ms': round(avg_execution_time_ms, 2)
         }
+
+    @staticmethod
+    async def compare_schema(device_type_code: str) -> Dict[str, Any]:
+        """比较TDengine表结构与系统定义的差异"""
+        # 1. 获取设备类型和关联字段
+        device_type = await DeviceType.get_or_none(type_code=device_type_code)
+        if not device_type:
+            raise APIException(message=f"Device type {device_type_code} not found", code=404)
+        
+        if not device_type.tdengine_stable_name:
+            raise APIException(message=f"Device type {device_type_code} has no TDengine stable name", code=400)
+
+        fields = await DeviceField.filter(
+            device_type_code=device_type_code, 
+            is_active=True
+        ).all()
+        
+        # 2. 获取TDengine表结构
+        connector = TDengineConnector()
+        try:
+            sql = f"DESCRIBE {device_type.tdengine_stable_name}"
+            result = await connector.execute_sql(sql)
+            
+            # Handle TDengine raw response (code/desc)
+            if 'code' in result and result['code'] != 0:
+                error_desc = result.get('desc', '').lower()
+                # Check for "Table does not exist" (code 9731)
+                if result['code'] == 9731 or "not exist" in error_desc or "not found" in error_desc:
+                    return {
+                        "status": "success",
+                        "device_type": device_type_code,
+                        "stable_name": device_type.tdengine_stable_name,
+                        "table_exists": False,
+                        "diff": {
+                            "missing_in_tdengine": [
+                                {
+                                    "field_code": f.field_code, 
+                                    "field_name": f.field_name, 
+                                    "field_type": f.field_type
+                                } for f in fields
+                            ],
+                            "missing_in_system": [],
+                            "type_mismatch": []
+                        }
+                    }
+                else:
+                    raise APIException(message=f"TDengine Error {result['code']}: {result.get('desc')}", code=500)
+
+            # Handle Legacy format (status/desc)
+            if 'status' in result and result.get('status') != 'succ':
+                raise APIException(message=f"Failed to describe table: {result.get('desc')}", code=500)
+                
+            td_columns = {}
+            for row in result.get('data', []):
+                # row format: [field_name, type, length, note]
+                col_name = row[0]
+                col_type = row[1]
+                col_note = row[3] if len(row) > 3 else ""
+                td_columns[col_name] = {
+                    'type': col_type,
+                    'is_tag': 'TAG' in col_note
+                }
+                
+        except Exception as e:
+            # Table might not exist
+            logger.error(f"Error describing table: {e}")
+            
+            error_msg = str(e)
+            if isinstance(e, httpx.HTTPStatusError):
+                # Append response text to error message for checking
+                try:
+                    error_msg += f" {e.response.text}"
+                except:
+                    pass
+            
+            error_msg_lower = error_msg.lower()
+            
+            # Check for common "table not exists" error messages from TDengine
+            # "Table does not exist" or similar
+            # Use case-insensitive check and broader patterns
+            if "not exist" in error_msg_lower or "not found" in error_msg_lower:
+                 return {
+                    "status": "success",
+                    "device_type": device_type_code,
+                    "stable_name": device_type.tdengine_stable_name,
+                    "table_exists": False,
+                    "diff": {
+                        "missing_in_tdengine": [
+                            {
+                                "field_code": f.field_code, 
+                                "field_name": f.field_name, 
+                                "field_type": f.field_type
+                            } for f in fields
+                        ],
+                        "missing_in_system": [],
+                        "type_mismatch": []
+                    }
+                 }
+
+            return {
+                "status": "error", 
+                "message": f"Table {device_type.tdengine_stable_name} does not exist or error occurred: {error_msg}",
+                "diff": None
+            }
+
+        # 3. 比较差异
+        diff = {
+            "missing_in_tdengine": [],
+            "missing_in_system": [],
+            "type_mismatch": []
+        }
+        
+        # System definition
+        system_fields = {f.field_code: f for f in fields}
+        
+        # Check for missing fields in TDengine
+        for code, field in system_fields.items():
+            if code not in td_columns:
+                diff['missing_in_tdengine'].append({
+                    "field_code": code,
+                    "field_name": field.field_name,
+                    "field_type": field.field_type
+                })
+            else:
+                # Type comparison can be added here if needed
+                pass
+                
+        # Check for extra fields in TDengine (missing in system)
+        for col_name, col_info in td_columns.items():
+            if col_name not in system_fields:
+                if col_name == 'ts': continue # Skip timestamp usually
+                diff['missing_in_system'].append({
+                    "field_code": col_name,
+                    "td_type": col_info['type'],
+                    "is_tag": col_info['is_tag']
+                })
+                
+        return {
+            "status": "success",
+            "device_type": device_type_code,
+            "stable_name": device_type.tdengine_stable_name,
+            "diff": diff
+        }
+
+    @staticmethod
+    async def check_schema_diff_daily():
+        """每日检查表结构差异并通知"""
+        logger.info("⏰ 开始执行每日表结构差异检查...")
+        try:
+            # 获取所有配置了超级表的设备类型
+            device_types = await DeviceType.filter(tdengine_stable_name__isnull=False).all()
+            
+            diff_count = 0
+            for dt in device_types:
+                if not dt.tdengine_stable_name:
+                    continue
+                    
+                try:
+                    result = await MetadataService.compare_schema(dt.type_code)
+                    if result.get('status') == 'success':
+                        diff = result.get('diff')
+                        if diff and (diff['missing_in_tdengine'] or diff['missing_in_system']):
+                            diff_count += 1
+                            # 创建通知
+                            missing_td = len(diff['missing_in_tdengine'])
+                            missing_sys = len(diff['missing_in_system'])
+                            
+                            content = f"设备类型 [{dt.type_name}] ({dt.type_code}) 发现表结构差异。\n"
+                            if missing_td > 0:
+                                content += f"- TDengine缺失字段: {missing_td} 个\n"
+                            if missing_sys > 0:
+                                content += f"- 系统缺失字段: {missing_sys} 个\n"
+                            content += "请前往[数据模型管理]查看并处理。"
+                            
+                            await Notification.create(
+                                title=f"⚠️ 表结构差异告警: {dt.type_name}",
+                                content=content,
+                                notification_type="system",
+                                level="warning",
+                                scope="all"
+                            )
+                            logger.warning(f"发现差异并发送通知: {dt.type_name}")
+                except Exception as e:
+                    logger.error(f"检查设备类型 {dt.type_code} 差异失败: {e}")
+            
+            logger.info(f"✅ 表结构差异检查完成，发现 {diff_count} 个设备类型存在差异")
+            
+        except Exception as e:
+            logger.error(f"❌ 每日表结构差异检查任务失败: {e}")
 

@@ -12,7 +12,7 @@ type NodeCategory = 'basic' | 'control' | 'integration' | 'device' | 'alarm' | '
 type NodeStatus = 'idle' | 'running' | 'success' | 'error' | 'warning'
 
 /** 节点类型字符串 */
-type NodeType = 'start' | 'end' | 'process' | 'transform' | 'filter' | 'condition' | 'loop' | 'timer' | 'parallel' | 'merge' | 'delay' | 'api' | 'database'
+type NodeType = 'start' | 'end' | 'process' | 'transform' | 'filter' | 'condition' | 'loop' | 'timer' | 'parallel' | 'merge' | 'delay' | 'api' | 'database' | 'metadata_analysis'
 
 /** 位置信息 */
 interface Position {
@@ -248,6 +248,14 @@ export const integrationNodes: NodeDefinition[] = [
     description: '调用Webhook接口',
     category: 'integration',
   },
+  {
+    type: 'metadata_analysis',
+    label: '模型分析',
+    icon: 'material-symbols:chart-data',
+    color: '#673ab7',
+    description: '执行元数据模型分析',
+    category: 'integration',
+  },
 ]
 
 // 设备节点类型
@@ -383,6 +391,7 @@ function getNodeDisplayIcon(iconName: string): string {
     'material-symbols:hourglass-empty': '⏳',
     'material-symbols:api': '🌐',
     'material-symbols:database': '🗄️',
+    'material-symbols:chart-data': '📈',
     // 新增节点图标
     'material-symbols:code': '💻',
     'material-symbols:mail-outline': '📧',
@@ -448,6 +457,10 @@ function getNodeInputs(type: string): NodeInput[] {
     delay: [{ name: 'input', type: 'any', required: true }],
     api: [{ name: 'params', type: 'object', required: false }],
     database: [{ name: 'query', type: 'string', required: true }],
+    metadata_analysis: [
+      { name: 'data', type: 'json', required: true },
+      { name: 'device_id', type: 'string', required: true }
+    ],
   }
   return inputsMap[type] || []
 }
@@ -471,6 +484,7 @@ function getNodeOutputs(type: string): NodeOutput[] {
     delay: [{ name: 'output', type: 'any' }],
     api: [{ name: 'response', type: 'object' }],
     database: [{ name: 'result', type: 'array' }],
+    metadata_analysis: [{ name: 'result', type: 'json' }],
   }
   return outputsMap[type] || []
 }
@@ -534,6 +548,15 @@ function getNodeProperties(type: string): NodeProperties {
         required: true,
       },
       sql: { label: 'SQL语句', type: 'textarea', required: true, description: '要执行的SQL语句' },
+    },
+    metadata_analysis: {
+      model_code: {
+        label: '选择模型',
+        type: 'select',
+        options: ['API:/api/v2/metadata/models'], // Front-end should handle this special prefix to load from API
+        required: true,
+        description: '要执行的元数据模型',
+      },
     },
     loop: {
       loopType: {

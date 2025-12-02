@@ -103,6 +103,7 @@ class DeviceField(TimestampMixin, BaseModel):
     
     # ⭐ 新增字段：元数据驱动支持
     is_monitoring_key = fields.BooleanField(default=False, description="是否为实时监控关键字段")
+    is_alarm_enabled = fields.BooleanField(default=False, description="是否允许配置报警规则")
     is_ai_feature = fields.BooleanField(default=False, description="是否为AI分析特征字段")
     aggregation_method = fields.CharField(max_length=20, null=True, description="聚合方法: avg/sum/max/min/count/first/last")
     data_range = fields.JSONField(null=True, description='正常数据范围: {"min": 0, "max": 100}')
@@ -646,4 +647,36 @@ class ModelExecutionLog(BaseModel):
             ("model_id", "executed_at"),
             ("execution_type", "status", "executed_at")
         ]
+        app = "models"
+
+
+class DeviceDataModelHistory(BaseModel):
+    """设备数据模型变更历史"""
+    
+    # 关联模型
+    model = fields.ForeignKeyField(
+        "models.DeviceDataModel",
+        related_name="history",
+        description="关联的数据模型",
+        on_delete=fields.CASCADE
+    )
+    
+    # 历史版本信息
+    version = fields.CharField(max_length=20, description="版本号")
+    
+    # 快照内容 (完整保存修改前的状态)
+    content = fields.JSONField(description="模型配置快照")
+    
+    # 变更说明
+    change_type = fields.CharField(max_length=20, description="变更类型: create/update/delete")
+    change_reason = fields.CharField(max_length=200, null=True, description="变更原因")
+    
+    # 审计字段
+    created_by = fields.IntField(null=True, description="创建人ID")
+    created_at = fields.DatetimeField(auto_now_add=True, description="创建时间")
+    
+    class Meta:
+        table = "t_device_model_history"
+        table_description = "设备数据模型变更历史表"
+        indexes = [("model_id", "version"), ("created_at",)]
         app = "models"

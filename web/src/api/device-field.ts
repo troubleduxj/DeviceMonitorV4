@@ -27,6 +27,7 @@ export interface DeviceField {
   group_order?: number  // ✅ 添加分组排序
   description?: string
   is_monitoring_key: boolean
+  is_alarm_enabled: boolean // ✅ 是否允许配置报警
   is_active: boolean
 }
 

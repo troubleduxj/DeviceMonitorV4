@@ -109,6 +109,7 @@ import { formatDate, formatDateTime } from '@/utils'
 import * as echarts from 'echarts'
 import { compatibilityApi as deviceDataApi } from '@/api/device-v2'
 import { deviceFieldApi } from '@/api/device-field'
+import { alarmRulesApi } from '@/api/alarm-rules'
 import type { DeviceField } from '@/api/device-field'
 import { useDeviceFieldStore } from '@/store/modules/device-field'
 
@@ -125,6 +126,9 @@ const deviceFieldStore = useDeviceFieldStore()
 const viewMode = ref('chart')
 const chartRef = ref(null)
 let chartInstance = null
+
+// 报警规则缓存
+const alarmRules = ref([])
 
 // 视图切换选项
 const viewOptions = [
@@ -268,6 +272,101 @@ function handlePageSizeChange(pageSize) {
 }
 
 /**
+ * 加载报警规则
+ */
+async function loadAlarmRules() {
+  try {
+    const params = {}
+    if (queryForm.device_type_code) params.device_type_code = queryForm.device_type_code
+    if (queryForm.device_code) params.device_code = queryForm.device_code
+    params.is_enabled = true
+    
+    // console.log('Fetching alarm rules with params:', params)
+    
+    const res = await alarmRulesApi.list(params)
+    if (res.success) {
+      alarmRules.value = res.data.items || res.data || []
+      console.log(`✅ 加载到 ${alarmRules.value.length} 条报警规则`)
+    }
+  } catch (error) {
+    console.warn('加载报警规则失败:', error)
+    alarmRules.value = []
+  }
+}
+
+/**
+ * 获取字段的MarkLine配置
+ */
+function getMarkLine(fieldCode: string) {
+  if (!alarmRules.value || alarmRules.value.length === 0) return null
+
+  // 查找适用于该字段的规则
+  // 优先使用特定设备的规则，然后是通用规则
+  // 注意：alarmRules.value 应该已经包含了过滤后的规则，这里我们找最匹配的
+  const rules = alarmRules.value.filter(r => r.field_code === fieldCode)
+  if (rules.length === 0) return null
+
+  // 排序：有device_code的优先
+  rules.sort((a, b) => {
+    if (a.device_code && !b.device_code) return -1
+    if (!a.device_code && b.device_code) return 1
+    return 0
+  })
+
+  const rule = rules[0] // 使用优先级最高的规则
+  const config = rule.threshold_config || {}
+  const data = []
+
+  // 解析阈值配置
+  // Warning
+  if (config.warning) {
+    if (config.warning.max !== undefined) {
+      data.push({ 
+        yAxis: config.warning.max, 
+        name: 'Warning Max',
+        lineStyle: { color: '#e6a23c', type: 'dashed' },
+        label: { formatter: 'Warn: {c}' }
+      })
+    }
+    if (config.warning.min !== undefined) {
+      data.push({ 
+        yAxis: config.warning.min, 
+        name: 'Warning Min',
+        lineStyle: { color: '#e6a23c', type: 'dashed' },
+        label: { formatter: 'Warn: {c}' }
+      })
+    }
+  }
+
+  // Critical
+  if (config.critical) {
+    if (config.critical.max !== undefined) {
+      data.push({ 
+        yAxis: config.critical.max, 
+        name: 'Critical Max',
+        lineStyle: { color: '#f56c6c', type: 'solid' },
+        label: { formatter: 'Crit: {c}' }
+      })
+    }
+    if (config.critical.min !== undefined) {
+      data.push({ 
+        yAxis: config.critical.min, 
+        name: 'Critical Min',
+        lineStyle: { color: '#f56c6c', type: 'solid' },
+        label: { formatter: 'Crit: {c}' }
+      })
+    }
+  }
+
+  if (data.length === 0) return null
+
+  return {
+    symbol: 'none',
+    data: data
+  }
+}
+
+/**
  * 初始化图表
  */
 function initChart() {
@@ -320,6 +419,7 @@ function initChart() {
           lineStyle: {
             color: colors[colorIndex % colors.length],
           },
+          markLine: getMarkLine(field.field_code) // 添加阈值线
         })
         colorIndex++
       })
@@ -456,8 +556,11 @@ async function loadDeviceFields() {
 async function queryHistoryData() {
   loading.value = true
   try {
-    // 先加载字段配置
-    await loadDeviceFields()
+    // 先加载字段配置和报警规则
+    await Promise.all([
+      loadDeviceFields(),
+      loadAlarmRules()
+    ])
 
     // 根据视图模式决定查询参数
     const queryParams = {

@@ -293,6 +293,10 @@ const categories = [
   { key: 'output', name: '输出', icon: '📤', description: '数据输出节点' },
   { key: 'control', name: '控制', icon: '🎛️', description: '流程控制节点' },
   { key: 'logic', name: '逻辑', icon: '🧠', description: '逻辑判断节点' },
+  { key: 'integration', name: '集成', icon: '🔌', description: '外部系统集成' },
+  { key: 'device', name: '设备', icon: '🏭', description: '设备相关节点' },
+  { key: 'alarm', name: '报警', icon: '🚨', description: '报警相关节点' },
+  { key: 'notification', name: '通知', icon: '📢', description: '消息通知节点' },
   { key: 'utility', name: '工具', icon: '🔧', description: '实用工具节点' },
   { key: 'favorite', name: '收藏', icon: '⭐', description: '收藏的节点' },
 ]

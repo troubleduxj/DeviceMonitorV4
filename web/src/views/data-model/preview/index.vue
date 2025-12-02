@@ -125,6 +125,7 @@
                   <n-code 
                     :code="generatedSQL || '暂无SQL'" 
                     language="sql"
+                    :hljs="hljs"
                     word-wrap
                   />
                 </n-scrollbar>
@@ -207,6 +208,7 @@
                 <!-- 数据表格 -->
                 <n-data-table
                   v-else
+                  remote
                   :columns="resultColumns"
                   :data="resultData"
                   :loading="querying"
@@ -234,6 +236,7 @@
             <n-tab-pane name="logs" tab="执行日志">
               <n-card :bordered="false">
                 <n-data-table
+                  remote
                   :columns="logColumns"
                   :data="executionLogs"
                   :loading="logsLoading"
@@ -255,6 +258,10 @@ import { SearchOutline, CopyOutline, DownloadOutline } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
 import { useResizeObserver } from '@vueuse/core'
 import * as echarts from 'echarts'
+import hljs from 'highlight.js/lib/core'
+import sql from 'highlight.js/lib/languages/sql'
+
+hljs.registerLanguage('sql', sql)
 
 const message = useMessage()
 
@@ -469,7 +476,7 @@ const handleQuery = async () => {
     if (response.success) {
       queryResult.value = response
       resultData.value = response.data || []
-      resultPagination.itemCount = response.total || 0
+      resultPagination.itemCount = response.meta?.total || response.total || 0
       generatedSQL.value = response.generated_sql || ''
       executionTime.value = Date.now() - startTime
       

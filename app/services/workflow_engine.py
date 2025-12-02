@@ -806,6 +806,35 @@ class WebhookNodeExecutor(NodeExecutor):
             return body
 
 
+
+class MetadataAnalysisNodeExecutor(NodeExecutor):
+    """元数据分析节点执行器"""
+    
+    async def execute(self, node: Dict, context: Dict[str, Any]) -> NodeExecutionResult:
+        logger.info(f"执行元数据分析节点: {node.get('name', 'metadata_analysis')}")
+        
+        properties = node.get('properties', {})
+        model_code = properties.get('model_code')
+        
+        if not model_code:
+            return NodeExecutionResult(success=False, error="未配置模型代码")
+            
+        # 提取数据 (假设上游节点输出了 data 或 payload)
+        data = context.get('data') or context.get('payload') or {}
+        
+        try:
+            from app.services.metadata_service import MetadataService
+            result = await MetadataService.execute_model(model_code, data)
+            
+            return NodeExecutionResult(
+                success=True, 
+                output={'result': result}
+            )
+        except Exception as e:
+            logger.error(f"元数据模型执行失败: {e}")
+            return NodeExecutionResult(success=False, error=str(e))
+
+
 class WorkflowEngine:
     """工作流执行引擎"""
     
@@ -845,6 +874,8 @@ class WorkflowEngine:
             'email': EmailNodeExecutor(),
             'sms': SmsNodeExecutor(),
             'webhook': WebhookNodeExecutor(),
+            # 元数据节点
+            'metadata_analysis': MetadataAnalysisNodeExecutor(),
             # 兼容旧节点
             'process': StartNodeExecutor(),
         }

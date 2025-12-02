@@ -45,7 +45,7 @@ class DeviceController(OptimizedCRUDBase[DeviceInfo, DeviceCreate, DeviceUpdate]
         Raises:
             HTTPException: 当设备编号或设备类型不存在时
         """
-        async with in_transaction():
+        async with in_transaction("default"):
             # 1. 检查设备编号是否已存在
             if await self.model.filter(device_code=obj_in.device_code).exists():
                 raise HTTPException(status_code=400, detail=f"设备编号 {obj_in.device_code} 已存在")

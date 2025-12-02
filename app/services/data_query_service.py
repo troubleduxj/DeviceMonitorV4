@@ -193,6 +193,7 @@ class DataQueryService:
                 'page_size': page_size,
                 'total_pages': (total_count + page_size - 1) // page_size,
                 'execution_time_ms': exec_time_ms,
+                'generated_sql': query_sql,
                 'model_info': {
                     'model_code': data_model.model_code,
                     'model_name': data_model.model_name,
@@ -370,6 +371,7 @@ class DataQueryService:
                 'data': transformed_data,
                 'total': len(transformed_data),
                 'execution_time_ms': exec_time_ms,
+                'generated_sql': query_sql,
                 'aggregation_info': {
                     'interval': interval,
                     'group_by': group_by,

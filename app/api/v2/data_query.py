@@ -143,7 +143,8 @@ async def query_realtime_data(
             total=result['total'],
             page=result['page'],
             page_size=result['page_size'],
-            message=f"查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms"
+            message=f"查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms",
+            generated_sql=result.get('generated_sql')
         )
         
     except APIException as e:
@@ -234,7 +235,8 @@ async def query_statistics_data(
         
         return formatter.success(
             data=result,
-            message=f"统计查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms"
+            message=f"统计查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms",
+            generated_sql=result.get('generated_sql')
         )
         
     except APIException as e:
@@ -302,7 +304,8 @@ async def preview_model_data(
                 'total': len(result['data']),
                 'model_info': result['model_info']
             },
-            message=f"预览成功，返回 {len(result['data'])} 条记录"
+            message=f"预览成功，返回 {len(result['data'])} 条记录",
+            generated_sql=result.get('generated_sql')
         )
         
     except APIException as e:

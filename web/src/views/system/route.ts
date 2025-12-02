@@ -114,16 +114,6 @@ const route: RouteRecordRaw = {
         keepAlive: true,
       },
     },
-    {
-      name: 'DeviceFieldConfig',
-      path: '/system/device-field',
-      component: () => import('./device-field/index.vue'),
-      meta: {
-        title: '设备字段配置',
-        icon: 'mdi-ticket-percent-outline',
-        keepAlive: true,
-      },
-    },
 
     {
       name: 'ComponentManagement',

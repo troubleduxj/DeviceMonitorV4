@@ -652,6 +652,7 @@ class DeviceFieldConfigResponse(BaseModel):
     options: Optional[List[Dict[str, str]]] = Field(None, description="选项值（用于字典类型字段）")
     unit: Optional[str] = Field(None, description="单位")
     description: Optional[str] = Field(None, description="字段描述")
+    is_alarm_enabled: bool = Field(False, description="是否允许配置报警规则")
     
     class Config:
         from_attributes = True
@@ -683,6 +684,7 @@ class DeviceFieldConfigCreate(BaseModel):
     unit: Optional[str] = Field(None, description="单位")
     description: Optional[str] = Field(None, description="字段描述")
     is_monitoring_key: bool = Field(False, description="是否为实时监控关键字段")
+    is_alarm_enabled: bool = Field(False, description="是否允许配置报警规则")
     is_ai_feature: bool = Field(False, description="是否为AI分析特征字段")
     aggregation_method: Optional[str] = Field(None, description="聚合方法")
     data_range: Optional[Dict[str, Any]] = Field(None, description="正常数据范围")
@@ -707,6 +709,7 @@ class DeviceFieldConfigUpdate(BaseModel):
     description: Optional[str] = Field(None, description="字段描述")
     is_active: Optional[bool] = Field(None, description="是否激活")
     is_monitoring_key: Optional[bool] = Field(None, description="是否为实时监控关键字段")
+    is_alarm_enabled: Optional[bool] = Field(None, description="是否允许配置报警规则")
     is_ai_feature: Optional[bool] = Field(None, description="是否为AI分析特征字段")
     aggregation_method: Optional[str] = Field(None, description="聚合方法")
     data_range: Optional[Dict[str, Any]] = Field(None, description="正常数据范围")

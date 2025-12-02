@@ -64,6 +64,7 @@ class APIv2Response(BaseModel):
     data: Optional[Any] = None
     meta: ResponseMeta
     links: Optional[HATEOASLinks] = None
+    generated_sql: Optional[str] = None  # 用于调试，返回生成的SQL
 
 
 class APIv2ErrorDetail(BaseModel):
@@ -232,7 +233,8 @@ class ResponseFormatterV2:
         code: int = 200,
         resource_id: Optional[str] = None,
         resource_type: Optional[str] = None,
-        related_resources: Optional[Dict[str, str]] = None
+        related_resources: Optional[Dict[str, str]] = None,
+        generated_sql: Optional[str] = None
     ) -> JSONResponse:
         """创建成功响应"""
         meta = self._build_meta()
@@ -251,7 +253,8 @@ class ResponseFormatterV2:
             message=message,
             data=data,
             meta=meta,
-            links=links
+            links=links,
+            generated_sql=generated_sql
         )
         
         # 移除调试信息以避免Content-Length问题
@@ -286,7 +289,8 @@ class ResponseFormatterV2:
         message: str = "success",
         code: int = 200,
         resource_type: Optional[str] = None,
-        query_params: Optional[Dict[str, Any]] = None
+        query_params: Optional[Dict[str, Any]] = None,
+        generated_sql: Optional[str] = None
     ) -> JSONResponse:
         """创建分页成功响应"""
         meta = self._build_meta(total=total, page=page, page_size=page_size)
@@ -308,11 +312,12 @@ class ResponseFormatterV2:
             message=message,
             data=data,
             meta=meta,
-            links=links
+            links=links,
+            generated_sql=generated_sql
         )
         
         return JSONResponse(
-            content=response_data.model_dump(exclude_none=True),
+            content=response_data.model_dump(mode='json', exclude_none=True),
             status_code=code
         )
     

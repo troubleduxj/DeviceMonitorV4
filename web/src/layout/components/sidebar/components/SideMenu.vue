@@ -54,7 +54,7 @@ function getMenuItem(route, basePath = '') {
   }
 
   const visibleChildren = route.children
-    ? route.children.filter((item) => item.name && !item.isHidden)
+    ? route.children.filter((item) => item.name && !item.meta?.isHidden)
     : []
 
   if (!visibleChildren.length) return menuItem
@@ -70,7 +70,7 @@ function getMenuItem(route, basePath = '') {
       icon: getIcon(singleRoute.meta),
     }
     const visibleItems = singleRoute.children
-      ? singleRoute.children.filter((item) => item.name && !item.isHidden)
+      ? singleRoute.children.filter((item) => item.name && !item.meta?.isHidden)
       : []
 
     if (visibleItems.length === 1) {

@@ -1970,9 +1970,10 @@ async function showDeviceCharts(device) {
   console.log('showDeviceCharts 被调用，设备数据:', device)
 
   // 确保使用正确的设备编码和设备名称字段
-  const deviceCode = device.id || device.device_code
-  const deviceName = device.name || device.device_name || ''
-  const deviceTypeCode = device.device_type || device.type_code || filterType.value
+  // 优先使用 device_code 作为业务主键，id 作为备选
+  const deviceCode = device.device_code || device.id
+  const deviceName = device.device_name || device.name || ''
+  const deviceTypeCode = device.device_type_code || device.type_code || device.device_type || filterType.value
 
   console.log('提取的设备信息:', { deviceCode, deviceName, deviceTypeCode })
 

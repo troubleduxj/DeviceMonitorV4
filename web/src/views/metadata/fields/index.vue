@@ -4,6 +4,7 @@
     <n-card :bordered="false" class="mb-4">
       <n-space>
         <n-select
+          v-if="!embedded"
           v-model:value="queryParams.device_type_code"
           placeholder="选择设备类型"
           clearable
@@ -57,12 +58,23 @@
           </template>
           从TDengine同步
         </n-button>
+
+        <n-button 
+          type="warning" 
+          @click="handleCheckDiff"
+        >
+          <template #icon>
+            <n-icon :component="GitCompareOutline" />
+          </template>
+          结构比对
+        </n-button>
       </n-space>
     </n-card>
 
     <!-- 字段列表 -->
     <n-card :bordered="false">
       <n-data-table
+        remote
         :columns="columns"
         :data="fieldList"
         :loading="loading"
@@ -130,13 +142,23 @@
           />
         </n-form-item>
         
-        <n-form-item label="监控关键字段">
-          <n-switch v-model:value="fieldFormData.is_monitoring_key" />
-        </n-form-item>
-        
-        <n-form-item label="AI特征字段">
-          <n-switch v-model:value="fieldFormData.is_ai_feature" />
-        </n-form-item>
+        <n-grid :cols="2">
+          <n-gi>
+            <n-form-item label="监控关键字段">
+              <n-switch v-model:value="fieldFormData.is_monitoring_key" />
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item label="允许报警配置">
+              <n-switch v-model:value="fieldFormData.is_alarm_enabled" />
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item label="AI特征字段">
+              <n-switch v-model:value="fieldFormData.is_ai_feature" />
+            </n-form-item>
+          </n-gi>
+        </n-grid>
       </n-form>
       
       <template #footer>
@@ -174,6 +196,7 @@
               v-model:value="syncFormData.device_type_code"
               placeholder="选择设备类型"
               :options="deviceTypeOptions"
+              @update:value="handleSyncDeviceTypeChange"
             />
           </n-form-item>
           
@@ -213,10 +236,12 @@
         </n-alert>
         
         <n-data-table
+          v-model:checked-row-keys="selectedPreviewFields"
           :columns="previewColumns"
           :data="previewResult.fields"
           :max-height="400"
           :pagination="false"
+          :row-key="row => row.field_code"
         />
       </div>
       
@@ -286,24 +311,77 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- 报警阈值配置抽屉 -->
+    <n-drawer v-model:show="showAlarmConfigDrawer" :width="400">
+      <n-drawer-content title="默认报警阈值配置">
+        <n-form
+          :model="alarmConfigData"
+          label-placement="top"
+        >
+          <n-alert type="info" class="mb-4">
+            为字段 <strong>{{ alarmConfigData.field_name }}</strong> 设置默认报警阈值。
+            这些阈值将作为创建报警规则时的推荐值。
+          </n-alert>
+
+          <n-form-item label="警告阈值 (Warning)">
+            <n-input-number v-model:value="alarmConfigData.warning" placeholder="请输入数值" clearable style="width: 100%" />
+          </n-form-item>
+
+          <n-form-item label="严重阈值 (Critical)">
+            <n-input-number v-model:value="alarmConfigData.critical" placeholder="请输入数值" clearable style="width: 100%" />
+          </n-form-item>
+        </n-form>
+
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="showAlarmConfigDrawer = false">取消</n-button>
+            <n-button type="primary" @click="handleSaveAlarmConfig" :loading="savingAlarmConfig">
+              保存
+            </n-button>
+          </n-space>
+        </template>
+      </n-drawer-content>
+    </n-drawer>
+
+    <SchemaDiffModal
+      v-model:show="showSchemaDiffModal"
+      :device-type-code="queryParams.device_type_code"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, h } from 'vue'
-import { NButton, NTag, NSpace, NSwitch, useMessage } from 'naive-ui'
+import { ref, reactive, computed, onMounted, h, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { NButton, NTag, NSpace, NSwitch, useMessage, NGrid, NGi, NInputNumber, NDrawer, NDrawerContent, NForm, NFormItem } from 'naive-ui'
 import { 
   SearchOutline, 
   RefreshOutline, 
   AddOutline, 
   CreateOutline, 
   TrashOutline,
-  CloudDownloadOutline
+  CloudDownloadOutline,
+  GitCompareOutline
 } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
-import axios from 'axios'
+import { deviceTypeApi } from '@/api/device-v2'
+// Note: Ensure this component exists in the same directory or update path
+import SchemaDiffModal from './components/SchemaDiffModal.vue'
+
+const props = defineProps({
+  deviceTypeCode: {
+    type: String,
+    default: null
+  },
+  embedded: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const message = useMessage()
+const route = useRoute()
 
 // 查询参数
 const queryParams = reactive({
@@ -312,6 +390,14 @@ const queryParams = reactive({
   search: '',
   is_active: true
 })
+
+// 监听 prop 变化
+watch(() => props.deviceTypeCode, (newVal) => {
+  if (newVal) {
+    queryParams.device_type_code = newVal
+    handleQuery()
+  }
+}, { immediate: true })
 
 // 数据
 const fieldList = ref([])
@@ -334,11 +420,27 @@ const pagination = reactive({
 })
 
 // 选项
-const deviceTypeOptions = ref([
-  { label: '焊接设备', value: 'welding' },
-  { label: '切割设备', value: 'cutting' },
-  { label: '装配设备', value: 'assembly' }
-])
+const deviceTypeOptions = ref([])
+
+const fetchDeviceTypes = async () => {
+  try {
+    const res = await deviceTypeApi.list({
+      page: 1,
+      page_size: 100,
+      is_active: true
+    })
+    if (res.success) {
+      deviceTypeOptions.value = res.data.map(item => ({
+        label: item.type_name,
+        value: item.type_code,
+        tdengine_stable_name: item.tdengine_stable_name
+      }))
+    }
+  } catch (error) {
+    console.error('获取设备类型列表失败:', error)
+    // 不显示错误提示，以免打断用户流程，只是下拉框为空
+  }
+}
 
 const fieldCategoryOptions = [
   { label: '数据采集', value: 'data_collection' },
@@ -388,6 +490,18 @@ const columns = [
     }
   },
   {
+    title: '允许报警',
+    key: 'is_alarm_enabled',
+    width: 100,
+    render(row) {
+      return h(NSwitch, {
+        value: row.is_alarm_enabled,
+        disabled: !row.is_monitoring_key, // 只有监控字段才能开启报警
+        onUpdateValue: (value) => handleToggleAlarmEnabled(row, value)
+      })
+    }
+  },
+  {
     title: 'AI特征',
     key: 'is_ai_feature',
     width: 100,
@@ -412,22 +526,33 @@ const columns = [
     width: 150,
     fixed: 'right',
     render(row) {
-      return h(NSpace, null, {
-        default: () => [
-          h(NButton, {
-            size: 'small',
-            type: 'info',
-            text: true,
-            onClick: () => handleEdit(row.id)
-          }, { default: () => '编辑' }),
-          h(NButton, {
-            size: 'small',
-            type: 'error',
-            text: true,
-            onClick: () => handleDelete(row.id)
-          }, { default: () => '删除' })
-        ]
-      })
+      const actions = [
+        h(NButton, {
+          size: 'small',
+          type: 'info',
+          text: true,
+          onClick: () => handleEdit(row.id)
+        }, { default: () => '编辑' }),
+        h(NButton, {
+          size: 'small',
+          type: 'error',
+          text: true,
+          onClick: () => handleDelete(row.id)
+        }, { default: () => '删除' })
+      ]
+      
+      // 如果已开启报警，显示配置按钮
+      if (row.is_alarm_enabled) {
+        actions.unshift(h(NButton, {
+          size: 'small',
+          type: 'warning',
+          text: true,
+          style: 'margin-right: 8px',
+          onClick: () => handleOpenAlarmConfig(row)
+        }, { default: () => '阈值' }))
+      }
+      
+      return h(NSpace, null, { default: () => actions })
     }
   }
 ]
@@ -441,15 +566,29 @@ const saving = ref(false)
 const fieldFormData = reactive({
   id: null,
   device_type_code: null,
-  field_name: '',
   field_code: '',
-  field_type: null,
+  field_name: '',
+  field_type: 'float',
   field_category: 'data_collection',
   unit: '',
-  description: '',
   is_monitoring_key: false,
-  is_ai_feature: false
+  is_alarm_enabled: false,
+  alarm_threshold: { warning: null, critical: null },
+  is_ai_feature: false,
+  description: '',
+  is_active: true
 })
+
+// 报警配置抽屉
+const showAlarmConfigDrawer = ref(false)
+const alarmConfigData = reactive({
+  id: null,
+  field_name: '',
+  warning: null,
+  critical: null
+})
+const savingAlarmConfig = ref(false)
+
 
 const fieldFormRules = {
   device_type_code: [{ required: true, message: '请选择设备类型', trigger: 'change' }],
@@ -464,6 +603,7 @@ const fieldFormRules = {
 
 // TDengine同步相关
 const showSyncModal = ref(false)
+const showSchemaDiffModal = ref(false)
 const syncStep = ref(1)
 const syncStatus = ref('process')
 const previewing = ref(false)
@@ -472,10 +612,17 @@ const syncFormRef = ref(null)
 
 const syncFormData = reactive({
   device_type_code: null,
-  tdengine_database: 'device_monitor',
+  tdengine_database: '',
   tdengine_stable: '',
   field_category: 'data_collection'
 })
+
+const handleSyncDeviceTypeChange = (value, option) => {
+  if (option && option.tdengine_stable_name) {
+    syncFormData.tdengine_stable = option.tdengine_stable_name
+    message.success(`已自动填充超级表名: ${option.tdengine_stable_name}`)
+  }
+}
 
 const syncFormRules = {
   device_type_code: [{ required: true, message: '请选择设备类型', trigger: 'change' }],
@@ -491,7 +638,10 @@ const previewResult = reactive({
   fields: []
 })
 
+const selectedPreviewFields = ref([])
+
 const previewColumns = [
+  { type: 'selection' },
   { 
     title: '状态', 
     key: 'status_text', 
@@ -548,7 +698,7 @@ const fetchFieldList = async () => {
     
     if (response.success) {
       fieldList.value = response.data || []
-      pagination.itemCount = response.total || 0
+      pagination.itemCount = response.meta?.total || response.total || 0
     } else {
       message.error(response.message || '查询失败')
     }
@@ -571,6 +721,14 @@ const handleReset = () => {
   handleQuery()
 }
 
+const handleCheckDiff = () => {
+  if (!queryParams.device_type_code) {
+    message.warning('请先选择设备类型')
+    return
+  }
+  showSchemaDiffModal.value = true
+}
+
 const handleCreate = () => {
   Object.assign(fieldFormData, {
     id: null,
@@ -582,6 +740,7 @@ const handleCreate = () => {
     unit: '',
     description: '',
     is_monitoring_key: false,
+    is_alarm_enabled: false,
     is_ai_feature: false
   })
   showFieldModal.value = true
@@ -616,140 +775,197 @@ const handleSaveField = async () => {
       showFieldModal.value = false
       fetchFieldList()
     } else {
-      message.error(response.message || '保存失败')
+      message.error(response.message || (fieldFormData.id ? '更新失败' : '创建失败'))
     }
   } catch (error) {
-    if (!error.errors) {
-      message.error('保存失败：' + (error.message || '未知错误'))
-    }
+    message.error((fieldFormData.id ? '更新失败' : '创建失败') + '：' + (error.message || '未知错误'))
   } finally {
     saving.value = false
   }
 }
 
 const handleDelete = async (id) => {
-  try {
-    const response = await dataModelApi.deleteField(id)
-    if (response.success) {
-      message.success('删除成功')
-      fetchFieldList()
-    } else {
-      message.error(response.message || '删除失败')
+  window.$dialog.warning({
+    title: '确认删除',
+    content: '确定要删除该字段配置吗？',
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        const response = await dataModelApi.deleteField(id)
+        if (response.success) {
+          message.success('删除成功')
+          fetchFieldList()
+        } else {
+          message.error(response.message || '删除失败')
+        }
+      } catch (error) {
+        message.error('删除失败：' + (error.message || '未知错误'))
+      }
     }
-  } catch (error) {
-    message.error('删除失败：' + (error.message || '未知错误'))
-  }
+  })
 }
 
 const handleToggleActive = async (id, value) => {
   try {
+    // 这里需要后端支持更新单个字段的接口，或者使用 updateField
     const response = await dataModelApi.updateField(id, { is_active: value })
     if (response.success) {
-      message.success(value ? '已激活' : '已停用')
+      message.success(value ? '启用成功' : '停用成功')
       fetchFieldList()
     } else {
       message.error(response.message || '操作失败')
-      fetchFieldList()
     }
   } catch (error) {
     message.error('操作失败：' + (error.message || '未知错误'))
-    fetchFieldList()
   }
 }
 
-// TDengine同步相关方法
-const handleSyncFromTDengine = () => {
-  // 重置表单
-  Object.assign(syncFormData, {
-    device_type_code: queryParams.device_type_code || null,
-    tdengine_database: 'device_monitor',
-    tdengine_stable: '',
-    field_category: 'data_collection'
-  })
+const handleToggleAlarmEnabled = async (row, value) => {
+  const originalValue = row.is_alarm_enabled
+  try {
+    // 乐观更新
+    row.is_alarm_enabled = value
+    
+    const response = await dataModelApi.updateField(row.id, { 
+      is_alarm_enabled: value 
+    })
+    
+    if (response.success) {
+      message.success(value ? '开启报警配置成功' : '关闭报警配置成功')
+    } else {
+      // 回滚
+      row.is_alarm_enabled = originalValue
+      message.error(response.message || '操作失败')
+    }
+  } catch (error) {
+    // 回滚
+    row.is_alarm_enabled = originalValue
+    message.error('操作失败：' + (error.message || '未知错误'))
+  }
+}
+
+const handleOpenAlarmConfig = (row) => {
+  alarmConfigData.id = row.id
+  alarmConfigData.field_name = row.field_name
   
-  // 重置状态
+  // 初始化现有值或默认值
+  const threshold = row.alarm_threshold || {}
+  alarmConfigData.warning = threshold.warning
+  alarmConfigData.critical = threshold.critical
+  
+  showAlarmConfigDrawer.value = true
+}
+
+const handleSaveAlarmConfig = async () => {
+  savingAlarmConfig.value = true
+  try {
+    const threshold = {
+      warning: alarmConfigData.warning,
+      critical: alarmConfigData.critical
+    }
+    
+    const response = await dataModelApi.updateField(alarmConfigData.id, {
+      alarm_threshold: threshold
+    })
+    
+    if (response.success) {
+      message.success('报警阈值配置保存成功')
+      showAlarmConfigDrawer.value = false
+      
+      // 更新本地列表
+      const item = fieldList.value.find(item => item.id === alarmConfigData.id)
+      if (item) {
+        item.alarm_threshold = threshold
+      }
+    } else {
+      message.error(response.message || '保存失败')
+    }
+  } catch (error) {
+    message.error('保存失败：' + (error.message || '未知错误'))
+  } finally {
+    savingAlarmConfig.value = false
+  }
+}
+
+// TDengine同步方法
+const handleSyncFromTDengine = () => {
   syncStep.value = 1
   syncStatus.value = 'process'
-  Object.assign(previewResult, {
-    total_fields: 0,
-    new_fields: 0,
-    existing_fields: 0,
-    skip_fields: 0,
-    fields: []
-  })
-  Object.assign(syncResult, {
-    created: [],
-    skipped: [],
-    errors: []
-  })
-  
+  syncFormData.device_type_code = queryParams.device_type_code
   showSyncModal.value = true
+}
+
+const handleCloseSyncModal = () => {
+  showSyncModal.value = false
 }
 
 const handlePreviewSync = async () => {
   try {
     await syncFormRef.value?.validate()
-    
     previewing.value = true
     
-    const response = await axios.get('/api/v2/metadata-sync/preview-tdengine-fields', {
-      params: syncFormData
-    })
-    
-    if (response.data.success) {
-      Object.assign(previewResult, response.data.data)
+    const response = await dataModelApi.previewTDengineFields(syncFormData)
+    if (response.success) {
+      Object.assign(previewResult, response.data)
+      // 默认全选新字段
+      selectedPreviewFields.value = previewResult.fields
+        .filter(f => f.status === 'new')
+        .map(f => f.field_code)
+        
       syncStep.value = 2
-      message.success('预览成功')
     } else {
-      message.error(response.data.message || '预览失败')
+      message.error(response.message || '预览失败')
     }
   } catch (error) {
-    if (!error.errors) {
-      message.error('预览失败：' + (error.response?.data?.message || error.message || '未知错误'))
-    }
+    message.error('预览失败：' + (error.message || '未知错误'))
   } finally {
     previewing.value = false
   }
 }
 
 const handleExecuteSync = async () => {
-  syncing.value = true
-  syncStatus.value = 'process'
+  if (selectedPreviewFields.value.length === 0) {
+    message.warning('请选择要同步的字段')
+    return
+  }
   
   try {
-    const response = await axios.post('/api/v2/metadata-sync/sync-from-tdengine', syncFormData)
+    syncing.value = true
+    const response = await dataModelApi.syncFromTDengine({
+      ...syncFormData,
+      field_codes: selectedPreviewFields.value
+    })
     
-    if (response.data.success) {
-      Object.assign(syncResult, response.data.data)
+    if (response.success) {
+      Object.assign(syncResult, response.data)
       syncStep.value = 3
-      syncStatus.value = 'finish'
-      message.success(response.data.message || '同步成功')
-      
-      // 刷新字段列表
+      if (syncResult.errors.length > 0) {
+        syncStatus.value = 'warning'
+      } else {
+        syncStatus.value = 'finish'
+      }
       fetchFieldList()
     } else {
+      message.error(response.message || '同步失败')
       syncStatus.value = 'error'
-      message.error(response.data.message || '同步失败')
     }
   } catch (error) {
-    syncStep.value = 3
+    message.error('同步失败：' + (error.message || '未知错误'))
     syncStatus.value = 'error'
-    message.error('同步失败：' + (error.response?.data?.message || error.message || '未知错误'))
   } finally {
     syncing.value = false
   }
 }
 
-const handleCloseSyncModal = () => {
-  showSyncModal.value = false
-  if (syncStep.value === 3 && syncStatus.value === 'finish') {
-    // 同步成功后刷新列表
-    fetchFieldList()
+onMounted(async () => {
+  await fetchDeviceTypes()
+  
+  // 处理路由查询参数
+  if (route.query.device_type) {
+    queryParams.device_type_code = route.query.device_type
   }
-}
-
-// 生命周期
-onMounted(() => {
+  
   fetchFieldList()
 })
 </script>
@@ -758,13 +974,4 @@ onMounted(() => {
 .field-management {
   padding: 16px;
 }
-
-.mb-4 {
-  margin-bottom: 16px;
-}
-
-.mt-4 {
-  margin-top: 16px;
-}
 </style>
-

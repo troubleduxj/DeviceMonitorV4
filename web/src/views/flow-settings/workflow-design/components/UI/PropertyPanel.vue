@@ -49,22 +49,22 @@
               <span>{{ nodeTypeConfig?.name || '节点' }}属性</span>
             </div>
 
-            <!-- 动态属性表单（暂时禁用） -->
-            <!-- <div v-if="nodePropertySchema" class="dynamic-form-wrapper">
+            <!-- 动态属性表单 -->
+            <div v-if="nodePropertySchema" class="dynamic-form-wrapper">
               <DynamicPropertyForm
                 :schema="nodePropertySchema"
                 :model-value="nodeProperties"
                 @update:model-value="nodeProperties = $event"
                 @change="handleDynamicPropertyChange"
               />
-            </div> -->
+            </div>
 
             <!-- 基础信息 -->
             <div class="property-group">
               <div class="group-title">基础信息</div>
 
               <!-- 节点名称 -->
-              <div class="property-item">
+              <div v-if="!nodePropertySchema" class="property-item">
                 <label class="property-label">名称</label>
                 <input
                   v-model="editingNode.name"
@@ -132,7 +132,7 @@
             </div>
 
             <!-- 节点配置 -->
-            <div v-if="nodeTypeConfig?.properties" class="property-group">
+            <div v-if="nodeTypeConfig?.properties && !nodePropertySchema" class="property-group">
               <div class="group-title">节点配置</div>
 
               <div
@@ -602,9 +602,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
 import { NODE_TYPES } from '../../utils/nodeTypes'
-// 暂时注释掉动态表单导入，避免加载问题
-// import DynamicPropertyForm from './DynamicPropertyForm.vue'
-// import { getNodePropertySchema, type NodePropertySchema } from '../../utils/nodePropertySchemas'
+import DynamicPropertyForm from './DynamicPropertyForm.vue'
+import { getNodePropertySchema, type NodePropertySchema } from '../../utils/nodePropertySchemas'
 
 // 简单的防抖函数实现
 function debounce(func, wait) {
@@ -681,12 +680,11 @@ const nodeTypeConfig = computed(() => {
   return NODE_TYPES[editingNode.value.type] || null
 })
 
-// 暂时注释掉动态表单相关代码
-// const nodePropertySchema = computed<NodePropertySchema | null>(() => {
-//   if (!editingNode.value) return null
-//   return getNodePropertySchema(editingNode.value.type)
-// })
-const nodePropertySchema = computed(() => null)
+// 动态表单模式配置
+const nodePropertySchema = computed<NodePropertySchema | null>(() => {
+  if (!editingNode.value) return null
+  return getNodePropertySchema(editingNode.value.type)
+})
 
 // 节点属性数据
 const nodeProperties = computed({
@@ -700,9 +698,10 @@ const nodeProperties = computed({
   },
   set: (value) => {
     if (editingNode.value) {
-      editingNode.value.name = value.name || editingNode.value.name
-      editingNode.value.description = value.description || ''
-      editingNode.value.properties = { ...editingNode.value.properties, ...value }
+      const { name, description, ...properties } = value
+      editingNode.value.name = name || editingNode.value.name
+      editingNode.value.description = description || ''
+      editingNode.value.properties = { ...editingNode.value.properties, ...properties }
     }
   }
 })

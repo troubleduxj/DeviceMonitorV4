@@ -4,7 +4,7 @@
 """
 
 from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 from datetime import datetime
 
 
@@ -29,6 +29,7 @@ class DeviceFieldBase(BaseModel):
     
     # ⭐ 新增字段：元数据驱动支持
     is_monitoring_key: bool = Field(default=False, description="是否为实时监控关键字段")
+    is_alarm_enabled: bool = Field(default=False, description="是否允许配置报警规则")
     is_ai_feature: bool = Field(default=False, description="是否为AI分析特征字段")
     aggregation_method: Optional[str] = Field(None, max_length=20, description="聚合方法")
     data_range: Optional[Dict[str, Any]] = Field(None, description="正常数据范围")
@@ -60,6 +61,7 @@ class DeviceFieldUpdate(BaseModel):
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
     is_monitoring_key: Optional[bool] = None
+    is_alarm_enabled: Optional[bool] = None
     is_ai_feature: Optional[bool] = None
     aggregation_method: Optional[str] = Field(None, max_length=20)
     data_range: Optional[Dict[str, Any]] = None
@@ -107,6 +109,12 @@ class AggregationConfig(BaseModel):
                 raise ValueError(f'无效的聚合方法: {method}，必须是: {"/".join(valid_methods)}')
         return v
 
+    @validator('time_window', 'interval')
+    def validate_time_format(cls, v):
+        if v and not any(v.endswith(unit) for unit in ['s', 'm', 'h', 'd', 'w']):
+            raise ValueError('时间格式无效，必须以 s/m/h/d/w 结尾 (例如: 1h, 5m)')
+        return v
+
 
 class AIConfig(BaseModel):
     """AI配置"""
@@ -140,6 +148,18 @@ class DeviceDataModelBase(BaseModel):
     is_active: bool = Field(default=True, description="是否激活")
     is_default: bool = Field(default=False, description="是否为默认模型")
     description: Optional[str] = Field(None, description="模型说明")
+
+    @root_validator(pre=True)
+    def cleanup_configs(cls, values):
+        """清理不匹配模型类型的配置"""
+        model_type = values.get('model_type')
+        # 如果不是统计类型，清除聚合配置
+        if model_type != 'statistics':
+            values['aggregation_config'] = None
+        # 如果不是AI类型，清除AI配置
+        if model_type != 'ai_analysis':
+            values['ai_config'] = None
+        return values
 
     @validator('aggregation_config')
     def validate_aggregation_config(cls, v, values):

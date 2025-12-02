@@ -318,9 +318,13 @@ import { ref, computed, watch } from 'vue'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useCanvasStore } from '../../stores/canvasStore'
 import { useSelectionStore } from '../../stores/selectionStore'
+import MetadataNodeConfig from '../Nodes/NodeTypes/MetadataNodeConfig.vue'
 
 export default {
   name: 'RightSidebar',
+  components: {
+    MetadataNodeConfig
+  },
   props: {
     collapsed: {
       type: Boolean,
@@ -452,6 +456,7 @@ export default {
         file: 'FileNodeConfig',
         condition: 'ConditionNodeConfig',
         loop: 'LoopNodeConfig',
+        metadata_analysis: 'MetadataNodeConfig',
       }
       return componentMap[nodeType] || 'DefaultNodeConfig'
     }

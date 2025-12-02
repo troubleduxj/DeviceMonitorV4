@@ -21,6 +21,10 @@ class PermissionStartupOptimizer:
         self.startup_time = None
         self.optimization_results = {}
         
+    async def optimize_on_startup(self) -> Dict[str, Any]:
+        """启动优化（别名）"""
+        return await self.optimize_system_startup()
+
     async def optimize_system_startup(self) -> Dict[str, Any]:
         """优化系统启动"""
         if not self.optimization_enabled:

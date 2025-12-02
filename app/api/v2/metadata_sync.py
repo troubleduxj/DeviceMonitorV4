@@ -28,6 +28,7 @@ class TDengineFieldSyncRequest(BaseModel):
     server_name: Optional[str] = Field(None, description="TDengine服务器名称")
     field_category: str = Field(default="data_collection", description="字段分类")
     overwrite_existing: bool = Field(default=False, description="是否覆盖已存在的字段")
+    selected_fields: Optional[List[str]] = Field(None, description="选择同步的字段代码列表，为空则同步所有")
 
 
 class FieldTypeMapping:
@@ -105,8 +106,17 @@ async def sync_fields_from_tdengine(
                 code=404
             )
         
-        columns = schema_result["columns"]
-        logger.info(f"从TDengine读取到 {len(columns)} 个字段")
+        all_columns = schema_result["columns"]
+        logger.info(f"从TDengine读取到 {len(all_columns)} 个字段")
+        
+        # 过滤选中的字段
+        if sync_request.selected_fields:
+            # 转换为小写以便匹配
+            selected_set = {f.lower() for f in sync_request.selected_fields}
+            columns = [col for col in all_columns if col["name"].lower() in selected_set]
+            logger.info(f"用户选择了 {len(columns)} 个字段进行同步")
+        else:
+            columns = all_columns
         
         # 2. 检查现有字段
         existing_fields, _ = await MetadataService.get_fields(
@@ -115,7 +125,9 @@ async def sync_fields_from_tdengine(
             page_size=1000  # 获取所有字段
         )
         
-        existing_field_codes = {field.field_code for field in existing_fields}
+        # 建立字段代码映射（小写）和字段名称映射（检查名称冲突）
+        existing_fields_map = {field.field_code.lower(): field for field in existing_fields if field.field_code}
+        existing_names_map = {field.field_name: field for field in existing_fields if field.field_name}
         
         # 3. 处理每个字段
         sync_results = {
@@ -141,26 +153,50 @@ async def sync_fields_from_tdengine(
             
             # 检查是否已存在
             field_code = field_name_en.lower()
-            if field_code in existing_field_codes:
-                if not sync_request.overwrite_existing:
-                    sync_results["skipped"].append({
-                        "field_code": field_code,
-                        "reason": "字段已存在"
-                    })
-                    continue
+            existing_field = existing_fields_map.get(field_code)
+            
+            if existing_field:
+                if existing_field.is_active:
+                    if not sync_request.overwrite_existing:
+                        sync_results["skipped"].append({
+                            "field_code": field_code,
+                            "reason": "字段已存在"
+                        })
+                        continue
+                    else:
+                        # TODO: 实现更新逻辑
+                        sync_results["skipped"].append({
+                            "field_code": field_code,
+                            "reason": "暂不支持覆盖已存在字段"
+                        })
+                        continue
                 else:
-                    # TODO: 实现更新逻辑
-                    sync_results["skipped"].append({
-                        "field_code": field_code,
-                        "reason": "暂不支持覆盖已存在字段"
-                    })
-                    continue
+                    # 已存在但未激活（软删除），恢复它
+                    try:
+                        existing_field.is_active = True
+                        await existing_field.save()
+                        sync_results["created"].append({
+                            "field_code": field_code,
+                            "field_name": existing_field.field_name,
+                            "field_type": existing_field.field_type
+                        })
+                        continue
+                    except Exception as e:
+                        sync_results["errors"].append({
+                            "field_code": field_code,
+                            "error": f"恢复字段失败: {str(e)}"
+                        })
+                        continue
             
             # 转换字段类型
             field_type = FieldTypeMapping.convert_type(field_type_td)
             
             # 生成字段中文名（默认与英文名相同，可后续手动修改）
             field_name_cn = note if note else field_name_en
+            
+            # 检查中文名是否冲突，如果冲突则添加后缀
+            if field_name_cn in existing_names_map:
+                field_name_cn = f"{field_name_cn}_{field_code}"
             
             # 判断是否为TAG（note中包含TAG标记）
             is_tag = "TAG" in note.upper() if note else False
@@ -257,13 +293,15 @@ async def preview_tdengine_fields(
             page_size=1000
         )
         
-        existing_field_codes = {field.field_code for field in existing_fields}
+        existing_fields_map = {field.field_code: field for field in existing_fields}
         
         # 3. 构建预览数据
         preview_fields = []
         for col in schema_result["columns"]:
             field_name_en = col["name"]
             field_code = field_name_en.lower()
+            existing_field = existing_fields_map.get(field_code)
+
             field_type_td = col["type"]
             field_type = FieldTypeMapping.convert_type(field_type_td)
             note = col.get("note", "")
@@ -272,7 +310,7 @@ async def preview_tdengine_fields(
             if field_name_en.lower() in ["ts", "timestamp", "_ts"]:
                 status = "skip_system"
                 status_text = "系统字段（跳过）"
-            elif field_code in existing_field_codes:
+            elif existing_field and existing_field.is_active:
                 status = "exists"
                 status_text = "已存在"
             else:

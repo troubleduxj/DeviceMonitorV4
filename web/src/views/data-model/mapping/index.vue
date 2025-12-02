@@ -20,6 +20,7 @@
           clearable
           style="width: 200px"
           :options="deviceTypeOptions"
+          @update:value="handleSearchDeviceTypeChange"
         />
         
         <n-input
@@ -55,6 +56,7 @@
     <!-- 字段映射列表 -->
     <n-card :bordered="false">
       <n-data-table
+        remote
         :columns="columns"
         :data="mappingList"
         :loading="loading"
@@ -229,6 +231,7 @@ import { ref, reactive, computed, onMounted, h } from 'vue'
 import { NButton, NTag, NSpace, useMessage, useDialog } from 'naive-ui'
 import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
+import { deviceTypeApi } from '@/api/device-shared'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -261,9 +264,40 @@ const pagination = reactive({
 })
 
 // 设备类型选项
-const deviceTypeOptions = ref([
-  { label: '焊接设备', value: 'welding' },
-])
+const deviceTypeOptions = ref([])
+const deviceTypeMap = ref({})
+
+// 获取设备类型列表
+const fetchDeviceTypes = async () => {
+  try {
+    const res = await deviceTypeApi.list({ limit: 100 })
+    const list = res.data?.items || res.data?.data || res.data || []
+    if (Array.isArray(list)) {
+      deviceTypeOptions.value = list.map(item => ({
+        label: item.type_name,
+        value: item.type_code,
+        tdengine_stable_name: item.tdengine_stable_name
+      }))
+      
+      // 构建映射字典
+      const map = {}
+      list.forEach(item => {
+        map[item.type_code] = item
+      })
+      deviceTypeMap.value = map
+    }
+  } catch (error) {
+    console.error('获取设备类型失败', error)
+  }
+}
+
+const handleSearchDeviceTypeChange = (value) => {
+  if (value && deviceTypeMap.value[value]) {
+    queryParams.tdengine_table = deviceTypeMap.value[value].tdengine_stable_name
+  } else {
+    queryParams.tdengine_table = null
+  }
+}
 
 // 字段选项
 const fieldOptions = ref([])
@@ -289,7 +323,13 @@ const columns = [
   {
     title: '设备类型',
     key: 'device_type_code',
-    width: 120
+    width: 120,
+    render(row) {
+      if (row.device_type_code && deviceTypeMap.value[row.device_type_code]) {
+        return deviceTypeMap.value[row.device_type_code].type_name
+      }
+      return row.device_type_code || '-'
+    }
   },
   {
     title: '字段名称',
@@ -451,7 +491,7 @@ const fetchMappingList = async () => {
     
     if (response.success) {
       mappingList.value = response.data || []
-      pagination.itemCount = response.total || 0
+      pagination.itemCount = response.meta?.total || response.total || 0
     } else {
       message.error(response.message || '查询失败')
     }
@@ -682,6 +722,7 @@ const handleSave = async () => {
 // 生命周期
 onMounted(() => {
   fetchMappingList()
+  fetchDeviceTypes()
 })
 </script>
 

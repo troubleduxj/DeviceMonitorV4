@@ -12,7 +12,12 @@ from app.log import logger
 from app.core.redis_cache import init_redis_cache, close_redis_cache, warm_up_cache
 from app.core.permission_cache import permission_cache_manager
 from app.core.async_tasks import init_task_scheduler, shutdown_task_scheduler
+from app.core.scheduler import scheduler_manager
 from app.services.device_collector_optimized import init_device_collector, shutdown_device_collector
+from app.services.metadata_service import MetadataService
+from app.services.alarm_detection import alarm_engine
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 
 class ApplicationStartup:
@@ -58,6 +63,7 @@ class ApplicationStartup:
             # 关闭异步任务调度器
             if hasattr(self, 'task_scheduler_initialized') and self.task_scheduler_initialized:
                 await shutdown_task_scheduler()
+                scheduler_manager.shutdown()
                 self.task_scheduler_initialized = False
             
             # 关闭Redis连接
@@ -84,7 +90,30 @@ class ApplicationStartup:
     async def _initialize_task_scheduler(self) -> None:
         """初始化异步任务调度器"""
         try:
+            # 初始化原有任务调度器 (Task Queue)
             await init_task_scheduler()
+            
+            # 初始化 APScheduler
+            scheduler_manager.start()
+            
+            # 添加每日表结构差异检查任务 (每天凌晨 02:00)
+            scheduler_manager.add_job(
+                MetadataService.check_schema_diff_daily,
+                CronTrigger(hour=2, minute=0),
+                id='daily_schema_check',
+                name='每日表结构差异检查',
+                replace_existing=True
+            )
+            
+            # 添加报警超时升级检查任务 (每1分钟)
+            scheduler_manager.add_job(
+                alarm_engine.check_timeout_alarms,
+                IntervalTrigger(minutes=1),
+                id='alarm_timeout_check',
+                name='报警超时升级检查',
+                replace_existing=True
+            )
+            
             self.task_scheduler_initialized = True
             logger.info("异步任务调度器初始化成功")
         except Exception as e:

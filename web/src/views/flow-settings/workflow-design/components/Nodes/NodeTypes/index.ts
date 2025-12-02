@@ -37,6 +37,7 @@ export type NodeType =
   | 'file'
   | 'condition'
   | 'loop'
+  | 'metadata_analysis'
 
 /** 节点类别 */
 export type NodeCategory = 'control' | 'processing' | 'logic' | 'action' | 'integration' | 'basic'
@@ -132,6 +133,7 @@ export const NODE_TYPE_COMPONENTS: Record<NodeType, Component> = {
   file: FileNode,
   condition: ConditionNode,
   loop: LoopNode,
+  metadata_analysis: ProcessNode,
 }
 
 // ==================== 节点类型配置 ====================
@@ -365,6 +367,20 @@ export const NODE_TYPE_CONFIGS: Record<NodeType, NodeTypeConfig> = {
         { id: 'exit', label: '退出', position: 'bottom' },
         { id: 'error', label: '错误', position: 'bottom-right' },
       ],
+    },
+  },
+  metadata_analysis: {
+    name: '元数据分析',
+    description: '执行元数据模型分析',
+    category: 'integration',
+    icon: 'bar-chart',
+    color: '#722ed1',
+    maxInputs: 1,
+    maxOutputs: 1,
+    defaultSize: { width: 140, height: 80 },
+    connectionPoints: {
+      inputs: [{ id: 'input', label: '输入', position: 'left' }],
+      outputs: [{ id: 'output', label: '结果', position: 'right' }],
     },
   },
 }

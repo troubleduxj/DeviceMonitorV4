@@ -286,6 +286,23 @@
               </div>
             </n-card>
           </n-gi>
+          <n-gi v-if="hasWorkbenchModulePermission('/notification')">
+            <n-card class="module-card notification" hoverable @click="handleCardClick('/notification')">
+              <div class="module-header">
+                <div class="module-icon">
+                  <Icon icon="ant-design:notification-outlined" />
+                </div>
+                <div class="module-badge">通知</div>
+              </div>
+              <div class="module-content">
+                <h3 class="module-title">通知管理</h3>
+                <p class="module-description">系统通知与消息模板</p>
+              </div>
+              <div class="module-footer">
+                <span class="module-action">通知设置</span>
+              </div>
+            </n-card>
+          </n-gi>
           <n-gi v-if="hasWorkbenchModulePermission('/system')">
             <n-card class="module-card system" hoverable @click="handleCardClick('/system')">
               <div class="module-header">
@@ -357,6 +374,7 @@ const getFirstChildMenuPath = (modulePath) => {
     '/workflow': ['workflow', '/workflow', 'flow-settings', '流程编排'],
     '/data-model': ['data-model', '/data-model', 'data-models', 'model-management', '数据模型', '数据模型管理'],
     '/ai-monitoring': ['ai-monitoring', '/ai-monitoring', 'ai-monitor', 'AI监测'],
+    '/notification': ['notification', '/notification', '系统通知', '通知管理', 'notification/list', 'notification/email-server', 'notification/email-template', 'notification/send-config'],
     '/system': ['system', '/system', 'system-management', '系统管理'],
   }
   
@@ -495,6 +513,7 @@ const hasAnyModulePermission = computed(() => {
     '/alarm',
     '/workflow',
     '/ai-monitoring',
+    '/notification',
     '/data-model',
     '/system',
   ]
@@ -706,6 +725,16 @@ const hasWorkbenchModulePermission = (modulePath) => {
       'AI监测',
       '智能监测',
       '人工智能',
+    ],
+    '/notification': [
+      'notification',
+      '/notification',
+      'notification/list',
+      'notification/email-server',
+      'notification/email-template',
+      'notification/send-config',
+      '系统通知',
+      '通知管理',
     ],
     '/data-model': [
       'data-model',
@@ -1115,6 +1144,10 @@ onMounted(async () => {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
 }
 
+.module-card.notification:hover {
+  background: linear-gradient(135deg, rgba(250, 173, 20, 0.08), rgba(255, 214, 102, 0.08));
+}
+
 .module-header {
   padding: 20px 20px 0 20px;
   display: flex;
@@ -1189,6 +1222,11 @@ onMounted(async () => {
   color: #667eea;
 }
 
+.module-card.notification .module-icon {
+  background: linear-gradient(135deg, rgba(250, 173, 20, 0.1), rgba(255, 214, 102, 0.1));
+  color: #faad14;
+}
+
 .module-badge {
   background: rgba(0, 0, 0, 0.1);
   color: #666;
@@ -1245,6 +1283,11 @@ onMounted(async () => {
 
 .module-card.system .module-badge {
   background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.module-card.notification .module-badge {
+  background: linear-gradient(135deg, #faad14, #ffd666);
   color: white;
 }
 
@@ -1331,6 +1374,10 @@ onMounted(async () => {
 
 .module-card.system .module-action {
   background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.module-card.notification .module-action {
+  background: linear-gradient(135deg, #faad14, #ffd666);
 }
 
 .module-card:hover .module-action {

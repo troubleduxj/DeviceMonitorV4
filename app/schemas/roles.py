@@ -73,7 +73,7 @@ class RoleUsersUpdate(BaseModel):
     action: str = Field("replace", description="操作类型：replace(替换), add(添加), remove(移除)")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "user_ids": [1, 2, 3],
                 "action": "replace"

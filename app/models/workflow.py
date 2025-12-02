@@ -52,6 +52,7 @@ class Workflow(TimestampMixin, BaseModel):
     is_active = fields.BooleanField(default=True, description="是否启用")
     is_published = fields.BooleanField(default=False, description="是否已发布")
     version = fields.CharField(max_length=20, default="1.0.0", description="版本号")
+    accent_color = fields.CharField(max_length=20, null=True, description="卡片强调色")
     
     # 统计信息
     execution_count = fields.IntField(default=0, description="执行次数")

@@ -56,6 +56,7 @@
     <!-- 数据模型列表 -->
     <n-card :bordered="false">
       <n-data-table
+        remote
         :columns="columns"
         :data="modelList"
         :loading="loading"
@@ -145,6 +146,28 @@
             />
           </div>
         </n-form-item>
+
+        <n-form-item 
+          v-if="formData.model_type === 'statistics'" 
+          label="聚合配置" 
+          path="aggregation_config"
+        >
+          <AggregationConfigEditor
+            v-model:value="formData.aggregation_config"
+            :fields="selectedFieldOptions"
+          />
+        </n-form-item>
+
+        <n-form-item 
+          v-if="formData.model_type === 'ai_analysis'" 
+          label="AI 配置" 
+          path="ai_config"
+        >
+          <AiConfigEditor
+            v-model:value="formData.ai_config"
+            :fields="selectedFieldOptions"
+          />
+        </n-form-item>
       </n-form>
       
       <template #footer>
@@ -162,6 +185,9 @@ import { ref, reactive, computed, onMounted, h } from 'vue'
 import { NButton, NTag, NSpace, NSwitch, useMessage, useDialog } from 'naive-ui'
 import { SearchOutline, RefreshOutline, AddOutline, CreateOutline, TrashOutline, EyeOutline, CloudDownloadOutline } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
+import { deviceTypeApi } from '@/api/device-shared'
+import AggregationConfigEditor from './components/AggregationConfigEditor.vue'
+import AiConfigEditor from './components/AiConfigEditor.vue'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -195,10 +221,32 @@ const pagination = reactive({
 })
 
 // 设备类型选项
-const deviceTypeOptions = ref([
-  { label: '焊接设备', value: 'welding' },
-  // 其他设备类型将从API动态加载
-])
+const deviceTypeOptions = ref([])
+const deviceTypeMap = ref({})
+
+// 获取设备类型列表
+const fetchDeviceTypes = async () => {
+  try {
+    const res = await deviceTypeApi.list({ limit: 100 })
+    const list = res.data?.items || res.data?.data || res.data || []
+    if (Array.isArray(list)) {
+      deviceTypeOptions.value = list.map(item => ({
+        label: item.type_name,
+        value: item.type_code,
+        tdengine_stable_name: item.tdengine_stable_name
+      }))
+      
+      // 构建映射字典
+      const map = {}
+      list.forEach(item => {
+        map[item.type_code] = item
+      })
+      deviceTypeMap.value = map
+    }
+  } catch (error) {
+    console.error('获取设备类型失败', error)
+  }
+}
 
 // 模型类型选项
 const modelTypeOptions = [
@@ -227,7 +275,13 @@ const columns = [
   {
     title: '设备类型',
     key: 'device_type_code',
-    width: 120
+    width: 120,
+    render(row) {
+      if (row.device_type_code && deviceTypeMap.value[row.device_type_code]) {
+        return deviceTypeMap.value[row.device_type_code].type_name
+      }
+      return row.device_type_code || '-'
+    }
   },
   {
     title: '模型类型',
@@ -313,7 +367,9 @@ const formData = reactive({
   model_type: null,
   version: '1.0',
   description: '',
-  selected_fields: []
+  selected_fields: [],
+  aggregation_config: null,
+  ai_config: null
 })
 
 const formRules = {
@@ -339,6 +395,11 @@ const formRules = {
 const availableFields = ref([])
 const selectedFieldCodes = ref([])
 
+// 选中的字段选项（用于编辑器）
+const selectedFieldOptions = computed(() => {
+  return availableFields.value.filter(f => selectedFieldCodes.value.includes(f.value))
+})
+
 // 方法
 const fetchModelList = async () => {
   loading.value = true
@@ -351,7 +412,7 @@ const fetchModelList = async () => {
     
     if (response.success) {
       modelList.value = response.data || []
-      pagination.itemCount = response.total || 0
+      pagination.itemCount = response.meta?.total || response.total || 0
     } else {
       message.error(response.message || '查询失败')
     }
@@ -384,19 +445,29 @@ const handleCreate = () => {
     model_type: null,
     version: '1.0',
     description: '',
-    selected_fields: []
+    selected_fields: [],
+    aggregation_config: null,
+    ai_config: null
   })
   selectedFieldCodes.value = []
+  availableFields.value = []
   showModal.value = true
 }
 
 const handleEdit = async (id) => {
   try {
+    availableFields.value = [] // 清空旧数据
     const response = await dataModelApi.getModel(id)
     if (response.success) {
       const model = response.data
       Object.assign(formData, model)
       selectedFieldCodes.value = (model.selected_fields || []).map(f => f.field_code)
+      
+      // 加载可用字段
+      if (model.device_type_code) {
+        handleDeviceTypeChange(model.device_type_code)
+      }
+      
       showModal.value = true
     } else {
       message.error(response.message || '获取模型详情失败')
@@ -450,10 +521,16 @@ const handleToggleActive = async (id, value) => {
 }
 
 const handleDeviceTypeChange = async (deviceTypeCode) => {
+  if (!deviceTypeCode) {
+    availableFields.value = []
+    return
+  }
   // 加载该设备类型的可用字段
   try {
     const response = await dataModelApi.getFields({
-      device_type_code: deviceTypeCode
+      device_type_code: deviceTypeCode,
+      is_active: true,
+      page_size: 1000
     })
     
     if (response.success) {
@@ -515,13 +592,14 @@ const handleQuickSync = () => {
   
   // 可以选择跳转
   setTimeout(() => {
-    window.open(`/data-model/fields?device_type=${device_type}`, '_blank')
+    window.open(`/metadata/fields?device_type=${device_type}`, '_blank')
   }, 1000)
 }
 
 // 生命周期
 onMounted(() => {
   fetchModelList()
+  fetchDeviceTypes()
 })
 </script>
 

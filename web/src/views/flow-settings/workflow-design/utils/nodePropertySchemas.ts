@@ -1251,6 +1251,263 @@ const WEBHOOK_NODE_SCHEMA: NodePropertySchema = {
   ],
 }
 
+// ========== 补充缺失节点属性Schema ==========
+
+/** 定时器节点属性 */
+const TIMER_NODE_SCHEMA: NodePropertySchema = {
+  nodeType: 'timer',
+  fields: [
+    {
+      type: 'input',
+      field: 'name',
+      label: '节点名称',
+      required: true,
+      placeholder: '请输入节点名称',
+      defaultValue: '定时器',
+    },
+    {
+      type: 'select',
+      field: 'timerType',
+      label: '定时类型',
+      required: true,
+      options: [
+        { label: 'Cron表达式', value: 'cron' },
+        { label: '时间间隔', value: 'interval' },
+        { label: '一次性', value: 'once' },
+      ],
+      defaultValue: 'cron',
+    },
+    {
+      type: 'input',
+      field: 'cronExpression',
+      label: 'Cron表达式',
+      placeholder: '* * * * *',
+      description: '分 时 日 月 周',
+      showWhen: { field: 'timerType', value: 'cron' },
+    },
+    {
+      type: 'number',
+      field: 'interval',
+      label: '间隔时间',
+      defaultValue: 60,
+      props: { min: 1 },
+      showWhen: { field: 'timerType', value: 'interval' },
+    },
+    {
+      type: 'select',
+      field: 'unit',
+      label: '时间单位',
+      options: TIME_UNIT_OPTIONS,
+      defaultValue: 'seconds',
+      showWhen: { field: 'timerType', value: 'interval' },
+    },
+    {
+      type: 'datepicker',
+      field: 'executeTime',
+      label: '执行时间',
+      placeholder: '选择执行时间',
+      showWhen: { field: 'timerType', value: 'once' },
+    },
+  ],
+}
+
+/** 转换节点属性 */
+const TRANSFORM_NODE_SCHEMA: NodePropertySchema = {
+  nodeType: 'transform',
+  fields: [
+    {
+      type: 'input',
+      field: 'name',
+      label: '节点名称',
+      required: true,
+      placeholder: '请输入节点名称',
+      defaultValue: '数据转换',
+    },
+    {
+      type: 'select',
+      field: 'transformType',
+      label: '转换类型',
+      required: true,
+      options: [
+        { label: 'JavaScript脚本', value: 'script' },
+        { label: '字段映射', value: 'mapping' },
+        { label: '模板渲染', value: 'template' },
+      ],
+      defaultValue: 'script',
+    },
+    {
+      type: 'code',
+      field: 'script',
+      label: '转换脚本',
+      placeholder: 'return data.map(item => item.value)',
+      props: { language: 'javascript', height: 200 },
+      showWhen: { field: 'transformType', value: 'script' },
+    },
+    {
+      type: 'json',
+      field: 'mapping',
+      label: '字段映射',
+      placeholder: '{"targetField": "sourceField"}',
+      showWhen: { field: 'transformType', value: 'mapping' },
+    },
+    {
+      type: 'textarea',
+      field: 'template',
+      label: '模板内容',
+      placeholder: 'Hello ${name}!',
+      props: { rows: 5 },
+      showWhen: { field: 'transformType', value: 'template' },
+    },
+    {
+      type: 'input',
+      field: 'outputVariable',
+      label: '输出变量名',
+      defaultValue: 'transformResult',
+    },
+  ],
+}
+
+/** 过滤节点属性 */
+const FILTER_NODE_SCHEMA: NodePropertySchema = {
+  nodeType: 'filter',
+  fields: [
+    {
+      type: 'input',
+      field: 'name',
+      label: '节点名称',
+      required: true,
+      placeholder: '请输入节点名称',
+      defaultValue: '数据过滤',
+    },
+    {
+      type: 'select',
+      field: 'filterMode',
+      label: '过滤模式',
+      required: true,
+      options: [
+        { label: '简单条件', value: 'condition' },
+        { label: '脚本过滤', value: 'script' },
+      ],
+      defaultValue: 'condition',
+    },
+    {
+      type: 'input',
+      field: 'field',
+      label: '过滤字段',
+      placeholder: 'data.value',
+      showWhen: { field: 'filterMode', value: 'condition' },
+    },
+    {
+      type: 'select',
+      field: 'operator',
+      label: '操作符',
+      options: COMPARE_OPERATOR_OPTIONS,
+      defaultValue: 'eq',
+      showWhen: { field: 'filterMode', value: 'condition' },
+    },
+    {
+      type: 'input',
+      field: 'value',
+      label: '比较值',
+      placeholder: '比较值',
+      showWhen: { field: 'filterMode', value: 'condition' },
+    },
+    {
+      type: 'code',
+      field: 'expression',
+      label: '过滤表达式',
+      placeholder: 'return item.value > 10',
+      props: { language: 'javascript', height: 100 },
+      showWhen: { field: 'filterMode', value: 'script' },
+    },
+    {
+      type: 'select',
+      field: 'action',
+      label: '不匹配动作',
+      options: [
+        { label: '丢弃', value: 'drop' },
+        { label: '保留但标记', value: 'mark' },
+      ],
+      defaultValue: 'drop',
+    },
+  ],
+}
+
+/** 流程调用节点属性 (Process) */
+const PROCESS_NODE_SCHEMA: NodePropertySchema = {
+  nodeType: 'process',
+  fields: [
+    {
+      type: 'input',
+      field: 'name',
+      label: '节点名称',
+      required: true,
+      placeholder: '请输入节点名称',
+      defaultValue: '子流程',
+    },
+    {
+      type: 'input',
+      field: 'processId',
+      label: '流程ID',
+      required: true,
+      placeholder: '请输入子流程ID',
+    },
+    {
+      type: 'switch',
+      field: 'sync',
+      label: '同步等待',
+      defaultValue: true,
+    },
+    {
+      type: 'json',
+      field: 'inputParams',
+      label: '输入参数',
+      placeholder: '{"param1": "value1"}',
+      defaultValue: {},
+    },
+    {
+      type: 'input',
+      field: 'outputVariable',
+      label: '输出变量名',
+      defaultValue: 'processResult',
+      showWhen: { field: 'sync', value: true },
+    },
+  ],
+}
+
+/** 合并节点属性 */
+const MERGE_NODE_SCHEMA: NodePropertySchema = {
+  nodeType: 'merge',
+  fields: [
+    {
+      type: 'input',
+      field: 'name',
+      label: '节点名称',
+      required: true,
+      placeholder: '请输入节点名称',
+      defaultValue: '合并分支',
+    },
+    {
+      type: 'select',
+      field: 'mergeStrategy',
+      label: '合并策略',
+      required: true,
+      options: [
+        { label: '等待所有 (And)', value: 'all' },
+        { label: '任一到达 (Or)', value: 'any' },
+      ],
+      defaultValue: 'all',
+    },
+    {
+      type: 'number',
+      field: 'timeout',
+      label: '超时时间(秒)',
+      defaultValue: 60,
+      props: { min: 0 },
+    },
+  ],
+}
+
 // ========== Schema注册表 ==========
 
 /** 所有节点属性Schema */
@@ -1263,6 +1520,12 @@ export const NODE_PROPERTY_SCHEMAS: Record<string, NodePropertySchema> = {
   loop: LOOP_NODE_SCHEMA,
   parallel: PARALLEL_NODE_SCHEMA,
   delay: DELAY_NODE_SCHEMA,
+  timer: TIMER_NODE_SCHEMA,
+  process: PROCESS_NODE_SCHEMA,
+  merge: MERGE_NODE_SCHEMA,
+  // 数据处理
+  transform: TRANSFORM_NODE_SCHEMA,
+  filter: FILTER_NODE_SCHEMA,
   // 集成节点
   api: API_NODE_SCHEMA,
   database: DATABASE_NODE_SCHEMA,

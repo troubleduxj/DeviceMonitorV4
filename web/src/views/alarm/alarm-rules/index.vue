@@ -12,10 +12,18 @@
       <div class="flex flex-wrap items-center gap-15">
         <QueryBarItem label="设备类型" :label-width="70">
           <NSelect
+            v-if="!embedded"
             v-model:value="queryParams.device_type_code"
             :options="deviceTypeOptions"
             placeholder="全部类型"
             clearable
+            style="width: 150px"
+          />
+          <NInput
+            v-else
+            :value="queryParams.device_type_code"
+            disabled
+            placeholder="已锁定"
             style="width: 150px"
           />
         </QueryBarItem>
@@ -94,8 +102,19 @@
             v-model:value="formData.device_type_code"
             :options="deviceTypeOptions"
             placeholder="请选择设备类型"
-            :disabled="isEdit"
+            :disabled="isEdit || embedded"
             @update:value="handleDeviceTypeChange"
+          />
+        </NFormItem>
+
+        <NFormItem label="设备编码" path="device_code">
+          <NSelect
+            v-model:value="formData.device_code"
+            :options="deviceOptions"
+            placeholder="请选择设备（为空则为通用规则）"
+            clearable
+            :loading="deviceLoading"
+            :disabled="!formData.device_type_code"
           />
         </NFormItem>
 
@@ -203,6 +222,15 @@
           </div>
         </NFormItem>
 
+        <NFormItem label="高级配置" path="trigger_config">
+          <NInput
+            v-model:value="formData.trigger_config"
+            type="textarea"
+            placeholder="请输入高级触发配置 (JSON格式)"
+            :rows="3"
+          />
+        </NFormItem>
+
         <NFormItem label="默认级别" path="alarm_level">
           <NSelect
             v-model:value="formData.alarm_level"
@@ -260,7 +288,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, h, onMounted } from 'vue'
+import { ref, reactive, h, onMounted, watch } from 'vue'
 import {
   NCard,
   NButton,
@@ -282,6 +310,18 @@ import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/page/QueryBarItem.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import { alarmRulesApi, AlarmLevelOptions, ThresholdTypeOptions } from '@/api/alarm-rules'
+import { deviceApi } from '@/api/device-v2'
+
+const props = defineProps({
+  deviceTypeCode: {
+    type: String,
+    default: null
+  },
+  embedded: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const message = useMessage()
 
@@ -290,6 +330,7 @@ const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const fieldLoading = ref(false)
+const deviceLoading = ref(false)
 const tableData = ref([])
 const modalVisible = ref(false)
 const testModalVisible = ref(false)
@@ -299,7 +340,8 @@ const formRef = ref(null)
 
 // 查询参数
 const queryParams = reactive({
-  device_type_code: null,
+  device_type_code: props.deviceTypeCode,
+  device_code: null,
   is_enabled: null,
   search: '',
 })
@@ -315,6 +357,7 @@ const pagination = reactive({
 
 // 选项数据
 const deviceTypeOptions = ref([])
+const deviceOptions = ref([])
 const fieldOptions = ref([])
 const enabledOptions = [
   { label: '全部', value: null },
@@ -330,6 +373,7 @@ const formData = reactive({
   rule_name: '',
   rule_code: '',
   device_type_code: null,
+  device_code: null,
   field_code: null,
   field_name: '',
   threshold_config: {
@@ -340,6 +384,7 @@ const formData = reactive({
   trigger_condition: {
     consecutive_count: 1,
   },
+  trigger_config: '',
   alarm_level: 'warning',
   description: '',
   is_enabled: true,
@@ -351,6 +396,18 @@ const formRules = {
   rule_code: { required: true, message: '请输入规则代码', trigger: 'blur' },
   device_type_code: { required: true, message: '请选择设备类型', trigger: 'change' },
   field_code: { required: true, message: '请选择监测字段', trigger: 'change' },
+  trigger_config: {
+    validator(rule, value) {
+      if (!value) return true
+      try {
+        JSON.parse(value)
+        return true
+      } catch (e) {
+        return new Error('请输入有效的JSON格式')
+      }
+    },
+    trigger: 'blur'
+  }
 }
 
 // 测试相关
@@ -363,6 +420,7 @@ const columns = [
   { title: '规则名称', key: 'rule_name', width: 150 },
   { title: '规则代码', key: 'rule_code', width: 150 },
   { title: '设备类型', key: 'device_type_code', width: 120 },
+  { title: '设备编码', key: 'device_code', width: 120, render: (row) => row.device_code || '通用' },
   { title: '监测字段', key: 'field_name', width: 100 },
   {
     title: '报警级别',
@@ -453,6 +511,28 @@ const loadDeviceTypes = async () => {
   }
 }
 
+const loadDevices = async (deviceTypeCode) => {
+  if (!deviceTypeCode) {
+    deviceOptions.value = []
+    return
+  }
+  deviceLoading.value = true
+  try {
+    const res = await deviceApi.list({ device_type_code: deviceTypeCode, page_size: 1000 })
+    if (res.success && res.data) {
+      const items = res.data.items || res.data || []
+      deviceOptions.value = items.map((item) => ({
+        label: `${item.device_name} (${item.device_code})`,
+        value: item.device_code,
+      }))
+    }
+  } catch (error) {
+    console.error('加载设备失败:', error)
+  } finally {
+    deviceLoading.value = false
+  }
+}
+
 const loadFields = async (deviceTypeCode) => {
   if (!deviceTypeCode) {
     fieldOptions.value = []
@@ -478,7 +558,9 @@ const loadFields = async (deviceTypeCode) => {
 const handleDeviceTypeChange = (value) => {
   formData.field_code = null
   formData.field_name = ''
+  formData.device_code = null
   loadFields(value)
+  loadDevices(value)
 }
 
 const handleFieldChange = (value) => {
@@ -515,7 +597,8 @@ const handlePageSizeChange = (pageSize) => {
 const resetForm = () => {
   formData.rule_name = ''
   formData.rule_code = ''
-  formData.device_type_code = null
+  formData.device_type_code = props.deviceTypeCode || null
+  formData.device_code = null
   formData.field_code = null
   formData.field_name = ''
   formData.threshold_config = {
@@ -524,17 +607,26 @@ const resetForm = () => {
     critical: { min: null, max: null },
   }
   formData.trigger_condition = { consecutive_count: 1 }
+  formData.trigger_config = ''
   formData.alarm_level = 'warning'
   formData.description = ''
   formData.is_enabled = true
   thresholdType.value = 'range'
   fieldOptions.value = []
+  deviceOptions.value = []
 }
 
 const handleAdd = () => {
   resetForm()
   isEdit.value = false
   modalTitle.value = '新建报警规则'
+  
+  // 如果有预设的设备类型（如嵌入模式），加载相关选项
+  if (formData.device_type_code) {
+    loadFields(formData.device_type_code)
+    loadDevices(formData.device_type_code)
+  }
+  
   modalVisible.value = true
 }
 
@@ -544,6 +636,8 @@ const handleEdit = async (row) => {
 
   // 加载字段选项
   await loadFields(row.device_type_code)
+  // 加载设备选项
+  await loadDevices(row.device_type_code)
 
   // 填充表单
   Object.assign(formData, {
@@ -551,10 +645,12 @@ const handleEdit = async (row) => {
     rule_name: row.rule_name,
     rule_code: row.rule_code,
     device_type_code: row.device_type_code,
+    device_code: row.device_code,
     field_code: row.field_code,
     field_name: row.field_name,
     threshold_config: row.threshold_config || { type: 'range', warning: {}, critical: {} },
     trigger_condition: row.trigger_condition || { consecutive_count: 1 },
+    trigger_config: row.trigger_config ? JSON.stringify(row.trigger_config, null, 2) : '',
     alarm_level: row.alarm_level,
     description: row.description,
     is_enabled: row.is_enabled,
@@ -580,14 +676,25 @@ const handleSave = async () => {
       critical: formData.threshold_config.critical,
     }
 
+    let parsedTriggerConfig = null
+    if (formData.trigger_config) {
+      try {
+        parsedTriggerConfig = JSON.parse(formData.trigger_config)
+      } catch (e) {
+        return
+      }
+    }
+
     const data = {
       rule_name: formData.rule_name,
       rule_code: formData.rule_code,
       device_type_code: formData.device_type_code,
+      device_code: formData.device_code,
       field_code: formData.field_code,
       field_name: formData.field_name,
       threshold_config: thresholdConfig,
       trigger_condition: formData.trigger_condition,
+      trigger_config: parsedTriggerConfig,
       alarm_level: formData.alarm_level,
       description: formData.description,
       is_enabled: formData.is_enabled,
@@ -666,6 +773,17 @@ const handleTest = async () => {
     testing.value = false
   }
 }
+
+// 监听 prop 变化
+watch(
+  () => props.deviceTypeCode,
+  (newVal) => {
+    if (newVal) {
+      queryParams.device_type_code = newVal
+      loadData()
+    }
+  }
+)
 
 // 初始化
 onMounted(() => {
