@@ -179,29 +179,35 @@ class MetadataService:
         page_size: int = 10
     ) -> Tuple[List[DeviceDataModel], int]:
         """获取数据模型列表（分页）"""
-        query = DeviceDataModel.all()
-        
-        # 构建查询条件
-        if device_type_code:
-            query = query.filter(device_type_code=device_type_code)
-        if model_type:
-            query = query.filter(model_type=model_type)
-        if is_active is not None:
-            query = query.filter(is_active=is_active)
-        if search:
-            query = query.filter(
-                Q(model_name__icontains=search) | 
-                Q(model_code__icontains=search)
-            )
-        
-        # 统计总数
-        total = await query.count()
-        
-        # 分页查询
-        offset = (page - 1) * page_size
-        models = await query.order_by('-created_at').offset(offset).limit(page_size)
-        
-        return models, total
+        try:
+            logger.info(f"get_models params: device_type_code={device_type_code}, search='{search}'")
+            query = DeviceDataModel.all()
+            
+            # 构建查询条件
+            if device_type_code:
+                query = query.filter(device_type_code=device_type_code)
+            if model_type:
+                query = query.filter(model_type=model_type)
+            if is_active is not None:
+                query = query.filter(is_active=is_active)
+            if search:
+                logger.info(f"Applying search filter: {search}")
+                query = query.filter(
+                    Q(model_name__icontains=search) | 
+                    Q(model_code__icontains=search)
+                )
+            
+            # 统计总数
+            total = await query.count()
+            
+            # 分页查询
+            offset = (page - 1) * page_size
+            models = await query.order_by('-created_at').offset(offset).limit(page_size)
+            
+            return models, total
+        except Exception as e:
+            logger.error(f"get_models failed: {str(e)}", exc_info=True)
+            raise
 
     @staticmethod
     async def execute_model(model_code: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
