@@ -192,10 +192,9 @@ class MetadataService:
                 query = query.filter(is_active=is_active)
             if search:
                 logger.info(f"Applying search filter: {search}")
-                query = query.filter(
-                    Q(model_name__icontains=search) | 
-                    Q(model_code__icontains=search)
-                )
+                q_obj = Q(model_name__icontains=search) | Q(model_code__icontains=search)
+                logger.info(f"Search Q object type: {type(q_obj)}")
+                query = query.filter(q_obj)
             
             # 统计总数
             total = await query.count()
