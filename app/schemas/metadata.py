@@ -158,6 +158,10 @@ class DeviceDataModelBase(BaseModel):
     @root_validator(pre=True)
     def cleanup_configs(cls, values):
         """清理不匹配模型类型的配置"""
+        # 如果是ORM对象，直接返回（避免 AttributeError: 'DeviceDataModel' object has no attribute 'get'）
+        if not isinstance(values, dict):
+            return values
+
         model_type = values.get('model_type')
         # 如果不是统计类型，清除聚合配置
         if model_type != 'statistics':
@@ -263,6 +267,7 @@ class DeviceFieldMappingResponse(DeviceFieldMappingBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    device_field: Optional[DeviceFieldResponse] = None
 
     class Config:
         from_attributes = True

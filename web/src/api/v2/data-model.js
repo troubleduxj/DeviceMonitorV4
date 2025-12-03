@@ -113,6 +113,20 @@ export const dataModelApi = {
    * @returns {Promise}
    */
   deleteField: (id) => requestV2.delete(`/metadata/fields/${id}`),
+
+  /**
+   * 批量删除设备类型字段
+   * @param {string} deviceTypeCode - 设备类型代码
+   * @returns {Promise}
+   */
+  batchDeleteFields: (deviceTypeCode) => requestV2.delete(`/metadata/fields/batch/${deviceTypeCode}`),
+
+  /**
+   * 批量删除选中字段
+   * @param {Array} ids - 字段ID列表
+   * @returns {Promise}
+   */
+  batchDeleteFieldsByIds: (ids) => requestV2.post('/metadata/fields/batch-delete', { ids }),
   
   // ==================== 字段映射管理 ====================
   
@@ -151,6 +165,13 @@ export const dataModelApi = {
    * @returns {Promise}
    */
   deleteMapping: (id) => requestV2.delete(`/metadata/mappings/${id}`),
+
+  /**
+   * 批量删除字段映射
+   * @param {Array} ids - 映射ID列表
+   * @returns {Promise}
+   */
+  batchDeleteMappingsByIds: (ids) => requestV2.post('/metadata/mappings/batch-delete', { ids }),
   
   // ==================== 动态模型生成 ====================
   

@@ -12,7 +12,8 @@ from app.core.dependency import DependAuth
 from app.models.admin import User
 from app.services.tdengine_service import tdengine_service_manager
 from app.services.metadata_service import MetadataService
-from app.schemas.metadata import DeviceFieldCreate
+from app.schemas.metadata import DeviceFieldCreate, DeviceFieldMappingCreate
+from app.models.device import DeviceFieldMapping
 import logging
 
 logger = logging.getLogger(__name__)
@@ -155,26 +156,199 @@ async def sync_fields_from_tdengine(
             field_code = field_name_en.lower()
             existing_field = existing_fields_map.get(field_code)
             
+            # 判断是否为TAG（note中包含TAG标记）
+            note_str = ""
+            if note:
+                 if isinstance(note, bytes):
+                     try:
+                         note_str = note.decode('utf-8', errors='ignore')
+                     except:
+                         note_str = str(note)
+                 else:
+                     note_str = str(note)
+            
+            is_tag = "TAG" in note_str.upper() if note_str else False
+            
             if existing_field:
                 if existing_field.is_active:
                     if not sync_request.overwrite_existing:
+                        # 检查并补全字段映射
+                        try:
+                            mapping_exists = await DeviceFieldMapping.filter(
+                                device_field_id=existing_field.id,
+                                is_active=True
+                            ).exists()
+                            
+                            if not mapping_exists:
+                                mapping_data = DeviceFieldMappingCreate(
+                                    device_type_code=sync_request.device_type_code,
+                                    tdengine_database=sync_request.tdengine_database,
+                                    tdengine_stable=sync_request.tdengine_stable,
+                                    tdengine_column=field_name_en,
+                                    device_field_id=existing_field.id,
+                                    is_tag=is_tag,
+                                    is_active=True
+                                )
+                                await MetadataService.create_mapping(mapping_data)
+                                logger.info(f"自动补全字段映射: {field_code}")
+                        except Exception as e:
+                            logger.error(f"补全字段映射失败: {field_code}, {e}")
+
                         sync_results["skipped"].append({
                             "field_code": field_code,
                             "reason": "字段已存在"
                         })
                         continue
                     else:
-                        # TODO: 实现更新逻辑
-                        sync_results["skipped"].append({
-                            "field_code": field_code,
-                            "reason": "暂不支持覆盖已存在字段"
-                        })
+                        # 用户选择了覆盖更新
+                        try:
+                            # 优化后的字段注释解析逻辑
+                            clean_note = ""
+                            if note:
+                                # 1. 统一转换为字符串
+                                if isinstance(note, bytes):
+                                    try:
+                                        s_note = note.decode('utf-8', errors='ignore')
+                                    except:
+                                        s_note = str(note)
+                                else:
+                                    s_note = str(note)
+                                
+                                # 2. 清理空白和特殊字符
+                                s_note = s_note.strip().replace('\x00', '').replace('\ufeff', '')
+                                
+                                # 3. 处理 bytes 字符串表示 (例如 "b'TAG'")
+                                s_note_upper = s_note.upper()
+                                if s_note_upper.startswith("B'") and s_note_upper.endswith("'"):
+                                        s_note = s_note[2:-1]
+                                        s_note_upper = s_note.upper()
+                                
+                                # 4. 判断是否为 TAG
+                                if s_note_upper in ['TAG', 'TAGS']:
+                                        clean_note = ""  # 如果仅仅是 TAG 标记，则不作为字段名称
+                                else:
+                                        clean_note = s_note
+                            
+                            field_name_cn = clean_note if clean_note else field_name_en
+                            
+                            # 检查中文名是否冲突（排除自身）
+                            if field_name_cn in existing_names_map and existing_names_map[field_name_cn].id != existing_field.id:
+                                field_name_cn = f"{field_name_cn}_{field_code}"
+
+                            existing_field.field_name = field_name_cn
+                            existing_field.field_type = FieldTypeMapping.convert_type(field_type_td)
+                            # existing_field.description = f"从TDengine同步: {sync_request.tdengine_database}.{sync_request.tdengine_stable}.{field_name_en}"
+                            await existing_field.save()
+                            logger.info(f"覆盖更新字段属性: {field_code} -> {field_name_cn}")
+                            
+                            # 也要检查并补全映射
+                            mapping_exists = await DeviceFieldMapping.filter(
+                                device_field_id=existing_field.id,
+                                is_active=True
+                            ).exists()
+                            
+                            if not mapping_exists:
+                                mapping_data = DeviceFieldMappingCreate(
+                                    device_type_code=sync_request.device_type_code,
+                                    tdengine_database=sync_request.tdengine_database,
+                                    tdengine_stable=sync_request.tdengine_stable,
+                                    tdengine_column=field_name_en,
+                                    device_field_id=existing_field.id,
+                                    is_tag=is_tag,
+                                    is_active=True
+                                )
+                                await MetadataService.create_mapping(mapping_data)
+
+                            sync_results["created"].append({
+                                "field_code": field_code,
+                                "field_name": existing_field.field_name,
+                                "field_type": existing_field.field_type,
+                                "action": "updated"
+                            })
+                        except Exception as e:
+                            logger.error(f"覆盖更新字段属性失败: {field_code}, {e}")
+                            sync_results["errors"].append({
+                                "field_code": field_code,
+                                "error": f"覆盖更新失败: {str(e)}"
+                            })
                         continue
                 else:
                     # 已存在但未激活（软删除），恢复它
                     try:
                         existing_field.is_active = True
                         await existing_field.save()
+                        
+                        # 恢复后检查映射
+                        # 检查是否已存在该列的映射（无论是否激活，因为唯一约束是数据库级别的）
+                        existing_mapping = await DeviceFieldMapping.get_or_none(
+                            tdengine_stable=sync_request.tdengine_stable,
+                            tdengine_column=field_name_en
+                        )
+                        
+                        if existing_mapping:
+                            # 如果映射存在，更新它指向当前字段
+                            existing_mapping.device_field_id = existing_field.id
+                            existing_mapping.is_active = True
+                            existing_mapping.is_tag = is_tag
+                            existing_mapping.tdengine_database = sync_request.tdengine_database
+                            await existing_mapping.save()
+                            logger.info(f"更新已存在的字段映射: {field_name_en}")
+                        else:
+                            mapping_data = DeviceFieldMappingCreate(
+                                device_type_code=sync_request.device_type_code,
+                                tdengine_database=sync_request.tdengine_database,
+                                tdengine_stable=sync_request.tdengine_stable,
+                                tdengine_column=field_name_en,
+                                device_field_id=existing_field.id,
+                                is_tag=is_tag,
+                                is_active=True
+                            )
+                            await MetadataService.create_mapping(mapping_data)
+
+                        # 如果选择了覆盖更新，则更新字段属性（如名称、类型等）
+                        if sync_request.overwrite_existing:
+                            try:
+                                # 优化后的字段注释解析逻辑
+                                clean_note = ""
+                                if note:
+                                    # 1. 统一转换为字符串
+                                    if isinstance(note, bytes):
+                                        try:
+                                            s_note = note.decode('utf-8', errors='ignore')
+                                        except:
+                                            s_note = str(note)
+                                    else:
+                                        s_note = str(note)
+                                    
+                                    # 2. 清理空白和特殊字符
+                                    s_note = s_note.strip().replace('\x00', '').replace('\ufeff', '')
+                                    
+                                    # 3. 处理 bytes 字符串表示 (例如 "b'TAG'")
+                                    s_note_upper = s_note.upper()
+                                    if s_note_upper.startswith("B'") and s_note_upper.endswith("'"):
+                                         s_note = s_note[2:-1]
+                                         s_note_upper = s_note.upper()
+                                    
+                                    # 4. 判断是否为 TAG
+                                    if s_note_upper in ['TAG', 'TAGS']:
+                                         clean_note = ""  # 如果仅仅是 TAG 标记，则不作为字段名称
+                                    else:
+                                         clean_note = s_note
+                                
+                                field_name_cn = clean_note if clean_note else field_name_en
+                                
+                                # 检查中文名是否冲突（排除自身）
+                                if field_name_cn in existing_names_map and existing_names_map[field_name_cn].id != existing_field.id:
+                                    field_name_cn = f"{field_name_cn}_{field_code}"
+
+                                existing_field.field_name = field_name_cn
+                                existing_field.field_type = FieldTypeMapping.convert_type(field_type_td)
+                                # existing_field.description = f"从TDengine同步: {sync_request.tdengine_database}.{sync_request.tdengine_stable}.{field_name_en}"
+                                await existing_field.save()
+                                logger.info(f"覆盖更新字段属性: {field_code} -> {field_name_cn}")
+                            except Exception as e:
+                                logger.error(f"覆盖更新字段属性失败: {field_code}, {e}")
+
                         sync_results["created"].append({
                             "field_code": field_code,
                             "field_name": existing_field.field_name,
@@ -192,14 +366,38 @@ async def sync_fields_from_tdengine(
             field_type = FieldTypeMapping.convert_type(field_type_td)
             
             # 生成字段中文名（默认与英文名相同，可后续手动修改）
-            field_name_cn = note if note else field_name_en
+            # 优化后的字段注释解析逻辑
+            clean_note = ""
+            if note:
+                # 1. 统一转换为字符串
+                if isinstance(note, bytes):
+                    try:
+                        s_note = note.decode('utf-8', errors='ignore')
+                    except:
+                        s_note = str(note)
+                else:
+                    s_note = str(note)
+                
+                # 2. 清理空白和特殊字符
+                s_note = s_note.strip().replace('\x00', '').replace('\ufeff', '')
+                
+                # 3. 处理 bytes 字符串表示 (例如 "b'TAG'")
+                s_note_upper = s_note.upper()
+                if s_note_upper.startswith("B'") and s_note_upper.endswith("'"):
+                     s_note = s_note[2:-1]
+                     s_note_upper = s_note.upper()
+                
+                # 4. 判断是否为 TAG
+                if s_note_upper in ['TAG', 'TAGS']:
+                     clean_note = ""  # 如果仅仅是 TAG 标记，则不作为字段名称
+                else:
+                     clean_note = s_note
+
+            field_name_cn = clean_note if clean_note else field_name_en
             
             # 检查中文名是否冲突，如果冲突则添加后缀
             if field_name_cn in existing_names_map:
                 field_name_cn = f"{field_name_cn}_{field_code}"
-            
-            # 判断是否为TAG（note中包含TAG标记）
-            is_tag = "TAG" in note.upper() if note else False
             
             # 创建字段
             try:
@@ -225,6 +423,36 @@ async def sync_fields_from_tdengine(
                 )
                 
                 created_field = await MetadataService.create_field(field_data)
+                
+                # 自动创建字段映射
+                try:
+                    # Check existing mapping first
+                    existing_mapping = await DeviceFieldMapping.get_or_none(
+                        tdengine_stable=sync_request.tdengine_stable,
+                        tdengine_column=field_name_en
+                    )
+                    
+                    if existing_mapping:
+                        existing_mapping.device_field_id = created_field.id
+                        existing_mapping.is_active = True
+                        existing_mapping.is_tag = is_tag
+                        existing_mapping.tdengine_database = sync_request.tdengine_database
+                        await existing_mapping.save()
+                        logger.info(f"关联已存在的字段映射: {field_name_en}")
+                    else:
+                        mapping_data = DeviceFieldMappingCreate(
+                            device_type_code=sync_request.device_type_code,
+                            tdengine_database=sync_request.tdengine_database,
+                            tdengine_stable=sync_request.tdengine_stable,
+                            tdengine_column=field_name_en,
+                            device_field_id=created_field.id,
+                            is_tag=is_tag,
+                            is_active=True
+                        )
+                        await MetadataService.create_mapping(mapping_data)
+                except Exception as e:
+                    logger.error(f"自动创建字段映射失败: {field_code}, 错误: {str(e)}")
+                    # 仅记录错误，不中断流程，字段已创建成功
                 
                 sync_results["created"].append({
                     "field_code": field_code,
@@ -306,6 +534,33 @@ async def preview_tdengine_fields(
             field_type = FieldTypeMapping.convert_type(field_type_td)
             note = col.get("note", "")
             
+            # 优化后的字段注释解析逻辑
+            clean_note = ""
+            if note:
+                # 1. 统一转换为字符串
+                if isinstance(note, bytes):
+                    try:
+                        s_note = note.decode('utf-8', errors='ignore')
+                    except:
+                        s_note = str(note)
+                else:
+                    s_note = str(note)
+                
+                # 2. 清理空白和特殊字符
+                s_note = s_note.strip().replace('\x00', '').replace('\ufeff', '')
+                
+                # 3. 处理 bytes 字符串表示 (例如 "b'TAG'")
+                s_note_upper = s_note.upper()
+                if s_note_upper.startswith("B'") and s_note_upper.endswith("'"):
+                     s_note = s_note[2:-1]
+                     s_note_upper = s_note.upper()
+                
+                # 4. 判断是否为 TAG
+                if s_note_upper in ['TAG', 'TAGS']:
+                     clean_note = ""  # 如果仅仅是 TAG 标记，则不作为字段名称
+                else:
+                     clean_note = s_note
+            
             # 判断状态
             if field_name_en.lower() in ["ts", "timestamp", "_ts"]:
                 status = "skip_system"
@@ -319,7 +574,7 @@ async def preview_tdengine_fields(
             
             preview_fields.append({
                 "field_code": field_code,
-                "field_name": note if note else field_name_en,
+                "field_name": clean_note if clean_note else field_name_en,
                 "tdengine_type": field_type_td,
                 "field_type": field_type,
                 "note": note,

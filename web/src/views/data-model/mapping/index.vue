@@ -44,6 +44,17 @@
           重置
         </n-button>
         
+        <n-button 
+          type="error" 
+          @click="handleBatchDelete"
+          :disabled="checkedRowKeys.length === 0"
+        >
+          <template #icon>
+            <n-icon :component="TrashOutline" />
+          </template>
+          批量删除
+        </n-button>
+
         <n-button type="success" @click="handleCreate">
           <template #icon>
             <n-icon :component="AddOutline" />
@@ -57,6 +68,7 @@
     <n-card :bordered="false">
       <n-data-table
         remote
+        v-model:checked-row-keys="checkedRowKeys"
         :columns="columns"
         :data="mappingList"
         :loading="loading"
@@ -229,7 +241,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, h } from 'vue'
 import { NButton, NTag, NSpace, useMessage, useDialog } from 'naive-ui'
-import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
+import { SearchOutline, RefreshOutline, AddOutline, TrashOutline } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
 import { deviceTypeApi } from '@/api/device-shared'
 
@@ -240,12 +252,14 @@ const dialog = useDialog()
 const queryParams = reactive({
   search: '',
   device_type_code: null,
-  tdengine_table: null
+  tdengine_table: null,
+  is_active: true
 })
 
 // 数据
 const mappingList = ref([])
 const loading = ref(false)
+const checkedRowKeys = ref([])
 const pagination = reactive({
   page: 1,
   pageSize: 10,
@@ -315,11 +329,8 @@ const transformTypeOptions = [
 
 // 表格列定义
 const columns = [
-  {
-    title: 'ID',
-    key: 'id',
-    width: 80
-  },
+  { type: 'selection' },
+  { title: 'ID', key: 'id', width: 80 },
   {
     title: '设备类型',
     key: 'device_type_code',
@@ -683,6 +694,34 @@ const buildTransformRule = () => {
     type: transformType.value,
     config: config
   }
+}
+
+const handleBatchDelete = () => {
+  if (checkedRowKeys.value.length === 0) return
+  
+  dialog.warning({
+    title: '确认删除',
+    content: `确定要删除选中的 ${checkedRowKeys.value.length} 条映射吗？`,
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        loading.value = true
+        const res = await dataModelApi.batchDeleteMappingsByIds(checkedRowKeys.value)
+        if (res.success) {
+          message.success(res.message)
+          checkedRowKeys.value = []
+          fetchMappingList()
+        } else {
+          message.error(res.message || '删除失败')
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        loading.value = false
+      }
+    }
+  })
 }
 
 const handleSave = async () => {

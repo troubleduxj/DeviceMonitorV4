@@ -208,11 +208,52 @@ async def get_field_suggestions(
                 tdengine_type = row[1]
                 note = row[3] if len(row) > 3 else ''
                 
-                # 排除时间戳和 TAG 字段
-                if field_code != 'ts' and note != 'TAG':
+                # 排除时间戳
+                if field_code != 'ts':
+                    # -------------------------------------------------
+                    # 优化后的字段注释解析逻辑
+                    # -------------------------------------------------
+                    clean_note = ""
+                    is_tag_field = False
+                    
+                    if note:
+                        # 1. 统一转换为字符串
+                        if isinstance(note, bytes):
+                            try:
+                                s_note = note.decode('utf-8', errors='ignore')
+                            except:
+                                s_note = str(note)
+                        else:
+                            s_note = str(note)
+                        
+                        # 2. 清理空白和特殊字符
+                        s_note = s_note.strip().replace('\x00', '').replace('\ufeff', '')
+                        
+                        # 3. 处理 bytes 字符串表示 (例如 "b'TAG'")
+                        s_note_upper = s_note.upper()
+                        if s_note_upper.startswith("B'") and s_note_upper.endswith("'"):
+                             s_note = s_note[2:-1]
+                             s_note_upper = s_note.upper()
+                        
+                        # 4. 判断是否为 TAG
+                        if s_note_upper in ['TAG', 'TAGS']:
+                             is_tag_field = True
+                             clean_note = ""  # 如果仅仅是 TAG 标记，则不作为字段名称
+                        else:
+                             # 如果包含 TAG 但还有其他内容，也认为是 TAG 字段，但保留注释内容
+                             if 'TAG' in s_note_upper:
+                                 is_tag_field = True
+                             clean_note = s_note
+
+                    # 如果清理后的注释为空，则使用字段代码作为名称
+                    field_name = clean_note if clean_note else field_code
+                    
                     tdengine_fields[field_code] = {
                         'tdengine_type': tdengine_type,
-                        'field_type': map_tdengine_type_to_field_type(tdengine_type)
+                        'field_type': map_tdengine_type_to_field_type(tdengine_type),
+                        'note': note,
+                        'field_name': field_name,
+                        'is_tag': is_tag_field
                     }
             
             await connector.close()

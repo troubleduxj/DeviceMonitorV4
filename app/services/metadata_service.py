@@ -5,7 +5,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
-from tortoise.exceptions import DoesNotExist
+from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.expressions import Q
 from tortoise.queryset import QuerySet
 
@@ -112,13 +112,130 @@ class MetadataService:
         """删除字段定义（软删除）"""
         try:
             field = await DeviceField.get(id=field_id)
+            
+            # 检查字段是否被激活的模型引用
+            active_models = await DeviceDataModel.filter(
+                device_type_code=field.device_type_code,
+                is_active=True
+            ).all()
+            
+            for model in active_models:
+                # selected_fields 是 List[Dict] (JSONField)
+                # 格式: [{"field_code": "voltage", ...}, ...]
+                selected_fields = model.selected_fields or []
+                for sf in selected_fields:
+                    if isinstance(sf, dict) and sf.get("field_code") == field.field_code:
+                        raise APIException(
+                            message=f"字段 '{field.field_name}' 正被模型 '{model.model_name}' 使用，无法删除。请先从模型中移除该字段。",
+                            code=400
+                        )
+            
             field.is_active = False
             await field.save()
+            
+            # 同时删除（禁用）关联的字段映射
+            await DeviceFieldMapping.filter(device_field_id=field.id).update(is_active=False)
+            
             logger.info(f"删除设备字段成功: {field.field_name}")
             return True
         except DoesNotExist:
             return False
+        except Exception as e:
+            logger.error(f"删除设备字段失败: {str(e)}")
+            raise
     
+    @staticmethod
+    async def delete_fields_by_device_type(device_type_code: str) -> int:
+        """批量删除设备类型下的所有字段"""
+        try:
+            # 1. 获取该类型下的所有激活字段
+            fields = await DeviceField.filter(device_type_code=device_type_code, is_active=True).all()
+            if not fields:
+                return 0
+
+            # 2. 检查是否被模型引用
+            active_models = await DeviceDataModel.filter(
+                device_type_code=device_type_code,
+                is_active=True
+            ).all()
+            
+            used_fields = set()
+            for model in active_models:
+                selected_fields = model.selected_fields or []
+                for sf in selected_fields:
+                    if isinstance(sf, dict):
+                        used_fields.add(sf.get("field_code"))
+            
+            # 3. 检查冲突
+            conflicts = []
+            for f in fields:
+                if f.field_code in used_fields:
+                    conflicts.append(f.field_name)
+            
+            if conflicts:
+                raise APIException(
+                    message=f"以下字段正被模型引用，无法批量删除: {', '.join(conflicts[:5])}{' 等' if len(conflicts)>5 else ''}。请先从模型中移除这些字段。",
+                    code=400
+                )
+                
+            # 4. 执行删除
+            count = await DeviceField.filter(device_type_code=device_type_code, is_active=True).update(is_active=False)
+            
+            # 同时删除关联的字段映射
+            await DeviceFieldMapping.filter(device_type_code=device_type_code, is_active=True).update(is_active=False)
+            
+            logger.info(f"批量删除设备字段成功: {device_type_code}, 数量: {count}")
+            return count
+        except Exception as e:
+            logger.error(f"批量删除设备字段失败: {str(e)}")
+            raise
+
+    @staticmethod
+    async def delete_fields_by_ids(field_ids: List[int]) -> int:
+        """批量删除指定ID的字段"""
+        try:
+            # 1. 获取字段
+            fields = await DeviceField.filter(id__in=field_ids, is_active=True).all()
+            if not fields:
+                return 0
+            
+            device_types = set(f.device_type_code for f in fields)
+            field_codes = set(f.field_code for f in fields)
+            
+            # 2. 检查引用
+            active_models = await DeviceDataModel.filter(
+                device_type_code__in=device_types,
+                is_active=True
+            ).all()
+            
+            conflicts = []
+            for model in active_models:
+                selected = model.selected_fields or []
+                for sf in selected:
+                    if isinstance(sf, dict) and sf.get("field_code") in field_codes:
+                         # Find which field
+                         fname = next((f.field_name for f in fields if f.field_code == sf.get("field_code")), "?")
+                         if fname not in conflicts:
+                             conflicts.append(fname)
+            
+            if conflicts:
+                 raise APIException(
+                    message=f"以下字段正被模型引用，无法删除: {', '.join(conflicts[:5])}{' 等' if len(conflicts)>5 else ''}。请先从模型中移除这些字段。",
+                    code=400
+                )
+            
+            # 3. 执行删除
+            count = await DeviceField.filter(id__in=field_ids).update(is_active=False)
+            
+            # 同时删除关联的字段映射
+            await DeviceFieldMapping.filter(device_field_id__in=field_ids).update(is_active=False)
+            
+            logger.info(f"批量删除设备字段成功: {field_ids}, 数量: {count}")
+            return count
+        except Exception as e:
+            logger.error(f"批量删除设备字段失败: {str(e)}")
+            raise
+
     # =====================================================
     # 数据模型管理
     # =====================================================
@@ -127,6 +244,11 @@ class MetadataService:
     async def create_model(model_data: DeviceDataModelCreate) -> DeviceDataModel:
         """创建数据模型"""
         try:
+            # 1. 验证设备类型是否存在
+            device_type = await DeviceType.get_or_none(type_code=model_data.device_type_code)
+            if not device_type:
+                raise APIException(message=f"设备类型 {model_data.device_type_code} 不存在", code=400)
+
             # 转换 Pydantic 模型为字典
             model_dict = model_data.model_dump()
             
@@ -143,6 +265,34 @@ class MetadataService:
 
             logger.info(f"创建数据模型成功: {model.model_name} ({model.model_code})")
             return model
+        except IntegrityError as e:
+            error_msg = str(e)
+            logger.error(f"数据库完整性错误: {error_msg}")
+            if "fk_data_model_device_type" in error_msg:
+                 raise APIException(message=f"设备类型 {model_data.device_type_code} 不存在", code=400)
+            elif "unique" in error_msg.lower() or "duplicate" in error_msg.lower():
+                 # 解析冲突的具体键值
+                 if "uk_model_code_version" in error_msg or "(model_code, version)" in error_msg:
+                     # 检查是否存在被软删除的同名模型
+                     deleted_model = await DeviceDataModel.filter(
+                         model_code=model_data.model_code, 
+                         version=model_data.version, 
+                         is_active=False
+                     ).first()
+                     
+                     if deleted_model:
+                         raise APIException(
+                             message=f"模型编码 {model_data.model_code} (版本 {model_data.version}) 已存在但被标记为删除。请使用其他版本号或联系管理员恢复。",
+                             code=400
+                         )
+                     else:
+                         raise APIException(message=f"模型编码 {model_data.model_code} (版本 {model_data.version}) 已存在", code=400)
+                 else:
+                     raise APIException(message=f"数据库唯一约束冲突: {error_msg}", code=400)
+            else:
+                 raise APIException(message=f"数据库操作失败: {error_msg}", code=400)
+        except APIException:
+            raise
         except Exception as e:
             logger.error(f"创建数据模型失败: {str(e)}", exc_info=True)
             raise
@@ -517,14 +667,81 @@ class MetadataService:
     
     @staticmethod
     async def delete_mapping(mapping_id: int) -> bool:
-        """删除字段映射"""
+        """删除字段映射（软删除）"""
         try:
-            mapping = await DeviceFieldMapping.get(id=mapping_id)
-            await mapping.delete()
+            mapping = await DeviceFieldMapping.get(id=mapping_id).prefetch_related('device_field')
+            
+            # 检查是否被模型引用
+            if mapping.device_field:
+                active_models = await DeviceDataModel.filter(
+                    device_type_code=mapping.device_type_code,
+                    is_active=True
+                ).all()
+                
+                for model in active_models:
+                    selected = model.selected_fields or []
+                    for sf in selected:
+                        if isinstance(sf, dict) and sf.get("field_code") == mapping.device_field.field_code:
+                            raise APIException(
+                                message=f"字段 '{mapping.device_field.field_name}' 的映射正被模型 '{model.model_name}' 使用，无法删除。",
+                                code=400
+                            )
+
+            mapping.is_active = False
+            await mapping.save()
             logger.info(f"删除字段映射成功: {mapping.tdengine_stable}.{mapping.tdengine_column}")
             return True
         except DoesNotExist:
             return False
+        except Exception as e:
+            logger.error(f"删除字段映射失败: {str(e)}")
+            raise
+
+    @staticmethod
+    async def delete_mappings_by_ids(mapping_ids: List[int]) -> int:
+        """批量删除字段映射"""
+        try:
+            # 1. 获取映射
+            mappings = await DeviceFieldMapping.filter(id__in=mapping_ids, is_active=True).prefetch_related('device_field').all()
+            if not mappings:
+                return 0
+            
+            # 2. 检查引用
+            fields = [m.device_field for m in mappings if m.device_field]
+            if not fields:
+                # No fields associated (shouldn't happen), safe to delete?
+                pass
+            
+            field_codes = set(f.field_code for f in fields)
+            device_types = set(f.device_type_code for f in fields)
+            
+            active_models = await DeviceDataModel.filter(
+                device_type_code__in=device_types,
+                is_active=True
+            ).all()
+            
+            conflicts = []
+            for model in active_models:
+                selected = model.selected_fields or []
+                for sf in selected:
+                    if isinstance(sf, dict) and sf.get("field_code") in field_codes:
+                         fname = next((f.field_name for f in fields if f.field_code == sf.get("field_code")), "?")
+                         conflict_msg = f"{fname} (模型: {model.model_name})"
+                         if conflict_msg not in conflicts:
+                             conflicts.append(conflict_msg)
+            
+            if conflicts:
+                 raise APIException(
+                    message=f"以下字段映射关联的字段正被模型引用，无法删除: {', '.join(conflicts[:3])}{'...' if len(conflicts)>3 else ''}。请先从模型中移除这些字段。",
+                    code=400
+                )
+
+            count = await DeviceFieldMapping.filter(id__in=mapping_ids).update(is_active=False)
+            logger.info(f"批量删除字段映射成功: {mapping_ids}, 数量: {count}")
+            return count
+        except Exception as e:
+            logger.error(f"批量删除字段映射失败: {str(e)}")
+            raise
     
     # =====================================================
     # 模型执行日志
@@ -667,9 +884,21 @@ class MetadataService:
                 col_name = row[0]
                 col_type = row[1]
                 col_note = row[3] if len(row) > 3 else ""
+                
+                # Handle bytes note
+                note_str = ""
+                if col_note:
+                     if isinstance(col_note, bytes):
+                         try:
+                             note_str = col_note.decode('utf-8', errors='ignore')
+                         except:
+                             note_str = str(col_note)
+                     else:
+                         note_str = str(col_note)
+
                 td_columns[col_name] = {
                     'type': col_type,
-                    'is_tag': 'TAG' in col_note
+                    'is_tag': 'TAG' in note_str.upper()
                 }
                 
         except Exception as e:

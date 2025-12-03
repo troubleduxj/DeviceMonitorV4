@@ -171,18 +171,18 @@ const columns = [
             type: 'info',
             style: 'margin-right: 8px;',
             onClick: () => {
-              // 跳转到数据模型配置页面，并预填充设备类型
+              // 跳转到统一配置页面，并预填充设备类型
               router.push({
-                path: '/data-model/config',
+                path: '/metadata/unified',
                 query: {
                   device_type: row.type_code,
-                  type_name: row.type_name,
+                  tab: 'models',
                 },
               })
             },
           },
           {
-            default: () => '配置数据模型',
+            default: () => '模型配置',
             icon: renderIcon('mdi:database-cog', { size: 16 }),
           }
         ),
@@ -279,7 +279,11 @@ const columns = [
             trigger: ['input', 'blur'],
           }"
         >
-          <NInput v-model:value="modalForm.type_code" placeholder="请输入类型编码" />
+          <NInput
+            v-model:value="modalForm.type_code"
+            placeholder="请输入类型编码"
+            :disabled="modalAction === 'edit'"
+          />
         </NFormItem>
         <NFormItem
           label="类型名称"

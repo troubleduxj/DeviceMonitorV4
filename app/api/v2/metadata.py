@@ -3,9 +3,10 @@
 提供设备字段定义、数据模型、字段映射的RESTful API
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Request, Query, Path, Body
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.core.response_formatter_v2 import create_formatter
 from app.core.dependency import DependAuth
@@ -169,6 +170,55 @@ async def delete_field(
         return formatter.internal_error(f"删除设备字段失败: {str(e)}")
 
 
+@router.delete("/fields/batch/{device_type_code}", summary="批量删除设备类型字段")
+async def batch_delete_fields(
+    request: Request,
+    device_type_code: str,
+    current_user: User = DependAuth
+):
+    """
+    批量删除指定设备类型下的所有字段
+    
+    - **device_type_code**: 设备类型代码
+    """
+    formatter = create_formatter(request)
+    try:
+        count = await MetadataService.delete_fields_by_device_type(device_type_code)
+        return formatter.success(
+            data={"deleted_count": count},
+            message=f"成功删除 {count} 个字段"
+        )
+    except APIException as e:
+        return formatter.error(message=e.message, code=e.code)
+    except Exception as e:
+        logger.error(f"批量删除设备字段失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"批量删除设备字段失败: {str(e)}")
+
+
+class BatchDeleteRequest(BaseModel):
+    ids: List[int]
+
+@router.post("/fields/batch-delete", summary="批量删除选中字段")
+async def batch_delete_selected_fields(
+    request: Request,
+    delete_req: BatchDeleteRequest,
+    current_user: User = DependAuth
+):
+    """批量删除选中的字段"""
+    formatter = create_formatter(request)
+    try:
+        count = await MetadataService.delete_fields_by_ids(delete_req.ids)
+        return formatter.success(
+            data={"deleted_count": count},
+            message=f"成功删除 {count} 个字段"
+        )
+    except APIException as e:
+        return formatter.error(message=e.message, code=e.code)
+    except Exception as e:
+        logger.error(f"批量删除设备字段失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"批量删除设备字段失败: {str(e)}")
+
+
 # =====================================================
 # 数据模型 API
 # =====================================================
@@ -198,6 +248,8 @@ async def create_model(
             data=DeviceDataModelResponse.model_validate(model).model_dump(mode='json'),
             message="创建数据模型成功"
         )
+    except APIException as e:
+        return formatter.error(message=e.message, code=e.code)
     except Exception as e:
         logger.error(f"创建数据模型失败: {str(e)}", exc_info=True)
         return formatter.internal_error(f"创建数据模型失败: {str(e)}")
@@ -490,6 +542,25 @@ async def delete_mapping(
     except Exception as e:
         logger.error(f"删除字段映射失败: {str(e)}", exc_info=True)
         return formatter.internal_error(f"删除字段映射失败: {str(e)}")
+
+
+@router.post("/mappings/batch-delete", summary="批量删除字段映射")
+async def batch_delete_mappings(
+    request: Request,
+    delete_req: BatchDeleteRequest,
+    current_user: User = DependAuth
+):
+    """批量删除选中的字段映射"""
+    formatter = create_formatter(request)
+    try:
+        count = await MetadataService.delete_mappings_by_ids(delete_req.ids)
+        return formatter.success(
+            data={"deleted_count": count},
+            message=f"成功删除 {count} 个字段映射"
+        )
+    except Exception as e:
+        logger.error(f"批量删除字段映射失败: {str(e)}", exc_info=True)
+        return formatter.internal_error(f"批量删除字段映射失败: {str(e)}")
 
 
 # =====================================================

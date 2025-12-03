@@ -17,14 +17,15 @@
             :options="deviceTypeOptions"
             placeholder="全部类型"
             clearable
-            style="width: 150px"
+            filterable
+            style="width: 200px"
           />
           <NInput
             v-else
-            :value="queryParams.device_type_code"
+            :value="currentDeviceTypeName"
             disabled
             placeholder="已锁定"
-            style="width: 150px"
+            style="width: 200px"
           />
         </QueryBarItem>
         <QueryBarItem label="启用状态" :label-width="70">
@@ -288,7 +289,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, h, onMounted, watch } from 'vue'
+import { ref, reactive, h, onMounted, watch, computed } from 'vue'
 import {
   NCard,
   NButton,
@@ -419,7 +420,15 @@ const testResult = ref(null)
 const columns = [
   { title: '规则名称', key: 'rule_name', width: 150 },
   { title: '规则代码', key: 'rule_code', width: 150 },
-  { title: '设备类型', key: 'device_type_code', width: 120 },
+  { 
+    title: '设备类型', 
+    key: 'device_type_code', 
+    width: 120,
+    render(row) {
+      const option = deviceTypeOptions.value.find(opt => opt.value === row.device_type_code)
+      return option ? option.label : row.device_type_code
+    }
+  },
   { title: '设备编码', key: 'device_code', width: 120, render: (row) => row.device_code || '通用' },
   { title: '监测字段', key: 'field_name', width: 100 },
   {
@@ -501,8 +510,9 @@ const loadDeviceTypes = async () => {
   try {
     const res = await alarmRulesApi.getDeviceTypes()
     if (res.success && res.data) {
-      deviceTypeOptions.value = res.data.map((item) => ({
-        label: item.type_name,
+      const items = Array.isArray(res.data) ? res.data : (res.data.items || [])
+      deviceTypeOptions.value = items.map((item) => ({
+        label: `${item.type_name} (${item.type_code})`,
         value: item.type_code,
       }))
     }
@@ -518,7 +528,13 @@ const loadDevices = async (deviceTypeCode) => {
   }
   deviceLoading.value = true
   try {
-    const res = await deviceApi.list({ device_type_code: deviceTypeCode, page_size: 1000 })
+    const params = {
+      device_type: deviceTypeCode,
+      page: 1,
+      page_size: 100 // 修正：后端限制最大100
+    }
+    
+    const res = await deviceApi.list(params)
     if (res.success && res.data) {
       const items = res.data.items || res.data || []
       deviceOptions.value = items.map((item) => ({
@@ -528,6 +544,7 @@ const loadDevices = async (deviceTypeCode) => {
     }
   } catch (error) {
     console.error('加载设备失败:', error)
+    message.error('加载设备列表失败')
   } finally {
     deviceLoading.value = false
   }
@@ -773,6 +790,14 @@ const handleTest = async () => {
     testing.value = false
   }
 }
+
+// 计算当前设备类型名称（用于嵌入模式）
+const currentDeviceTypeName = computed(() => {
+  const code = queryParams.device_type_code
+  if (!code) return ''
+  const option = deviceTypeOptions.value.find(opt => opt.value === code)
+  return option ? option.label : code
+})
 
 // 监听 prop 变化
 watch(

@@ -28,7 +28,7 @@
 
     <div v-if="selectedDeviceType" class="config-content">
       <n-card :bordered="false">
-        <n-tabs type="line" animated>
+        <n-tabs type="line" animated v-model:value="activeTab">
           <n-tab-pane name="fields" tab="字段定义">
             <div class="tab-content">
               <FieldConfig :device-type-code="selectedDeviceType" embedded />
@@ -48,12 +48,13 @@
       </n-card>
     </div>
     
-    <n-empty v-else description="请先选择设备类型" class="mt-20" />
+    <GlobalDashboard v-else @select="handleGlobalSelect" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { 
   NCard, NSpace, NAlert, NFormItem, NSelect, NButton, NIcon, 
   NTabs, NTabPane, NEmpty, useMessage 
@@ -63,10 +64,13 @@ import { deviceTypeApi } from '@/api/device-v2'
 import FieldConfig from '@/views/metadata/fields/index.vue'
 import ModelConfig from '@/views/metadata/models/index.vue'
 import AlarmRules from '@/views/alarm/alarm-rules/index.vue'
+import GlobalDashboard from './components/GlobalDashboard.vue'
 
+const route = useRoute()
 const message = useMessage()
 const selectedDeviceType = ref(null)
 const deviceTypeOptions = ref([])
+const activeTab = ref('fields')
 
 const fetchDeviceTypes = async () => {
   try {
@@ -92,8 +96,21 @@ const handleDeviceTypeChange = (val) => {
   // Can add logic here if needed
 }
 
-onMounted(() => {
-  fetchDeviceTypes()
+const handleGlobalSelect = ({ deviceType, tab }) => {
+  selectedDeviceType.value = deviceType
+  if (tab) {
+    activeTab.value = tab
+  }
+}
+
+onMounted(async () => {
+  await fetchDeviceTypes()
+  if (route.query.device_type) {
+    selectedDeviceType.value = route.query.device_type
+  }
+  if (route.query.tab) {
+    activeTab.value = route.query.tab
+  }
 })
 </script>
 

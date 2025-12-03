@@ -60,6 +60,17 @@
         </n-button>
 
         <n-button 
+          type="error" 
+          @click="handleBatchDelete"
+          :disabled="checkedRowKeys.length === 0 && !queryParams.device_type_code"
+        >
+          <template #icon>
+            <n-icon :component="TrashOutline" />
+          </template>
+          {{ checkedRowKeys.length > 0 ? `批量删除 (${checkedRowKeys.length})` : '清空分类' }}
+        </n-button>
+
+        <n-button 
           type="warning" 
           @click="handleCheckDiff"
         >
@@ -75,6 +86,7 @@
     <n-card :bordered="false">
       <n-data-table
         remote
+        v-model:checked-row-keys="checkedRowKeys"
         :columns="columns"
         :data="fieldList"
         :loading="loading"
@@ -220,6 +232,11 @@
               placeholder="选择字段分类"
               :options="fieldCategoryOptions"
             />
+          </n-form-item>
+          
+          <n-form-item label="覆盖已存在字段">
+             <n-switch v-model:value="syncFormData.overwrite_existing" />
+             <n-text depth="3" class="ml-2">选中后将更新已存在字段的名称、类型等属性</n-text>
           </n-form-item>
         </n-form>
       </div>
@@ -402,6 +419,7 @@ watch(() => props.deviceTypeCode, (newVal) => {
 // 数据
 const fieldList = ref([])
 const loading = ref(false)
+const checkedRowKeys = ref([])
 const pagination = reactive({
   page: 1,
   pageSize: 10,
@@ -461,10 +479,19 @@ const fieldTypeOptions = [
 
 // 表格列定义
 const columns = [
+  { type: 'selection' },
   { title: 'ID', key: 'id', width: 80 },
   { title: '字段代码', key: 'field_code', width: 180 },
   { title: '字段名称', key: 'field_name', width: 150 },
-  { title: '设备类型', key: 'device_type_code', width: 120 },
+  { 
+    title: '设备类型', 
+    key: 'device_type_code', 
+    width: 150,
+    render(row) {
+      const option = deviceTypeOptions.value.find(opt => opt.value === row.device_type_code)
+      return option ? option.label : row.device_type_code
+    }
+  },
   { 
     title: '字段类型', 
     key: 'field_type', 
@@ -614,7 +641,8 @@ const syncFormData = reactive({
   device_type_code: null,
   tdengine_database: '',
   tdengine_stable: '',
-  field_category: 'data_collection'
+  field_category: 'data_collection',
+  overwrite_existing: false
 })
 
 const handleSyncDeviceTypeChange = (value, option) => {
@@ -760,6 +788,78 @@ const handleEdit = async (id) => {
   }
 }
 
+// 批量删除
+const handleBatchDelete = async () => {
+  // 情况1：删除选中项
+  if (checkedRowKeys.value.length > 0) {
+    window.$dialog.warning({
+      title: '确认删除',
+      content: `确定要删除选中的 ${checkedRowKeys.value.length} 个字段吗？`,
+      positiveText: '确定',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+         try {
+            loading.value = true
+            const res = await dataModelApi.batchDeleteFieldsByIds(checkedRowKeys.value)
+            if (res.success) {
+                message.success(res.message)
+                checkedRowKeys.value = []
+                fetchFieldList()
+            } else {
+                message.error(res.message || '删除失败')
+            }
+         } catch (e) {
+            console.error(e)
+         } finally {
+            loading.value = false
+         }
+      }
+    })
+    return
+  }
+
+  // 情况2：清空当前分类
+  if (!queryParams.device_type_code) {
+    message.warning('请先选择要删除的字段，或选择设备类型以执行清空操作')
+    return
+  }
+
+  const option = deviceTypeOptions.value.find(opt => opt.value === queryParams.device_type_code)
+  const deviceTypeName = option ? option.label : queryParams.device_type_code
+  
+  window.$dialog.error({
+    title: '危险操作警告',
+    content: `确定要删除该设备类型（${deviceTypeName}）下的所有字段吗？此操作不可恢复！`,
+    positiveText: '确定删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      // 二次确认
+      window.$dialog.error({
+        title: '最终确认',
+        content: '请再次确认：这将清空该分类下所有字段定义！如果字段已被模型使用，删除将失败。',
+        positiveText: '我已确认风险，执行删除',
+        negativeText: '取消',
+        onPositiveClick: async () => {
+          try {
+            loading.value = true
+            const res = await dataModelApi.batchDeleteFields(queryParams.device_type_code)
+            if (res.success) {
+              message.success(res.message)
+              fetchFieldList()
+            } else {
+              message.error(res.message || '删除失败')
+            }
+          } catch (e) {
+            console.error(e)
+          } finally {
+            loading.value = false
+          }
+        }
+      })
+    }
+  })
+}
+
 const handleSaveField = async () => {
   try {
     await fieldFormRef.value?.validate()
@@ -800,7 +900,9 @@ const handleDelete = async (id) => {
           message.error(response.message || '删除失败')
         }
       } catch (error) {
-        message.error('删除失败：' + (error.message || '未知错误'))
+        console.error('删除失败:', error)
+        // 全局错误拦截器会显示错误信息，此处不再重复显示
+        // message.error('删除失败：' + (error.message || '未知错误'))
       }
     }
   })
@@ -889,10 +991,29 @@ const handleSaveAlarmConfig = async () => {
 }
 
 // TDengine同步方法
-const handleSyncFromTDengine = () => {
+const handleSyncFromTDengine = async () => {
   syncStep.value = 1
   syncStatus.value = 'process'
   syncFormData.device_type_code = queryParams.device_type_code
+  
+  // 自动填充：获取TDengine默认配置
+  try {
+    const res = await dataModelApi.getTDengineDefaultConfig()
+    if (res.success && res.data.database) {
+      syncFormData.tdengine_database = res.data.database
+    }
+  } catch (e) {
+    console.error('获取TDengine默认配置失败', e)
+  }
+
+  // 自动填充：如果已选择设备类型，填充超级表名
+  if (syncFormData.device_type_code) {
+    const option = deviceTypeOptions.value.find(opt => opt.value === syncFormData.device_type_code)
+    if (option && option.tdengine_stable_name) {
+      syncFormData.tdengine_stable = option.tdengine_stable_name
+    }
+  }
+
   showSyncModal.value = true
 }
 

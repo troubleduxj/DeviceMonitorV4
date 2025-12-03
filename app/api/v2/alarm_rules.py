@@ -176,7 +176,7 @@ async def get_fields_for_device_type(device_type_code: str):
             device_type_code=device_type_code,
             is_active=True,
             # is_monitoring_key=True, # 旧逻辑：仅监控字段
-            is_alarm_enabled=True     # 新逻辑：仅允许报警的字段
+            # is_alarm_enabled=True     # 新逻辑：仅允许报警的字段 -> 暂时移除此限制，防止列表为空
         ).order_by("sort_order")
         
         items = [

@@ -19,6 +19,7 @@
           v-model:value="queryParams.device_type_code"
           placeholder="选择设备类型"
           clearable
+          filterable
           style="width: 200px"
           :options="deviceTypeOptions"
         />
@@ -178,12 +179,65 @@
         </n-space>
       </template>
     </n-modal>
+    <!-- 预览对话框 -->
+    <n-modal
+      v-model:show="showPreviewModal"
+      title="模型预览"
+      preset="card"
+      style="width: 800px"
+    >
+      <n-tabs type="line" animated>
+        <n-tab-pane name="basic" tab="基本信息">
+          <n-descriptions bordered :column="2">
+            <n-descriptions-item label="模型名称">{{ previewData.model_name }}</n-descriptions-item>
+            <n-descriptions-item label="模型代码">
+              <n-tag :bordered="false">{{ previewData.model_code }}</n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="设备类型">
+              {{ deviceTypeMap[previewData.device_type_code]?.type_name || previewData.device_type_code }}
+            </n-descriptions-item>
+            <n-descriptions-item label="模型类型">
+              <n-tag :type="getModelTypeTag(previewData.model_type).type">
+                {{ getModelTypeTag(previewData.model_type).label }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="版本">{{ previewData.version }}</n-descriptions-item>
+            <n-descriptions-item label="状态">
+              <n-tag :type="previewData.is_active ? 'success' : 'error'">
+                {{ previewData.is_active ? '已激活' : '已停用' }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="说明" :span="2">{{ previewData.description || '-' }}</n-descriptions-item>
+          </n-descriptions>
+        </n-tab-pane>
+        <n-tab-pane name="fields" tab="包含字段">
+          <n-data-table
+            :columns="previewFieldColumns"
+            :data="previewData.selected_fields || []"
+            :pagination="false"
+            max-height="400"
+            size="small"
+          />
+        </n-tab-pane>
+        <n-tab-pane name="json" tab="JSON结构">
+          <n-code :code="JSON.stringify(previewData, null, 2)" language="json" word-wrap />
+        </n-tab-pane>
+      </n-tabs>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showPreviewModal = false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, h, watch } from 'vue'
-import { NButton, NTag, NSpace, NSwitch, useMessage, useDialog } from 'naive-ui'
+import { 
+  NButton, NTag, NSpace, NSwitch, useMessage, useDialog, 
+  NDescriptions, NDescriptionsItem, NCode, NDataTable, NModal, NTabs, NTabPane, NForm, NFormItem, NInput, NSelect, NTransfer, NText, NIcon
+} from 'naive-ui'
 import { SearchOutline, RefreshOutline, AddOutline, CreateOutline, TrashOutline, EyeOutline, CloudDownloadOutline } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
 import { deviceTypeApi } from '@/api/device-shared'
@@ -209,12 +263,18 @@ const queryParams = reactive({
   search: '',
   device_type_code: null,
   model_type: null,
-  is_active: null
+  is_active: true
 })
 
 // 监听 prop 变化
 watch(() => props.deviceTypeCode, (newVal) => {
-  if (newVal) {
+  // 即使 newVal 为 null，也应该允许查询（显示所有模型）
+  // 如果是 embedded 模式，则强制使用 props.deviceTypeCode
+  // 否则，只有当 newVal 有值时才更新 queryParams.device_type_code
+  if (props.embedded) {
+    queryParams.device_type_code = newVal
+    fetchModelList()
+  } else if (newVal) {
     queryParams.device_type_code = newVal
     fetchModelList()
   }
@@ -247,11 +307,11 @@ const deviceTypeMap = ref({})
 // 获取设备类型列表
 const fetchDeviceTypes = async () => {
   try {
-    const res = await deviceTypeApi.list({ limit: 100 })
+    const res = await deviceTypeApi.list({ limit: 100, is_active: true })
     const list = res.data?.items || res.data?.data || res.data || []
     if (Array.isArray(list)) {
       deviceTypeOptions.value = list.map(item => ({
-        label: item.type_name,
+        label: `${item.type_name} (${item.type_code})`, // 显示代码以便区分
         value: item.type_code,
         tdengine_stable_name: item.tdengine_stable_name
       }))
@@ -452,7 +512,7 @@ const handleReset = () => {
   queryParams.search = ''
   queryParams.device_type_code = null
   queryParams.model_type = null
-  queryParams.is_active = null
+  queryParams.is_active = true
   handleQuery()
 }
 
@@ -520,9 +580,44 @@ const handleDelete = (id) => {
 }
 
 const handlePreview = async (id) => {
-  message.info('预览功能开发中...')
-  // TODO: 跳转到预览页面
+  previewLoading.value = true
+  try {
+    const response = await dataModelApi.getModel(id)
+    if (response.success) {
+      previewData.value = response.data
+      showPreviewModal.value = true
+    } else {
+      message.error(response.message || '获取模型详情失败')
+    }
+  } catch (error) {
+    message.error('获取模型详情失败：' + (error.message || '未知错误'))
+  } finally {
+    previewLoading.value = false
+  }
 }
+
+const getModelTypeTag = (type) => {
+  const typeMap = {
+    realtime: { label: '实时监控', type: 'info' },
+    statistics: { label: '统计分析', type: 'success' },
+    ai_analysis: { label: 'AI分析', type: 'warning' }
+  }
+  return typeMap[type] || { label: type, type: 'default' }
+}
+
+const showPreviewModal = ref(false)
+const previewLoading = ref(false)
+const previewData = ref({})
+const previewFieldColumns = [
+  { title: '字段代码', key: 'field_code' },
+  { title: '字段别名', key: 'alias' },
+  { 
+    title: '必填', 
+    key: 'is_required',
+    render: (row) => row.is_required ? h(NTag, { type: 'error', size: 'small' }, { default: () => '是' }) : '否'
+  },
+  { title: '权重', key: 'weight' }
+]
 
 const handleToggleActive = async (id, value) => {
   try {
