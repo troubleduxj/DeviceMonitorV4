@@ -153,6 +153,43 @@
             :rows="3"
           />
         </n-form-item>
+
+        <n-divider title-placement="left">展示配置</n-divider>
+        
+        <n-grid :cols="2" :x-gap="24">
+          <n-gi>
+            <n-form-item label="字段分组">
+              <n-select
+                v-model:value="fieldFormData.field_group"
+                :options="fieldGroupOptions"
+                placeholder="输入或选择分组"
+                filterable
+                tag
+                clearable
+              />
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item label="分组排序">
+              <n-input-number v-model:value="fieldFormData.group_order" placeholder="分组内排序" />
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item label="卡片显示">
+              <n-switch v-model:value="fieldFormData.is_default_visible">
+                <template #checked>显示</template>
+                <template #unchecked>隐藏</template>
+              </n-switch>
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item label="全局排序">
+              <n-input-number v-model:value="fieldFormData.sort_order" placeholder="全局列表排序" />
+            </n-form-item>
+          </n-gi>
+        </n-grid>
+        
+        <n-divider title-placement="left">高级属性</n-divider>
         
         <n-grid :cols="2">
           <n-gi>
@@ -371,7 +408,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, h, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { NButton, NTag, NSpace, NSwitch, useMessage, NGrid, NGi, NInputNumber, NDrawer, NDrawerContent, NForm, NFormItem } from 'naive-ui'
+import { NButton, NTag, NSpace, NSwitch, useMessage, NGrid, NGi, NInputNumber, NDrawer, NDrawerContent, NForm, NFormItem, NIcon } from 'naive-ui'
 import { 
   SearchOutline, 
   RefreshOutline, 
@@ -379,10 +416,12 @@ import {
   CreateOutline, 
   TrashOutline,
   CloudDownloadOutline,
-  GitCompareOutline
+  GitCompareOutline,
+  EyeOutline
 } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
 import { deviceTypeApi } from '@/api/device-v2'
+import { systemV2Api } from '@/api/system-v2'
 // Note: Ensure this component exists in the same directory or update path
 import SchemaDiffModal from './components/SchemaDiffModal.vue'
 
@@ -507,6 +546,22 @@ const columns = [
       return h(NTag, { type: typeMap[row.field_type] || 'default' }, { default: () => row.field_type })
     }
   },
+  {
+    title: '字段分组',
+    key: 'field_group',
+    width: 100,
+    render(row) {
+      return row.field_group ? h(NTag, { size: 'small', bordered: false }, { default: () => row.field_group }) : '-'
+    }
+  },
+  {
+    title: '卡片显示',
+    key: 'is_default_visible',
+    width: 80,
+    render(row) {
+      return row.is_default_visible ? h(NIcon, { component: EyeOutline, color: '#18a058' }) : '-'
+    }
+  },
   { title: '单位', key: 'unit', width: 80 },
   {
     title: '监控字段',
@@ -597,6 +652,10 @@ const fieldFormData = reactive({
   field_name: '',
   field_type: 'float',
   field_category: 'data_collection',
+  field_group: 'default',
+  group_order: 0,
+  is_default_visible: true,
+  sort_order: 0,
   unit: '',
   is_monitoring_key: false,
   is_alarm_enabled: false,
@@ -616,6 +675,27 @@ const alarmConfigData = reactive({
 })
 const savingAlarmConfig = ref(false)
 
+
+const fieldGroupOptions = computed(() => {
+  // 1. 优先使用字典数据（保留标签）
+  const options = [...dictGroupOptions.value]
+  const existingValues = new Set(options.map(o => o.value))
+
+  // 2. 合并现有字段中的分组（如果不在字典中，则label=value）
+  fieldList.value.forEach(f => {
+    if (f.field_group && !existingValues.has(f.field_group)) {
+      options.push({ label: f.field_group, value: f.field_group })
+      existingValues.add(f.field_group)
+    }
+  })
+
+  // 3. 确保包含默认分组
+  if (!existingValues.has('default')) {
+    options.push({ label: 'default', value: 'default' })
+  }
+  
+  return options
+})
 
 const fieldFormRules = {
   device_type_code: [{ required: true, message: '请选择设备类型', trigger: 'change' }],
@@ -737,6 +817,104 @@ const fetchFieldList = async () => {
   }
 }
 
+// 字典分组相关
+const monitoringGroupTypeId = ref(null)
+const dictGroupOptions = ref([])
+
+const initDictData = async () => {
+  try {
+    // 1. 确保字典类型存在
+    await ensureDictTypeExists()
+
+    // 2. 获取字典数据
+    console.log('正在获取字典数据...')
+    const dataRes = await systemV2Api.getDictDataByType('monitoring_field_group')
+    console.log('获取到的字典数据响应:', dataRes)
+    
+    // 兼容处理多种返回结构
+    const items = dataRes.data?.data || dataRes.data || []
+    console.log('解析后的字典数据项:', items)
+    
+    if (Array.isArray(items)) {
+      dictGroupOptions.value = items.map(d => ({ label: d.data_label, value: d.data_value }))
+      console.log('字典选项已更新:', dictGroupOptions.value)
+    }
+  } catch (error) {
+    console.error('初始化字典数据失败:', error)
+  }
+}
+
+const ensureDictTypeExists = async () => {
+  if (monitoringGroupTypeId.value) return monitoringGroupTypeId.value
+  
+  try {
+    // 再次检查是否存在
+    const typeRes = await systemV2Api.getDictTypeList({ type_code: 'monitoring_field_group' })
+    
+    // 兼容处理多种返回结构
+    let items = []
+    if (typeRes.data && Array.isArray(typeRes.data.items)) {
+      items = typeRes.data.items
+    } else if (typeRes.items && Array.isArray(typeRes.items)) {
+      items = typeRes.items
+    } else if (typeRes.data && Array.isArray(typeRes.data.data)) {
+      items = typeRes.data.data
+    } else if (typeRes.data && Array.isArray(typeRes.data)) {
+      items = typeRes.data
+    } else if (Array.isArray(typeRes)) {
+      items = typeRes
+    }
+
+    if (items.length > 0) {
+      monitoringGroupTypeId.value = items[0].id
+      return monitoringGroupTypeId.value
+    }
+    
+    // 不存在则创建
+    const createRes = await systemV2Api.createDictType({ 
+      type_name: '监测字段分组', 
+      type_code: 'monitoring_field_group', 
+      is_enabled: true,
+      description: '设备实时监测字段的分组定义'
+    })
+    if (createRes.code === 200 && createRes.data) {
+      monitoringGroupTypeId.value = createRes.data.id
+      return monitoringGroupTypeId.value
+    }
+  } catch (error) {
+    console.error('创建字典类型失败:', error)
+  }
+  return null
+}
+
+const handleAutoCreateDictData = async (groupName) => {
+  if (!groupName || groupName === 'default') return
+  // 检查是否已存在于字典选项中
+  if (dictGroupOptions.value.some(o => o.value === groupName)) return
+  
+  try {
+    const typeId = await ensureDictTypeExists()
+    if (!typeId) return
+    
+    await systemV2Api.createDictData({
+      dict_type_id: typeId,
+      data_label: groupName,
+      data_value: groupName,
+      is_enabled: true,
+      sort_order: 0
+    })
+    
+    // 刷新选项
+    const dataRes = await systemV2Api.getDictDataByType('monitoring_field_group')
+    const items = dataRes.data?.data || dataRes.data || []
+    if (Array.isArray(items)) {
+      dictGroupOptions.value = items.map(d => ({ label: d.data_label, value: d.data_value }))
+    }
+  } catch (e) {
+    console.error('自动创建字典数据失败:', e)
+  }
+}
+
 const handleQuery = () => {
   pagination.page = 1
   fetchFieldList()
@@ -765,6 +943,10 @@ const handleCreate = () => {
     field_code: '',
     field_type: null,
     field_category: 'data_collection',
+    field_group: 'default',
+    group_order: 0,
+    is_default_visible: true,
+    sort_order: 0,
     unit: '',
     description: '',
     is_monitoring_key: false,
@@ -865,6 +1047,9 @@ const handleSaveField = async () => {
     await fieldFormRef.value?.validate()
     
     saving.value = true
+    
+    // 尝试自动创建字典数据
+    await handleAutoCreateDictData(fieldFormData.field_group)
     
     const response = fieldFormData.id
       ? await dataModelApi.updateField(fieldFormData.id, fieldFormData)
@@ -1081,6 +1266,9 @@ const handleExecuteSync = async () => {
 
 onMounted(async () => {
   await fetchDeviceTypes()
+  
+  // 初始化字典数据
+  initDictData()
   
   // 处理路由查询参数
   if (route.query.device_type) {

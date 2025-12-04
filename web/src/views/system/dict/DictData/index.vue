@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, onMounted, ref, watch, resolveDirective, withDirectives, onActivated } from 'vue'
-import { NButton, NInput, NPopconfirm, NSwitch, NSelect } from 'naive-ui'
+import { NButton, NInput, NPopconfirm, NSwitch, NSelect, NForm, NFormItem } from 'naive-ui'
 import { useRoute } from 'vue-router'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -135,8 +135,23 @@ watch(
 async function loadDictTypeOptions() {
   try {
     const res = await systemV2Api.getDictTypeList({ page: 1, page_size: 100 })
-    if (res.code === 200 && res.data) {
-      dictTypeOptions.value = res.data.map((item) => ({
+    
+    // 兼容多种返回结构
+    let items = []
+    if (res.data && Array.isArray(res.data.items)) {
+      items = res.data.items
+    } else if (res.items && Array.isArray(res.items)) {
+      items = res.items
+    } else if (res.data && Array.isArray(res.data.data)) {
+      items = res.data.data
+    } else if (res.data && Array.isArray(res.data)) {
+      items = res.data
+    } else if (Array.isArray(res)) {
+      items = res
+    }
+
+    if (items.length > 0) {
+      dictTypeOptions.value = items.map((item) => ({
         label: item.type_name,
         value: item.id,
       }))

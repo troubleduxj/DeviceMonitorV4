@@ -1403,38 +1403,23 @@ async def get_device_monitoring(
         if not device_obj:
             return formatter.not_found("设备不存在", "device")
 
-        # 构建查询条件
-        from app.models.device import DeviceRealTimeData
-        query = DeviceRealTimeData.filter(device_id=device_id)
+        # 使用 DeviceDataController 查询 TDengine 历史数据
+        from app.controllers.device_data import DeviceDataController
+        data_controller = DeviceDataController()
         
-        if start_time:
-            query = query.filter(data_timestamp__gte=start_time)
-        if end_time:
-            query = query.filter(data_timestamp__lte=end_time)
-        
-        # 分页查询
-        offset = (page - 1) * page_size
-        monitoring_data = await query.offset(offset).limit(page_size).order_by('-data_timestamp')
-        total = await query.count()
+        # 调用 get_device_history_data (支持 device_id)
+        total, history_data = await data_controller.get_device_history_data(
+            device_id=device_id,
+            device_code=device_obj.device_code, # 传入 device_code 以便查找表名
+            start_time=start_time,
+            end_time=end_time,
+            page=page,
+            page_size=page_size
+        )
         
         # 转换为响应格式
-        data = []
-        for item in monitoring_data:
-            data.append({
-                "id": item.id,
-                "device_id": item.device_id,
-                "voltage": item.voltage,
-                "current": item.current,
-                "power": item.power,
-                "temperature": item.temperature,
-                "pressure": item.pressure,
-                "vibration": item.vibration,
-                "status": item.status,
-                "error_code": item.error_code,
-                "error_message": item.error_message,
-                "data_timestamp": item.data_timestamp.isoformat() if item.data_timestamp else None,
-                "created_at": item.created_at.isoformat() if item.created_at else None
-            })
+        # 注意：TDengine 返回的数据字段已经是扁平的字典
+        data = history_data
 
         # 构建查询参数
         query_params = {}
@@ -2533,6 +2518,26 @@ async def websocket_realtime_data_v2(
 
     await manager_v2.connect(websocket, device_code, device_codes_list, type_code, page, page_size)
     
+    # 初始化复用的TDengine连接器
+    from app.settings.config import TDengineCredentials
+    from app.core.tdengine_connector import TDengineConnector
+    
+    td_connector = None
+    try:
+        tdengine_creds = TDengineCredentials()
+        td_connector = TDengineConnector(
+            host=tdengine_creds.host,
+            port=tdengine_creds.port,
+            user=tdengine_creds.user,
+            password=tdengine_creds.password,
+            database=tdengine_creds.database,
+        )
+        logger.info("WebSocket V2: TDengine连接器初始化完成 (复用模式)")
+    except Exception as e:
+        logger.error(f"WebSocket V2: TDengine连接器初始化失败: {e}")
+        await websocket.close(code=1011, reason="Database connection failed")
+        return
+
     try:
         # 立即推送一次初始数据
         first_push = True
@@ -2560,7 +2565,8 @@ async def websocket_realtime_data_v2(
                 controller = DeviceDataController()
                 
                 try:
-                    result = await controller.get_device_realtime_data(query)
+                    # 传入复用的连接器
+                    result = await controller.get_device_realtime_data(query, td_connector=td_connector)
                     
                     # 检查是否有错误信息
                     if isinstance(result, dict) and "error" in result:
@@ -2597,7 +2603,7 @@ async def websocket_realtime_data_v2(
                         )
                         await manager_v2.send_personal_message(message, websocket)
 
-                    # 第一次推送后立即进入正常循环，后续等待60秒
+                    # 第一次推送后立即进入正常循环
                     if first_push:
                         first_push = False
                         logger.info(f"WebSocket V2初始数据已推送，设备类型: {subscription.get('type_code', 'welding')}")
@@ -2617,8 +2623,8 @@ async def websocket_realtime_data_v2(
                     )
                     await manager_v2.send_personal_message(error_message, websocket)
                 
-                # 等待60秒（按用户要求的查询频率）
-                await asyncio.sleep(60)
+                # 缩短轮询间隔以实现实时性 (原为60s，改为3s)
+                await asyncio.sleep(3)
 
             except WebSocketDisconnect:
                 break
@@ -2634,9 +2640,12 @@ async def websocket_realtime_data_v2(
                     ensure_ascii=False,
                 )
                 await manager_v2.send_personal_message(error_message, websocket)
-                await asyncio.sleep(60)  # 错误后也等待60秒再重试
+                await asyncio.sleep(5)  # 错误后等待5秒再重试
 
     except WebSocketDisconnect:
         pass
     finally:
+        if td_connector:
+            await td_connector.close()
+            logger.info("WebSocket V2: TDengine连接器已关闭")
         manager_v2.disconnect(websocket)

@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { deviceFieldApi } from '@/api/device-field'
 import type { DeviceField } from '@/api/device-field'
+import { dataModelApi } from '@/api/v2/data-model'
 
 /**
  * 设备字段 Store
@@ -127,8 +128,21 @@ export const useDeviceFieldStore = defineStore('deviceField', () => {
       loadingState.value.set(deviceTypeCode, true)
       console.log(`[DeviceFieldStore] 从 API 获取字段配置: ${deviceTypeCode}`)
 
-      const response = await deviceFieldApi.getMonitoringKeys(deviceTypeCode)
-      const fields = response.data || []
+      // 使用 dataModelApi 获取所有字段配置，支持分组和排序
+      // 替换原来的 deviceFieldApi.getMonitoringKeys，因为后者可能只返回部分字段且不支持新属性
+      const response = await dataModelApi.getFields({ 
+        device_type_code: deviceTypeCode,
+        is_active: true,
+        page_size: 1000 // 获取所有字段
+      })
+      
+      let fields: DeviceField[] = []
+      if (response.success) {
+        const items = Array.isArray(response.data) ? response.data : (response.data.items || response.data || [])
+        // 按 sort_order 排序
+        items.sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+        fields = items as DeviceField[]
+      }
 
       // 存入缓存
       setCache(deviceTypeCode, fields)

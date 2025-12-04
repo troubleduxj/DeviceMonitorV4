@@ -342,25 +342,45 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                 status_code=500, detail={"message": "更新实时数据失败", "error": str(e), "error_type": type(e).__name__}
             )
 
-    async def get_device_realtime_data(self, query: DeviceRealtimeQuery) -> dict:
+    async def get_device_realtime_data(self, query: DeviceRealtimeQuery, td_connector: Optional[TDengineConnector] = None) -> dict:
         """
         获取设备实时数据
 
         Args:
             query: 查询参数，包含分页、设备代码等信息
+            td_connector: 复用的TDengine连接器（可选）
 
         Returns:
             dict: 包含设备实时数据的字典
         """
         if query.paged:
-            return await self._get_device_realtime_data_paged(query)
+            return await self._get_device_realtime_data_paged(query, td_connector)
         else:
-            return await self._get_device_realtime_data_unpaged(query)
+            return await self._get_device_realtime_data_unpaged(query, td_connector)
 
-    async def _get_device_realtime_data_unpaged(self, query: DeviceRealtimeQuery) -> dict:
+    async def _get_device_realtime_data_unpaged(self, query: DeviceRealtimeQuery, td_connector: Optional[TDengineConnector] = None) -> dict:
         """
         获取设备实时数据（旧版-全量查询）
         """
+        should_close_connector = False
+        if not td_connector:
+            # 初始化TDengine连接器
+            from app.settings.config import TDengineCredentials
+
+            tdengine_creds = TDengineCredentials()
+            logger.info(
+                f"初始化TDengine连接器: host={tdengine_creds.host}, port={tdengine_creds.port}, database={tdengine_creds.database}"
+            )
+            tdengine_connector = TDengineConnector(
+                host=tdengine_creds.host,
+                port=tdengine_creds.port,
+                user=tdengine_creds.user,
+                password=tdengine_creds.password,
+                database=tdengine_creds.database,
+            )
+            should_close_connector = True
+            logger.info("TDengine连接器初始化完成")
+
         try:
             # 验证设备存在性（如果指定了device_code或device_codes）
             if query.device_code:
@@ -416,20 +436,10 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             realtime_data_list = []
 
             # 初始化TDengine连接器（移到循环外）
-            from app.settings.config import TDengineCredentials
-
-            tdengine_creds = TDengineCredentials()
-            logger.info(
-                f"初始化TDengine连接器: host={tdengine_creds.host}, port={tdengine_creds.port}, database={tdengine_creds.database}"
-            )
-            tdengine_connector = TDengineConnector(
-                host=tdengine_creds.host,
-                port=tdengine_creds.port,
-                user=tdengine_creds.user,
-                password=tdengine_creds.password,
-                database=tdengine_creds.database,
-            )
-            logger.info("TDengine连接器初始化完成")
+            # from app.settings.config import TDengineCredentials
+            # tdengine_creds = TDengineCredentials()
+            # tdengine_connector = TDengineConnector(...)
+            # logger.info("TDengine连接器初始化完成")
 
             # 判断是查询单一设备类型还是所有设备类型
             if query.type_code and query.type_code != "all":
@@ -438,7 +448,8 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                 if not device_type_obj:
                     # 不要抛出异常，而是返回空数据（避免WebSocket连接关闭）
                     logger.warning(f"设备类型 {query.type_code} 不存在或未激活，返回空数据")
-                    await tdengine_connector.close()
+                    if should_close_connector:
+                        await tdengine_connector.close()
                     return {
                         "items": [],
                         "total": 0,
@@ -625,11 +636,24 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                 detail={"message": "获取设备实时数据失败", "error": str(e), "error_type": type(e).__name__},
             )
 
-    async def _get_device_realtime_data_paged(self, query: DeviceRealtimeQuery) -> dict:
+    async def _get_device_realtime_data_paged(self, query: DeviceRealtimeQuery, td_connector: Optional[TDengineConnector] = None) -> dict:
         """
         获取设备实时数据（新版-分页优化）
         """
-        tdengine_connector = None
+        should_close_connector = False
+        if not td_connector:
+            from app.settings.config import TDengineCredentials
+
+            tdengine_creds = TDengineCredentials()
+            tdengine_connector = TDengineConnector(
+                host=tdengine_creds.host,
+                port=tdengine_creds.port,
+                user=tdengine_creds.user,
+                password=tdengine_creds.password,
+                database=tdengine_creds.database,
+            )
+            should_close_connector = True
+
         try:
             # 1. 构建基础查询，并应用分页
             device_query = DeviceInfo.filter(device_type=query.type_code)
@@ -747,7 +771,7 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             logger.error(f"获取设备实时数据失败(分页): {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail={"message": "获取设备实时数据失败(分页)", "error": str(e)})
         finally:
-            if tdengine_connector:
+            if 'tdengine_connector' in locals() and tdengine_connector and should_close_connector:
                 await tdengine_connector.close()
 
     async def get_realtime_device_status(self, device_type: str) -> dict:

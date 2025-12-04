@@ -148,17 +148,14 @@ const groupedFields = computed(() => {
   const groups = new Map<string, { name: string; title: string; icon: string; fields: DeviceField[]; order: number }>()
   
   allFields.value.forEach(field => {
+    // 如果标记为不显示，直接跳过（兼容旧数据：undefined视为显示）
+    if (field.is_default_visible === false) return
+
     // 确定分组名称
-    let groupName: string
-    
+    let groupName = 'other'
     if (field.field_group && field.field_group !== 'default') {
-      // 如果有明确的分组，使用该分组
       groupName = field.field_group
-    } else if (field.is_default_visible === false) {
-      // 如果没有分组但标记为不默认显示，放入"其他"分组
-      groupName = 'other'
-    } else {
-      // 默认放入核心参数组
+    } else if (field.is_monitoring_key) {
       groupName = 'core'
     }
     

@@ -35,6 +35,11 @@ class DeviceFieldBase(BaseModel):
     data_range: Optional[Dict[str, Any]] = Field(None, description="正常数据范围")
     alarm_threshold: Optional[Dict[str, Any]] = Field(None, description="报警阈值配置")
     display_config: Optional[Dict[str, Any]] = Field(None, description="前端显示配置")
+    
+    # ⭐ 字段分组功能
+    field_group: str = Field(default="default", max_length=50, description="字段分组")
+    is_default_visible: bool = Field(default=True, description="是否默认显示（卡片上直接可见）")
+    group_order: int = Field(default=0, description="分组内排序顺序")
 
     @validator('aggregation_method')
     def validate_aggregation_method(cls, v):
@@ -67,6 +72,9 @@ class DeviceFieldUpdate(BaseModel):
     data_range: Optional[Dict[str, Any]] = None
     alarm_threshold: Optional[Dict[str, Any]] = None
     display_config: Optional[Dict[str, Any]] = None
+    field_group: Optional[str] = Field(None, max_length=50)
+    is_default_visible: Optional[bool] = None
+    group_order: Optional[int] = None
 
 
 class DeviceFieldResponse(DeviceFieldBase):
