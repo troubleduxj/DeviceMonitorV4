@@ -11,6 +11,7 @@ TORTOISE_ORM = {
                 "app.models.notification",
                 "app.models.alarm",
                 "app.models.email",
+                "app.models.workflow",
                 "aerich.models"
             ],
             "default_connection": "default"

@@ -105,7 +105,7 @@ class Apps(BaseSettings):
 class TortoiseORMConfig(BaseSettings):
     connections: Connections = Field(default_factory=Connections)
     apps: Apps = Field(default_factory=Apps)
-    use_tz: bool = False  # 禁用时区支持，使用naive datetime
+    use_tz: bool = True  # 启用时区支持
     timezone: str = Field(default="Asia/Shanghai")
 
     def model_dump(self):
@@ -194,6 +194,9 @@ class Settings(BaseSettings):
     
     # Redis配置
     redis: RedisCredentials = Field(default_factory=RedisCredentials)
+    
+    # TDengine配置 (添加此配置)
+    tdengine: TDengineConnection = Field(default_factory=TDengineConnection)
 
     @property
     def LOGGING_CONFIG(self):
@@ -231,6 +234,10 @@ class Settings(BaseSettings):
         """获取Tortoise ORM配置（向后兼容）"""
         return self.tortoise_orm.model_dump()
     
+    @property
+    def TDENGINE_DATABASE(self) -> str:
+        return self.tortoise_orm.connections.tdengine.credentials.database
+
     # 数据库配置属性（向后兼容）
     @property
     def DATABASE_HOST(self) -> str:

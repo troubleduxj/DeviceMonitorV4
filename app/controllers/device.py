@@ -6,7 +6,13 @@ from fastapi.exceptions import HTTPException
 from app.core.crud import CRUDBase
 from app.core.optimized_crud import OptimizedCRUDBase
 from tortoise.transactions import in_transaction
-from app.models.device import DeviceInfo, DeviceType
+from app.models.device import (
+    DeviceInfo, DeviceType,
+    DeviceRealTimeData, DeviceHistoryData, DeviceAlarmHistory,
+    DeviceMaintenanceRecord, DeviceRepairRecord,
+    DeviceMaintenancePlan, DeviceMaintenanceReminder,
+    DeviceProcess, DeviceProcessExecution, DeviceProcessMonitoring
+)
 from app.schemas.devices import DeviceCreate, DeviceUpdate
 from app.core.query_optimizer import monitor_performance, cached_query
 
@@ -64,6 +70,17 @@ class DeviceController(OptimizedCRUDBase[DeviceInfo, DeviceCreate, DeviceUpdate]
 
             return device
 
+    async def get_related_counts(self, id: int) -> dict:
+        """获取设备关联数据的数量"""
+        return {
+            "repair_records": await DeviceRepairRecord.filter(device_id=id).count(),
+            "maintenance_records": await DeviceMaintenanceRecord.filter(device_id=id).count(),
+            "maintenance_plans": await DeviceMaintenancePlan.filter(device_id=id).count(),
+            "process_executions": await DeviceProcessExecution.filter(device_id=id).count(),
+            "processes": await DeviceProcess.filter(device_id=id).count(),
+            "alarm_history": await DeviceAlarmHistory.filter(device_id=id).count(),
+        }
+
     async def delete_device(self, id: int) -> None:
         """删除设备信息, 并更新设备类型的计数值
 
@@ -73,13 +90,30 @@ class DeviceController(OptimizedCRUDBase[DeviceInfo, DeviceCreate, DeviceUpdate]
         Raises:
             HTTPException: 当设备不存在时
         """
-        async with in_transaction():
+        async with in_transaction("default"):
             # 1. 获取设备信息
             device = await self.get(id)
             if not device:
                 raise HTTPException(status_code=404, detail="设备不存在")
 
-            # 2. 获取设备类型并更新计数值
+            # 2. 级联删除关联数据 (按依赖顺序反向删除)
+            # 工艺相关
+            await DeviceProcessMonitoring.filter(device_id=id).delete()
+            await DeviceProcessExecution.filter(device_id=id).delete()
+            await DeviceProcess.filter(device_id=id).delete()
+            
+            # 维护相关
+            await DeviceMaintenanceReminder.filter(device_id=id).delete()
+            await DeviceMaintenancePlan.filter(device_id=id).delete()
+            await DeviceRepairRecord.filter(device_id=id).delete()
+            await DeviceMaintenanceRecord.filter(device_id=id).delete()
+            
+            # 监控数据相关
+            await DeviceAlarmHistory.filter(device_id=id).delete()
+            await DeviceHistoryData.filter(device_id=id).delete()
+            await DeviceRealTimeData.filter(device_id=id).delete()
+
+            # 3. 更新设备类型的计数值
             if device.device_type:
                 device_type_obj = await DeviceType.get_or_none(type_code=device.device_type)
                 if device_type_obj:
@@ -105,7 +139,7 @@ class DeviceController(OptimizedCRUDBase[DeviceInfo, DeviceCreate, DeviceUpdate]
         from datetime import datetime, timezone
 
         try:
-            async with in_transaction():
+            async with in_transaction("default"):
                 # 检查设备是否存在
                 device = await self.model.filter(id=id).first()
                 if not device:

@@ -473,8 +473,8 @@ async def init_db():
         logger.error("数据库初始化超时")
         raise
     except Exception as e:
-        logger.error(f"数据库初始化失败: {e}")
-        raise
+        logger.error(f"PostgreSQL数据库初始化失败，请检查数据库连接设置或服务是否启动: {e}")
+        raise e
 
 
 async def init_configs():
@@ -540,5 +540,5 @@ async def init_data():
         # await init_roles()
         logger.info("Database initialization completed successfully")
     except Exception as e:
-        logger.error(f"Database initialization failed: {str(e)}")
-        raise
+        logger.error(f"PostgreSQL Database initialization failed: {str(e)}")
+        raise e

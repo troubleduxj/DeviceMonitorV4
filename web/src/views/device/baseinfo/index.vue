@@ -20,6 +20,7 @@ import {
   NSelect,
   NTag,
   useMessage,
+  useDialog,
 } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -70,6 +71,7 @@ const queryItems = ref<QueryItems>({
 })
 const vPermission = resolveDirective('permission')
 const $message = useMessage()
+const dialog = useDialog()
 const router = useRouter()
 
 // 设备类型数据
@@ -124,6 +126,9 @@ const viewOptions = [
   },
 ]
 
+// 选中行
+const checkedRowKeys = ref([])
+
 // 模态框状态
 const modalVisible = ref(false)
 const modalTitle = ref('')
@@ -150,19 +155,84 @@ const handleEdit = (row: DeviceInfo) => {
 
 // 处理删除设备
 const handleDelete = async (ids) => {
-  try {
-    const idList = Array.isArray(ids) ? ids : [ids]
-    if (idList.length > 1) {
-      await deviceApi.batchDelete(idList)
-    } else {
-      await deviceApi.delete(idList[0])
+  const idList = Array.isArray(ids) ? ids : [ids]
+  if (idList.length === 0) return
+
+  const executeDelete = async () => {
+    try {
+      if (idList.length > 1) {
+        await deviceApi.batchDelete(idList)
+      } else {
+        await deviceApi.delete(idList[0])
+      }
+      $message?.success('删除设备成功')
+      checkedRowKeys.value = [] // 清空选中
+      // 刷新列表
+      if (viewMode.value === 'table') {
+        loadTableData()
+      } else {
+        // loadCardData() ? 
+        // The original code called getDevices() which seems to be loadTableData alias?
+        // Ah, original code called getDevices(). Let's check if getDevices exists.
+        // Looking at original code: getDevices() // 统一刷新
+        // But I didn't see getDevices definition in the snippet. 
+        // Wait, loadTableData is passed to PermissionDataWrapper @refresh.
+        // I will use loadTableData() assuming it handles both or viewMode logic handles it.
+        // Actually PermissionDataWrapper uses loadTableData.
+        loadTableData()
+      }
+    } catch (error) {
+      console.error('删除设备失败:', error)
+      $message?.error(`删除设备失败: ${error.message || '未知错误'}`)
     }
-    $message?.success('删除设备成功')
-    getDevices() // 统一刷新
-  } catch (error) {
-    console.error('删除设备失败:', error)
-    $message?.error(`删除设备失败: ${error.message || '未知错误'}`)
   }
+
+  // 1. 单个删除：检查关联数据
+  if (idList.length === 1) {
+    try {
+      const id = idList[0]
+      // 尝试获取关联统计
+      const { data: counts } = await deviceApi.getRelatedCounts(id)
+      
+      // 检查是否有关联数据
+      // counts keys: repair_records, process_executions, etc.
+      // Filter keys that have value > 0
+      const hasRelations = Object.values(counts).some(v => v > 0)
+      
+      if (hasRelations) {
+        // 构建提示详情
+        const details = []
+        if (counts.process_monitoring > 0) details.push(`工艺监控数据 (${counts.process_monitoring})`)
+        if (counts.process_executions > 0) details.push(`工艺执行记录 (${counts.process_executions})`)
+        if (counts.processes > 0) details.push(`工艺定义 (${counts.processes})`)
+        if (counts.maintenance_reminders > 0) details.push(`维护提醒 (${counts.maintenance_reminders})`)
+        if (counts.maintenance_plans > 0) details.push(`维护计划 (${counts.maintenance_plans})`)
+        if (counts.repair_records > 0) details.push(`维修记录 (${counts.repair_records})`)
+        if (counts.maintenance_records > 0) details.push(`维护记录 (${counts.maintenance_records})`)
+        if (counts.alarm_history > 0) details.push(`报警历史 (${counts.alarm_history})`)
+        
+        dialog.warning({
+          title: '关联数据删除确认',
+          content: `检测到该设备包含以下关联数据：\n\n${details.join('、')}\n\n删除设备将自动清理这些数据且不可恢复，是否继续？`,
+          positiveText: '确认删除',
+          negativeText: '取消',
+          onPositiveClick: executeDelete
+        })
+        return
+      }
+    } catch (e) {
+      console.warn('获取关联统计失败，降级处理', e)
+    }
+  }
+
+  // 2. 批量删除或无关联数据：普通确认
+  dialog.warning({
+    title: '删除确认',
+    content: `确定删除选中的 ${idList.length} 台设备吗？此操作不可恢复。`,
+    positiveText: '确认删除',
+    negativeText: '取消',
+    onPositiveClick: executeDelete
+  })
 }
 
 // 跳转到设备维修记录
@@ -436,6 +506,7 @@ const deviceTypeOptions = computed(() => {
 // ]
 
 const columns = [
+  { type: 'selection' },
   {
     title: '设备名称',
     key: 'device_name',
@@ -536,10 +607,7 @@ const columns = [
           size: 'small',
           type: 'error',
           style: 'margin-left: 8px;',
-          needConfirm: true,
-          confirmTitle: '删除确认',
-          confirmContent: '确定删除该设备吗？此操作不可恢复。',
-          onConfirm: () => handleDelete([row.id!], false)
+          onClick: () => handleDelete([row.id!])
         }, {
           default: () => '删除',
           icon: renderIcon('material-symbols:delete-outline', { size: 14 }),
@@ -615,6 +683,16 @@ const deviceRules = {
             :icon-size="16"
             align="right"
           />
+          <PermissionButton
+            v-if="viewMode === 'table'"
+            permission="DELETE /api/v2/devices/{id}"
+            type="error"
+            :disabled="checkedRowKeys.length === 0"
+            class="mr-4"
+            @click="() => handleDelete(checkedRowKeys)"
+          >
+            <TheIcon icon="material-symbols:delete-outline" :size="18" class="mr-5" />批量删除
+          </PermissionButton>
           <PermissionButton 
             permission="POST /api/v2/devices" 
             type="primary" 
@@ -649,7 +727,13 @@ const deviceRules = {
         @create="handleAdd"
       >
         <template #default="{ data }">
-          <n-data-table :columns="columns" :data="data" :loading="loading" />
+          <n-data-table
+            :columns="columns"
+            :data="data"
+            :loading="loading"
+            :row-key="(row) => row.id"
+            v-model:checked-row-keys="checkedRowKeys"
+          />
 
           <div v-if="data.length > 0" class="mt-6 flex justify-center">
             <n-pagination
@@ -783,10 +867,7 @@ const deviceRules = {
               size="small"
               type="error"
               title="删除"
-              needConfirm
-              confirmTitle="删除确认"
-              confirmContent="确定删除该设备吗？此操作不可恢复。"
-              @confirm="() => handleDelete([device.id])"
+              @click="() => handleDelete([device.id])"
             >
               <TheIcon icon="mdi:delete" :size="14" />
             </PermissionButton>

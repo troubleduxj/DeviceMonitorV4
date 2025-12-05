@@ -156,7 +156,21 @@
               <n-card :bordered="false">
                 <template #header>
                   <n-space align="center" justify="space-between">
-                    <span>查询结果</span>
+                    <n-space align="center">
+                      <n-button 
+                        v-if="siderCollapsed" 
+                        size="small" 
+                        @click="siderCollapsed = false"
+                        type="primary"
+                        secondary
+                      >
+                        <template #icon>
+                          <n-icon :component="FilterOutline" />
+                        </template>
+                        查询条件
+                      </n-button>
+                      <span>查询结果</span>
+                    </n-space>
                     <n-space>
                       <n-tag v-if="queryResult" type="info">
                         共 {{ queryResult.total || 0 }} 条记录
@@ -248,13 +262,45 @@
         </div>
       </n-layout-content>
     </n-layout>
+    <n-modal v-model:show="showLogDetail" preset="card" title="日志详情" style="width: 800px">
+      <n-scrollbar style="max-height: 600px">
+        <n-descriptions bordered :column="2" v-if="currentLog">
+          <n-descriptions-item label="日志ID">{{ currentLog.id }}</n-descriptions-item>
+          <n-descriptions-item label="执行状态">
+            <n-tag :type="currentLog.status === 'success' ? 'success' : 'error'" size="small">
+              {{ currentLog.status }}
+            </n-tag>
+          </n-descriptions-item>
+          <n-descriptions-item label="执行时间">{{ currentLog.executed_at }}</n-descriptions-item>
+          <n-descriptions-item label="耗时">{{ currentLog.execution_time_ms }}ms</n-descriptions-item>
+          <n-descriptions-item label="数据量">{{ currentLog.data_volume || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="执行人">{{ currentLog.executed_by || '-' }}</n-descriptions-item>
+          
+          <n-descriptions-item label="输入参数" :span="2">
+            <n-code :code="JSON.stringify(currentLog.input_params, null, 2)" language="json" />
+          </n-descriptions-item>
+          
+          <n-descriptions-item label="结果摘要" :span="2">
+            <n-code :code="JSON.stringify(currentLog.result_summary, null, 2)" language="json" />
+          </n-descriptions-item>
+          
+          <n-descriptions-item label="生成的SQL" :span="2" v-if="currentLog.generated_sql">
+            <n-code :code="currentLog.generated_sql" language="sql" />
+          </n-descriptions-item>
+          
+          <n-descriptions-item label="错误信息" :span="2" v-if="currentLog.error_message">
+            <n-tag type="error">{{ currentLog.error_message }}</n-tag>
+          </n-descriptions-item>
+        </n-descriptions>
+      </n-scrollbar>
+    </n-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, h, watch, nextTick } from 'vue'
-import { NTag, NButton, NIcon, NEmpty, NCollapse, NCollapseItem, NScrollbar, useMessage } from 'naive-ui'
-import { SearchOutline, CopyOutline, DownloadOutline } from '@vicons/ionicons5'
+import { NTag, NButton, NIcon, NEmpty, NCollapse, NCollapseItem, NScrollbar, useMessage, NModal, NDescriptions, NDescriptionsItem, NCode } from 'naive-ui'
+import { SearchOutline, CopyOutline, DownloadOutline, FilterOutline } from '@vicons/ionicons5'
 import { dataModelApi } from '@/api/v2/data-model'
 import { useResizeObserver } from '@vueuse/core'
 import * as echarts from 'echarts'
@@ -322,8 +368,15 @@ const logsPagination = reactive({
   page: 1,
   pageSize: 10,
   itemCount: 0,
-  showSizePicker: false
+  showSizePicker: false,
+  onChange: (page) => {
+    logsPagination.page = page
+    fetchExecutionLogs()
+  }
 })
+
+const showLogDetail = ref(false)
+const currentLog = ref(null)
 
 // 日志列定义
 const logColumns = [
@@ -334,7 +387,7 @@ const logColumns = [
   },
   {
     title: '执行时间',
-    key: 'created_at',
+    key: 'executed_at',
     width: 180
   },
   {
@@ -347,14 +400,25 @@ const logColumns = [
     }
   },
   {
-    title: '耗时(ms)',
-    key: 'execution_time',
-    width: 100
+    title: '耗时',
+    key: 'execution_time_ms',
+    width: 100,
+    render(row) {
+      if (row.execution_time_ms == null) return '-'
+      return `${row.execution_time_ms}ms`
+    }
   },
   {
     title: '记录数',
-    key: 'row_count',
-    width: 100
+    key: 'result_summary',
+    width: 100,
+    render(row) {
+      if (!row.result_summary) return '-'
+      const summary = typeof row.result_summary === 'string' 
+        ? JSON.parse(row.result_summary) 
+        : row.result_summary
+      return summary?.returned_rows ?? '-'
+    }
   },
   {
     title: '操作',
@@ -586,6 +650,7 @@ const fetchExecutionLogs = async () => {
     if (response.success) {
       executionLogs.value = response.data || []
       logsPagination.itemCount = response.total || 0
+      console.log('Execution Logs:', executionLogs.value)
     }
   } catch (error) {
     console.error('获取执行日志失败:', error)
@@ -595,8 +660,11 @@ const fetchExecutionLogs = async () => {
 }
 
 const handleViewLog = (logId) => {
-  message.info(`查看日志详情: ${logId}`)
-  // TODO: 实现日志详情对话框
+  const log = executionLogs.value.find(l => l.id === logId)
+  if (log) {
+    currentLog.value = log
+    showLogDetail.value = true
+  }
 }
 
 const getModelTypeLabel = (type) => {

@@ -29,10 +29,12 @@ async def get_tdengine_connector() -> TDengineConnector:
     port = int(os.getenv("TDENGINE_PORT", "6041"))
     user = os.getenv("TDENGINE_USER", "root")
     password = os.getenv("TDENGINE_PASSWORD", "taosdata")
+    # Fix: Load database from settings/env
+    database = os.getenv("TDENGINE_DATABASE", settings.TDENGINE_DATABASE)
     
-    logger.info(f"TDengine连接配置: host={host}, port={port}, user={user}")
+    logger.info(f"TDengine连接配置: host={host}, port={port}, user={user}, database={database}")
     
-    return TDengineConnector(host=host, port=port, user=user, password=password)
+    return TDengineConnector(host=host, port=port, user=user, password=password, database=database)
 
 
 class AuthControl:

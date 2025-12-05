@@ -304,12 +304,7 @@ class OptimizedDeviceCollector:
                 
                 realtime_data = DeviceRealTimeData(
                     device_id=result.device_id,
-                    voltage=device_data.get('voltage'),
-                    current=device_data.get('current'),
-                    power=device_data.get('power'),
-                    temperature=device_data.get('temperature'),
-                    pressure=device_data.get('pressure'),
-                    vibration=device_data.get('vibration'),
+                    metrics=device_data,
                     status=device_data.get('status', 'online'),
                     error_code=device_data.get('error_code'),
                     error_message=device_data.get('error_message'),

@@ -35,7 +35,8 @@ from app.schemas.devices import (
     DeviceFieldUpdate,
     DeviceFieldResponse
 )
-from app.models.device import DeviceInfo, DeviceType, DeviceField
+from app.schemas.base import BatchDeleteRequest
+from app.models.device import DeviceInfo, DeviceType, DeviceField, DeviceDataModel, DeviceFieldMapping
 from app.models.admin import User
 
 logger = logging.getLogger(__name__)
@@ -398,16 +399,106 @@ async def update_device_type(
         return formatter.internal_error(f"更新设备类型失败: {str(e)}")
 
 
+@router.post("/types/batch-delete", summary="批量删除设备类型", response_model=None, dependencies=[DependAuth])
+async def batch_delete_device_types(
+    request: Request,
+    batch_req: BatchDeleteRequest,
+    cascade: bool = Query(False, description="是否级联删除关联设备"),
+    current_user: User = DependAuth
+):
+    """
+    批量删除设备类型
+    
+    - **ids**: 设备类型ID列表 (注意：虽然模型用 type_code 标识，但 BatchDeleteRequest 传的是 ids。如果前端传 type_code，需调整)
+    """
+    # Wait, DeviceType uses type_code as key in URL, but has ID PK?
+    # Model: `class DeviceType(TimestampMixin, BaseModel): ... type_code ...`
+    # BaseModel has `id` (Int).
+    # So we can delete by ID.
+    # But `delete_device_type` uses `type_code`.
+    # The frontend `BatchDeleteRequest` sends `ids` (integers).
+    # So I should delete by ID.
+    
+    try:
+        formatter = create_formatter(request)
+        ids = batch_req.ids
+        
+        if not ids:
+            return formatter.validation_error("ID列表不能为空")
+            
+        success_count = 0
+        failed_count = 0
+        errors = []
+        
+        from tortoise.transactions import in_transaction
+        
+        async with in_transaction("default"):
+            for type_id in ids:
+                try:
+                    # Get type to find type_code (needed for cascade)
+                    device_type = await DeviceType.get_or_none(id=type_id)
+                    if not device_type:
+                        failed_count += 1
+                        errors.append(f"ID {type_id}: 类型不存在")
+                        continue
+                        
+                    type_code = device_type.type_code
+                    
+                    # Check/Cascade logic (Same as single delete)
+                    device_count = await DeviceInfo.filter(device_type=type_code).count()
+                    
+                    if device_count > 0:
+                        if not cascade:
+                            failed_count += 1
+                            errors.append(f"ID {type_id} ({type_code}): 还有 {device_count} 个设备，需确认级联删除")
+                            continue
+                        
+                        # Cascade delete devices
+                        devices = await DeviceInfo.filter(device_type=type_code).all()
+                        for device in devices:
+                            await device_controller.delete_device(device.id)
+                    
+                    # Cascade delete metadata
+                    await DeviceField.filter(device_type_code=type_code).delete()
+                    await DeviceDataModel.filter(device_type_code=type_code).delete()
+                    await DeviceFieldMapping.filter(device_type_code=type_code).delete()
+                    
+                    # Delete Type
+                    await device_type.delete()
+                    success_count += 1
+                    
+                except Exception as e:
+                    failed_count += 1
+                    errors.append(f"ID {type_id}: {str(e)}")
+        
+        return formatter.success(
+            message=f"批量删除完成: 成功 {success_count}, 失败 {failed_count}",
+            data={
+                "success_count": success_count, 
+                "failed_count": failed_count,
+                "errors": errors
+            },
+            resource_type="devices/types"
+        )
+
+    except Exception as e:
+        logger.error(f"批量删除设备类型失败: {str(e)}", exc_info=True)
+        formatter = create_formatter(request)
+        return formatter.internal_error(f"批量删除设备类型失败: {str(e)}")
+
+
 @router.delete("/types/{type_code}", summary="删除设备类型", response_model=None, dependencies=[DependAuth])
 async def delete_device_type(
     request: Request,
     type_code: str,
+    cascade: bool = Query(False, description="是否级联删除关联设备"),
     current_user: User = DependAuth
 ):
     """
     删除设备类型（软删除，设置为非激活状态）
     
     - **type_code**: 设备类型编码
+    - **cascade**: 是否级联删除关联设备
     """
     try:
         formatter = create_formatter(request)
@@ -415,21 +506,47 @@ async def delete_device_type(
         # 检查是否有关联的设备
         device_count = await DeviceInfo.filter(device_type=type_code).count()
         if device_count > 0:
-            return formatter.error(
-                f"该设备类型下还有 {device_count} 个设备，无法删除",
-                code=400,
-                error_type="ValidationError"
-            )
-        
+            if not cascade:
+                return formatter.error(
+                    f"该设备类型下还有 {device_count} 个设备，无法删除",
+                    code=400,
+                    error_type="ValidationError"
+                )
+            
+            # 级联删除所有关联设备
+            # 使用 device_controller.delete_device 以确保清理所有关联数据
+            devices = await DeviceInfo.filter(device_type=type_code).all()
+            from tortoise.transactions import in_transaction
+            async with in_transaction("default"):
+                for device in devices:
+                    await device_controller.delete_device(device.id)
+
         # 获取设备类型
         try:
             device_type = await DeviceType.get(type_code=type_code)
         except DoesNotExist:
             return formatter.not_found(f"设备类型 {type_code} 不存在", "device_type")
         
-        # 软删除（设置为非激活状态）
-        device_type.is_active = False
-        await device_type.save()
+        # 物理删除（包括关联元数据清理）
+        from tortoise.transactions import in_transaction
+        async with in_transaction("default"):
+            # 如果是级联删除，设备已经在上面被删除了（或者上面逻辑有误？）
+            # Wait, my previous code block:
+            # if device_count > 0:
+            #    if not cascade: return error
+            #    for device in devices: delete_device(device.id)
+            #
+            # This block is BEFORE "获取设备类型".
+            # If cascade=True, devices are gone.
+            # Now we delete the type and metadata.
+            
+            # 级联删除元数据配置
+            await DeviceField.filter(device_type_code=type_code).delete()
+            await DeviceDataModel.filter(device_type_code=type_code).delete()
+            await DeviceFieldMapping.filter(device_type_code=type_code).delete()
+            
+            # 物理删除设备类型
+            await device_type.delete()
         
         return formatter.success(
             message="设备类型删除成功",
@@ -811,6 +928,23 @@ async def update_device(
         return formatter.internal_error(f"更新设备失败: {str(e)}")
 
 
+@router.get("/{device_id}/related-counts", summary="获取设备关联数据统计", response_model=None, dependencies=[DependAuth])
+async def get_device_related_counts(
+    request: Request,
+    device_id: int,
+    current_user: User = DependAuth
+):
+    """获取设备关联数据统计"""
+    try:
+        formatter = create_formatter(request)
+        counts = await device_controller.get_related_counts(device_id)
+        return formatter.success(data=counts)
+    except Exception as e:
+        logger.error(f"获取关联统计失败: {str(e)}", exc_info=True)
+        formatter = create_formatter(request)
+        return formatter.internal_error(f"获取关联统计失败: {str(e)}")
+
+
 @router.delete("/{device_id}", summary="删除设备", response_model=None, dependencies=[DependAuth])
 async def delete_device(
     request: Request,
@@ -847,6 +981,66 @@ async def delete_device(
         logger.error(f"删除设备失败: {str(e)}", exc_info=True)
         formatter = create_formatter(request)
         return formatter.internal_error(f"删除设备失败: {str(e)}")
+
+
+@router.post("/batch-delete", summary="批量删除设备", response_model=None, dependencies=[DependAuth])
+async def batch_delete_devices(
+    request: Request,
+    batch_req: BatchDeleteRequest,
+    current_user: User = DependAuth
+):
+    """
+    批量删除设备
+    
+    - **ids**: 设备ID列表
+    """
+    try:
+        formatter = create_formatter(request)
+        ids = batch_req.ids
+        
+        if not ids:
+            return formatter.validation_error("ID列表不能为空")
+            
+        success_count = 0
+        failed_count = 0
+        errors = []
+        
+        from tortoise.transactions import in_transaction
+
+        # 使用事务包裹批量操作
+        # 注意：controller.delete_device 内部也有事务，这里使用 default 连接
+        async with in_transaction("default"):
+            for device_id in ids:
+                try:
+                    # 检查设备是否存在
+                    device_obj = await device_controller.get(id=device_id)
+                    if not device_obj:
+                        failed_count += 1
+                        errors.append(f"ID {device_id}: 设备不存在")
+                        continue
+                        
+                    await device_controller.delete_device(id=device_id)
+                    success_count += 1
+                except Exception as e:
+                    failed_count += 1
+                    errors.append(f"ID {device_id}: {str(e)}")
+        
+        message = f"批量删除完成: 成功 {success_count}, 失败 {failed_count}"
+        
+        return formatter.success(
+            message=message,
+            data={
+                "success_count": success_count, 
+                "failed_count": failed_count,
+                "errors": errors
+            },
+            resource_type="devices"
+        )
+
+    except Exception as e:
+        logger.error(f"批量删除设备失败: {str(e)}", exc_info=True)
+        formatter = create_formatter(request)
+        return formatter.internal_error(f"批量删除设备失败: {str(e)}")
 
 
 @router.post("/batch", summary="批量操作设备", response_model=None)
@@ -1505,6 +1699,7 @@ async def get_realtime_monitoring(
                 "status": item.status,
                 "error_code": item.error_code,
                 "error_message": item.error_message,
+                "realtime_data": item.metrics,  # Add dynamic metrics
                 "data_timestamp": item.data_timestamp.isoformat() if item.data_timestamp else None,
                 "created_at": item.created_at.isoformat() if item.created_at else None
             })

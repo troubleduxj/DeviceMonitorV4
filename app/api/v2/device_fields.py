@@ -407,6 +407,8 @@ async def batch_get_realtime_with_config(
                         field_code = field['field_code']
                         if hasattr(latest_data, field_code):
                             data_dict[field_code] = getattr(latest_data, field_code)
+                        elif latest_data.metrics and isinstance(latest_data.metrics, dict) and field_code in latest_data.metrics:
+                            data_dict[field_code] = latest_data.metrics[field_code]
                         else:
                             data_dict[field_code] = None
                     realtime_data_map[device.device_code] = data_dict

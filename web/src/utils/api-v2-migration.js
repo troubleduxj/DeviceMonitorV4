@@ -599,7 +599,8 @@ export function createDeviceApis() {
       getHistoryData: (pathParams, params = {}) =>
         requestV2.get(`${basePath}/${pathParams.id}/history`, { params }),
       getRealtimeMonitoring: (params = {}) =>
-        requestV2.get(`${basePath}/realtime/monitoring`, { params }),
+        // 修正：后端对应接口为 /monitoring/realtime
+        requestV2.get(`${basePath}/monitoring/realtime`, { params }),
       getMonitoringSummary: (params = {}) =>
         requestV2.get(`${basePath}/monitoring/summary`, { params }),
       getMonitoringOverview: (params = {}) =>

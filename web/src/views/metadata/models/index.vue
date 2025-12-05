@@ -412,19 +412,16 @@ const columns = [
           h(NButton, {
             size: 'small',
             type: 'primary',
-            text: true,
             onClick: () => handlePreview(row.id)
           }, { default: () => '预览' }),
           h(NButton, {
             size: 'small',
             type: 'info',
-            text: true,
             onClick: () => handleEdit(row.id)
           }, { default: () => '编辑' }),
           h(NButton, {
             size: 'small',
             type: 'error',
-            text: true,
             onClick: () => handleDelete(row.id)
           }, { default: () => '删除' })
         ]

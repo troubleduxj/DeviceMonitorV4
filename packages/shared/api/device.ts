@@ -50,8 +50,8 @@ export class DeviceApi {
   /**
    * 删除设备类型
    */
-  async deleteDeviceType(typeCode: string) {
-    return this.client.delete(`/devices/types/${typeCode}`);
+  async deleteDeviceType(typeCode: string, params?: any) {
+    return this.client.delete(`/devices/types/${typeCode}`, params);
   }
 
   // ========== 设备管理 ==========
@@ -98,11 +98,23 @@ export class DeviceApi {
     return this.client.delete(`/devices/${id}`);
   }
 
+  async getRelatedCounts(id: number) {
+    return this.client.get(`/devices/${id}/related-counts`);
+  }
+
   /**
    * 批量删除设备
    */
   async batchDeleteDevices(ids: number[]) {
     return this.client.post('/devices/batch-delete', { ids });
+  }
+
+  async batchDeleteDeviceTypes(ids: number[], params?: any) {
+    let url = '/devices/types/batch-delete';
+    if (params && params.cascade) {
+        url += '?cascade=true';
+    }
+    return this.client.post(url, { ids });
   }
 
   /**

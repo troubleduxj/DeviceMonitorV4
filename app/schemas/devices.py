@@ -110,6 +110,7 @@ class DeviceResponse(BaseModel):
     team_name: Optional[str] = None
     is_locked: bool = False
     description: Optional[str] = None
+    attributes: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
@@ -132,6 +133,7 @@ class DeviceCreate(BaseModel):
     team_name: Optional[str] = Field(None, description="所属班组", example="生产一班")
     is_locked: bool = Field(False, description="是否锁定状态")
     description: Optional[str] = Field(None, description="备注信息")
+    attributes: Optional[Dict[str, Any]] = Field(None, description="扩展属性")
 
     def create_dict(self):
         return self.model_dump(exclude_unset=True)
@@ -152,6 +154,7 @@ class DeviceUpdate(BaseModel):
     team_name: Optional[str] = Field(None, description="所属班组")
     is_locked: Optional[bool] = Field(None, description="是否锁定状态")
     description: Optional[str] = Field(None, description="备注信息")
+    attributes: Optional[Dict[str, Any]] = Field(None, description="扩展属性")
 
     def update_dict(self):
         return self.model_dump(exclude_unset=True, exclude={"id"})
@@ -322,6 +325,7 @@ class DeviceRealtimeResponse(BaseModel):
     temperature: Optional[float] = Field(None, description="温度值(°C)")
     pressure: Optional[float] = Field(None, description="压力值(Pa)")
     vibration: Optional[float] = Field(None, description="振动值")
+    metrics: Optional[Dict[str, Any]] = Field(None, description="实时指标快照")
     status: str = Field(..., description="设备状态")
     error_code: Optional[str] = Field(None, description="错误代码")
     error_message: Optional[str] = Field(None, description="错误信息")
@@ -341,6 +345,7 @@ class DeviceRealTimeDataCreate(BaseModel):
     temperature: Optional[float] = Field(None, description="温度值(°C)")
     pressure: Optional[float] = Field(None, description="压力值(Pa)")
     vibration: Optional[float] = Field(None, description="振动值")
+    metrics: Optional[Dict[str, Any]] = Field(None, description="实时指标快照")
     status: str = Field("offline", description="设备状态: online/offline/error/maintenance")
     error_code: Optional[str] = Field(None, description="错误代码")
     error_message: Optional[str] = Field(None, description="错误信息")
@@ -358,6 +363,7 @@ class DeviceRealTimeDataResponse(BaseModel):
     temperature: Optional[float] = Field(None, description="温度值(°C)")
     pressure: Optional[float] = Field(None, description="压力值(Pa)")
     vibration: Optional[float] = Field(None, description="振动值")
+    metrics: Optional[Dict[str, Any]] = Field(None, description="实时指标快照")
     status: str = Field(..., description="设备状态")
     error_code: Optional[str] = Field(None, description="错误代码")
     error_message: Optional[str] = Field(None, description="错误信息")
@@ -487,6 +493,24 @@ class WeldingAlarmHistoryResponse(BaseModel):
     alarm_code: Optional[str] = Field(None, description="报警代码")
     alarm_message: Optional[str] = Field(None, description="报警内容")
     alarm_solution: Optional[str] = Field(None, description="解决方法")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+    
+    class Config:
+        from_attributes = True
+
+
+class DeviceAlarmHistoryResponse(BaseModel):
+    """设备报警历史响应模型"""
+    id: int = Field(..., description="报警记录ID")
+    device_id: int = Field(..., description="设备ID")
+    alarm_code: str = Field(..., description="报警代码")
+    severity: str = Field(..., description="报警等级")
+    category: str = Field(..., description="报警分类")
+    content: str = Field(..., description="报警内容")
+    start_time: datetime = Field(..., description="开始时间")
+    end_time: Optional[datetime] = Field(None, description="结束时间")
+    context: Optional[Dict[str, Any]] = Field(None, description="报警上下文数据")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     

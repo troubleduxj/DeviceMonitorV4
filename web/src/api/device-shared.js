@@ -11,8 +11,12 @@ export const deviceTypeApi = {
   // 获取设备类型列表
   list: async (params = {}) => {
     const result = await sharedApi.device.getDeviceTypes(params)
-    // 保持完整的分页响应格式（包含 data, meta, links）
-    return result
+    // 透传 meta 和 total 信息，防止分页丢失
+    return { 
+      data: result.data,
+      meta: result.meta,
+      total: result.total ?? result.meta?.total
+    }
   },
 
   // 获取设备类型详情
@@ -45,17 +49,17 @@ export const deviceTypeApi = {
   },
 
   // 删除设备类型
-  delete: async (typeCodeOrData) => {
+  delete: async (typeCodeOrData, params = {}) => {
     const typeCode =
       typeof typeCodeOrData === 'object' && typeCodeOrData.type_code
         ? typeCodeOrData.type_code
         : typeCodeOrData
 
-    const result = await sharedApi.device.deleteDeviceType(typeCode)
+    const result = await sharedApi.device.deleteDeviceType(typeCode, params)
     return { data: result.data }
   },
 
-  // 批量操作（暂时使用循环实现，后续优化）
+  // 批量操作
   batchCreate: async (items) => {
     const results = await Promise.all(items.map((item) => sharedApi.device.createDeviceType(item)))
     return { data: results.map((r) => r.data) }
@@ -68,10 +72,11 @@ export const deviceTypeApi = {
     return { data: results.map((r) => r.data) }
   },
 
-  batchDelete: async (items) => {
-    const codes = items.map((item) => (typeof item === 'object' ? item.type_code : item))
-    const results = await Promise.all(codes.map((code) => sharedApi.device.deleteDeviceType(code)))
-    return { data: results }
+  batchDelete: async (items, params = {}) => {
+    // 优先使用新版批量删除接口 (基于ID)
+    const ids = items.map((item) => (typeof item === 'object' ? item.id : item))
+    const result = await sharedApi.device.batchDeleteDeviceTypes(ids, params)
+    return { data: result.data }
   },
 
   // 搜索
@@ -87,8 +92,12 @@ export const deviceApi = {
   // 获取设备列表
   list: async (params = {}) => {
     const result = await sharedApi.device.getDevices(params)
-    // 保持完整的分页响应格式（包含 data, meta, links）
-    return result
+    // 透传 meta 和 total 信息，防止分页丢失
+    return { 
+      data: result.data,
+      meta: result.meta,
+      total: result.total ?? result.meta?.total
+    }
   },
 
   // 获取设备详情
@@ -118,6 +127,12 @@ export const deviceApi = {
   // 删除设备
   delete: async (id) => {
     const result = await sharedApi.device.deleteDevice(id)
+    return { data: result.data }
+  },
+
+  // 获取关联统计
+  getRelatedCounts: async (id) => {
+    const result = await sharedApi.device.getRelatedCounts(id)
     return { data: result.data }
   },
 

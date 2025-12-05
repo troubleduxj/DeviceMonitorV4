@@ -14,6 +14,8 @@
 from typing import Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Query, Body
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 from app.services.data_query_service import data_query_service
 from app.core.dependency import DependAuth
@@ -118,18 +120,41 @@ async def query_realtime_data(
     formatter = create_formatter(request)
     
     try:
+        # Extract start_time and end_time from filters if not provided in top-level
+        # Frontend sends time range in filters, but backend expects them as top-level fields
+        start_time = query_request.start_time
+        end_time = query_request.end_time
+        filters = query_request.filters or {}
+        
+        if not start_time and 'start_time' in filters:
+            try:
+                time_str = str(filters.pop('start_time')).replace('Z', '+00:00')
+                # Convert UTC to local time (naive) for TDengine
+                start_time = datetime.fromisoformat(time_str).astimezone().replace(tzinfo=None)
+            except Exception as e:
+                logger.warning(f"Failed to parse start_time from filters: {e}")
+                
+        if not end_time and 'end_time' in filters:
+            try:
+                time_str = str(filters.pop('end_time')).replace('Z', '+00:00')
+                # Convert UTC to local time (naive) for TDengine
+                end_time = datetime.fromisoformat(time_str).astimezone().replace(tzinfo=None)
+            except Exception as e:
+                logger.warning(f"Failed to parse end_time from filters: {e}")
+
         logger.info(
             f"[数据查询API] 实时数据查询: model={query_request.model_code}, "
-            f"device={query_request.device_code}"
+            f"device={query_request.device_code}, "
+            f"start_time={start_time}, end_time={end_time}"
         )
         
         # 调用数据查询服务
         result = await data_query_service.query_realtime_data(
             model_code=query_request.model_code,
             device_code=query_request.device_code,
-            filters=query_request.filters,
-            start_time=query_request.start_time,
-            end_time=query_request.end_time,
+            filters=filters,
+            start_time=start_time,
+            end_time=end_time,
             order_by=query_request.order_by,
             order_direction=query_request.order_direction,
             page=query_request.page,
@@ -138,18 +163,41 @@ async def query_realtime_data(
             log_execution=True
         )
         
-        return formatter.paginated_success(
-            data=result['data'],
-            total=result['total'],
-            page=result['page'],
-            page_size=result['page_size'],
-            message=f"查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms",
-            generated_sql=result.get('generated_sql')
-        )
+        logger.info(f"[API] Realtime Query Result: total={result['total']}, rows={len(result['data'])}")
+
+        # Custom response format to match frontend expectations (Flattened Structure)
+        # Frontend expects response.data to be an array and response.total to be at top level
+        # We also add 'meta' for compatibility with different frontend versions
+        return JSONResponse(content=jsonable_encoder({
+            "code": 200,
+            "success": True,
+            "data": result['data'],
+            "total": result['total'],
+            "meta": {
+                "total": result['total'],
+                "page": result['page'],
+                "page_size": result['page_size']
+            },
+            "page": result['page'],
+            "page_size": result['page_size'],
+            "message": f"查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms",
+            "generated_sql": result.get('generated_sql')
+        }))
+        
+        # return formatter.paginated_success(
+        #     data=result['data'],
+        #     total=result['total'],
+        #     page=result['page'],
+        #     page_size=result['page_size'],
+        #     message=f"查询成功，共 {result['total']} 条记录，耗时 {result['execution_time_ms']} ms",
+        #     generated_sql=result.get('generated_sql')
+        # )
         
     except APIException as e:
         logger.error(f"[数据查询API] 实时数据查询失败: {e.message}")
-        return formatter.error(message=e.message, code=e.code, error_type=e.error_type)
+        # Fix: APIException has error_code, not error_type
+        error_code = getattr(e, 'error_code', getattr(e, 'error_type', 'API_ERROR'))
+        return formatter.error(message=e.message, code=e.code, error_type=error_code)
     except Exception as e:
         logger.error(f"[数据查询API] 实时数据查询异常: {e}", exc_info=True)
         return formatter.internal_error(f"查询实时数据失败: {str(e)}")
@@ -380,7 +428,8 @@ async def list_available_models(
                 'is_default': model.is_default,
                 'version': model.version,
                 'description': model.description,
-                'fields_count': len(model.selected_fields) if model.selected_fields else 0
+                'fields_count': len(model.selected_fields) if model.selected_fields else 0,
+                'selected_fields': model.selected_fields  # Fix: Return selected_fields for frontend
             }
             for model in models
         ]

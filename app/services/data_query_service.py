@@ -15,6 +15,8 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import time
+import json
+from tortoise import Tortoise
 from app.models.device import DeviceDataModel, ModelExecutionLog
 from app.services.dynamic_model_service import dynamic_model_service
 from app.services.sql_builder import sql_builder
@@ -22,6 +24,7 @@ from app.services.transform_engine import transform_engine
 from app.core.tdengine_connector import TDengineConnector
 from app.core.dependency import get_tdengine_connector
 from app.core.exceptions import APIException
+from app.settings.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -78,9 +81,18 @@ class DataQueryService:
         """
         start_exec_time = time.time()
         
+        # Fix: Strip whitespace from input parameters to prevent copy-paste errors
+        if model_code:
+            model_code = model_code.strip()
+        if device_code:
+            device_code = device_code.strip()
+        
+        # Debug Log: Capture incoming request parameters
         logger.info(
-            f"[数据查询] 实时数据查询: model={model_code}, device={device_code}, "
-            f"page={page}, page_size={page_size}"
+            f"[DEBUG_REQUEST] query_realtime_data params: "
+            f"model={model_code}, device={device_code}, "
+            f"start={start_time}, end={end_time}, "
+            f"page={page}, size={page_size}"
         )
         
         try:
@@ -124,12 +136,18 @@ class DataQueryService:
             if not self.tdengine_connector:
                 self.tdengine_connector = await get_tdengine_connector()
             
+            # Fix: Use query_data with explicit database name to ensure correct context
+            db_name = settings.TDENGINE_DATABASE
+            
             # 查询总记录数
-            count_result = await self.tdengine_connector.execute_query(count_sql)
+            # Fix: Use query_data instead of execute_query and parse response
+            count_res = await self.tdengine_connector.query_data(count_sql, db_name=db_name)
+            count_result = self._parse_tdengine_response(count_res)
             total_count = count_result[0]['total'] if count_result else 0
             
             # 查询数据
-            raw_data = await self.tdengine_connector.execute_query(query_sql)
+            raw_res = await self.tdengine_connector.query_data(query_sql, db_name=db_name)
+            raw_data = self._parse_tdengine_response(raw_res)
             
             # 4. 应用数据转换
             transformed_data = []
@@ -147,7 +165,14 @@ class DataQueryService:
                     )
                     # 保留原始的时间戳和设备编码
                     transformed_row['ts'] = row.get('ts')
-                    transformed_row['prod_code'] = row.get('prod_code')
+                    # Fix: Support dynamic device identifier (device_id, device_code, or prod_code)
+                    transformed_row['prod_code'] = row.get('prod_code') or row.get('device_id') or row.get('device_code')
+                    # Also ensure explicit keys are present if available
+                    if 'device_id' in row:
+                        transformed_row['device_id'] = row['device_id']
+                    if 'device_code' in row:
+                        transformed_row['device_code'] = row['device_code']
+                    
                     transformed_data.append(transformed_row)
             else:
                 transformed_data = raw_data
@@ -155,30 +180,29 @@ class DataQueryService:
             # 5. 计算执行时间
             exec_time_ms = int((time.time() - start_exec_time) * 1000)
             
-            # 6. 记录执行日志
-            if log_execution:
-                await self._log_execution(
-                    model_id=data_model.id,
-                    execution_type='query',
-                    input_params={
-                        'model_code': model_code,
-                        'device_code': device_code,
-                        'filters': filters,
-                        'start_time': start_time.isoformat() if start_time else None,
-                        'end_time': end_time.isoformat() if end_time else None,
-                        'page': page,
-                        'page_size': page_size
-                    },
-                    status='success',
-                    result_summary={
-                        'total_rows': total_count,
-                        'returned_rows': len(transformed_data),
-                        'transformed': apply_transform
-                    },
-                    execution_time_ms=exec_time_ms,
-                    data_volume=len(transformed_data),
-                    generated_sql=query_sql
-                )
+            # 7. 记录执行日志
+            await self._log_execution(
+                model_id=data_model.id,
+                execution_type='query',
+                input_params={
+                    'model_code': model_code,
+                    'device_code': device_code,
+                    'filters': filters,
+                    'start_time': start_time.isoformat() if start_time else None,
+                    'end_time': end_time.isoformat() if end_time else None,
+                    'page': page,
+                    'page_size': page_size
+                },
+                status='success',
+                result_summary={
+                    'total_rows': total_count,
+                    'returned_rows': len(transformed_data),
+                    'transformed': apply_transform
+                },
+                execution_time_ms=exec_time_ms,
+                data_volume=len(transformed_data),
+                generated_sql=query_sql
+            )
             
             logger.info(
                 f"[数据查询] 查询成功: {len(transformed_data)} 行数据，"
@@ -306,7 +330,12 @@ class DataQueryService:
             if not self.tdengine_connector:
                 self.tdengine_connector = await get_tdengine_connector()
             
-            raw_data = await self.tdengine_connector.execute_query(query_sql)
+            # Fix: Use query_data with explicit database name
+            db_name = settings.TDENGINE_DATABASE
+
+            # Fix: Use query_data instead of execute_query and parse response
+            raw_res = await self.tdengine_connector.query_data(query_sql, db_name=db_name)
+            raw_data = self._parse_tdengine_response(raw_res)
             
             # 4. 应用数据转换（如果需要）
             transformed_data = []
@@ -327,8 +356,10 @@ class DataQueryService:
                         transformed_row['window_start'] = row['window_start']
                     if 'window_end' in row:
                         transformed_row['window_end'] = row['window_end']
-                    if 'prod_code' in row:
-                        transformed_row['prod_code'] = row['prod_code']
+                    
+                    # Fix: Support dynamic device identifier
+                    transformed_row['prod_code'] = row.get('prod_code') or row.get('device_id') or row.get('device_code')
+                    
                     transformed_data.append(transformed_row)
             else:
                 transformed_data = raw_data
@@ -437,6 +468,40 @@ class DataQueryService:
         """
         return await sql_builder._get_field_mappings(device_type_code, selected_fields)
     
+    def _parse_tdengine_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        解析 TDengine 响应格式为字典列表
+        """
+        # TDengine response success code is 0
+        if not response:
+            return []
+            
+        # Check 'code' (0 is success) OR 'status' ('succ') for compatibility
+        is_success = (response.get('code') == 0) or (response.get('status') == 'succ')
+        if not is_success:
+            return []
+        
+        head = response.get('column_meta', []) # New format uses column_meta? Or head?
+        # Check which key is used for columns
+        columns = []
+        if 'column_meta' in response:
+             columns = [col[0] for col in response['column_meta']]
+        elif 'head' in response:
+             columns = response['head']
+        else:
+             return []
+
+        data = response.get('data', [])
+        
+        result = []
+        for row in data:
+            item = {}
+            for i, field in enumerate(columns):
+                if i < len(row):
+                    item[field] = row[i]
+            result.append(item)
+        return result
+
     async def _log_execution(
         self,
         model_id: Optional[int],
@@ -467,17 +532,36 @@ class DataQueryService:
             return
         
         try:
-            await ModelExecutionLog.create(
-                model_id=model_id,
-                execution_type=execution_type,
-                input_params=input_params,
-                status=status,
-                result_summary=result_summary,
-                error_message=error_message,
-                execution_time_ms=execution_time_ms,
-                data_volume=data_volume,
-                generated_sql=generated_sql
+            conn = Tortoise.get_connection("default")
+            
+            # Use raw SQL to bypass Tortoise timezone handling issues
+            sql = """
+                INSERT INTO "t_model_execution_log" 
+                ("model_id", "execution_type", "input_params", "status", "result_summary", 
+                 "error_message", "execution_time_ms", "data_volume", "generated_sql", 
+                 "executed_at")
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            """
+            
+            # Use naive local time which works with asyncpg when passed directly
+            executed_at = datetime.now().replace(microsecond=0)
+            
+            await conn.execute_query(
+                sql,
+                [
+                    model_id,
+                    execution_type,
+                    json.dumps(input_params, default=str) if input_params else None,
+                    status,
+                    json.dumps(result_summary, default=str) if result_summary else None,
+                    error_message,
+                    execution_time_ms,
+                    data_volume,
+                    generated_sql,
+                    executed_at
+                ]
             )
+            
         except Exception as e:
             logger.error(f"[数据查询] 记录执行日志失败: {e}", exc_info=True)
 

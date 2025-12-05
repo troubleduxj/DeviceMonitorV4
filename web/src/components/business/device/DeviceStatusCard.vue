@@ -35,7 +35,8 @@
       <div class="metrics-grid">
         <div v-for="metric in displayMetrics" :key="metric.key" class="metric-item">
           <div class="metric-icon">
-            <n-icon :component="metric.icon" :size="16" />
+            <TheIcon v-if="typeof metric.icon === 'string'" :icon="metric.icon" :size="16" />
+            <n-icon v-else :component="metric.icon" :size="16" />
           </div>
           <div class="metric-content">
             <span class="metric-label">{{ metric.label }}</span>
@@ -116,6 +117,7 @@ import {
   ThermometerOutline,
   BarChartOutline,
 } from '@vicons/ionicons5'
+import TheIcon from '@/components/icon/TheIcon.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
@@ -190,6 +192,12 @@ const props = defineProps({
   showControlButton: {
     type: Boolean,
     default: false,
+  },
+
+  // 监控字段配置
+  monitoringFields: {
+    type: Array,
+    default: () => [],
   },
 
   // 自定义指标配置
@@ -326,6 +334,29 @@ const hasMetrics = computed(() => {
 })
 
 const displayMetrics = computed(() => {
+  // 优先使用传入的监控字段配置
+  if (props.monitoringFields && props.monitoringFields.length > 0) {
+    return props.monitoringFields
+      .filter((field) => field.is_default_visible !== false)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .slice(0, props.maxMetrics)
+      .map((field) => ({
+        key: field.field_code,
+        label: field.field_name,
+        icon: field.display_config?.icon || 'material-symbols:circle',
+        unit: field.unit,
+        format: (value) => {
+          if (value === undefined || value === null || value === '') return '--'
+          if (field.field_type === 'float') {
+            const num = Number(value)
+            return isNaN(num) ? value : num.toFixed(2)
+          }
+          return value
+        },
+      }))
+  }
+
+  // 降级逻辑：使用默认或自定义指标
   const allMetrics = [...defaultMetrics, ...props.customMetrics]
   const availableMetrics = allMetrics.filter((metric) => {
     const value = props.device[metric.key]

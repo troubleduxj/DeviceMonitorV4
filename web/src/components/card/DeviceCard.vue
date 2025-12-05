@@ -29,17 +29,19 @@
 
     <!-- 设备监控数据 -->
     <div v-if="showMonitoringData" class="monitoring-data">
-      <div class="data-row">
+      <!-- 使用动态组件渲染 -->
+      <GroupedMonitoringData
+        v-if="monitoringFields && monitoringFields.length > 0"
+        :monitoring-fields="monitoringFields"
+        :realtime-data="device"
+        :loading="false"
+      />
+      <!-- 降级显示：硬编码数据 (仅当没有字段配置时显示) -->
+      <div v-else class="data-row">
         <span class="data-label">⚡ 预设电流:</span>
         <span class="data-value">{{ device.preset_current || '274.0' }} A</span>
         <span class="data-label ml-20">🔌 预设电压:</span>
         <span class="data-value">{{ device.preset_voltage || '26.8' }} V</span>
-      </div>
-      <div class="data-row">
-        <span class="data-label">⚡ 焊接电流:</span>
-        <span class="data-value">{{ device.welding_current || '82.0' }} A</span>
-        <span class="data-label ml-20">🔌 焊接电压:</span>
-        <span class="data-value">{{ device.welding_voltage || '21.2' }} V</span>
       </div>
     </div>
 
@@ -69,6 +71,7 @@
 <script setup>
 import { NCard, NTag, NButton } from 'naive-ui'
 import TheIcon from '@/components/icon/TheIcon.vue'
+import GroupedMonitoringData from '@/components/device/GroupedMonitoringData.vue'
 import { computed } from 'vue'
 
 /**
@@ -81,6 +84,11 @@ const props = defineProps({
     type: Object,
     required: true,
     default: () => ({}),
+  },
+  // 监控字段配置
+  monitoringFields: {
+    type: Array,
+    default: () => [],
   },
   // 是否显示监控数据
   showMonitoringData: {
@@ -122,9 +130,12 @@ const cardClass = computed(() => {
 function getStatusText(status) {
   const statusMap = {
     active: '运行中',
+    online: '运行中',
     inactive: '离线',
+    offline: '离线',
     maintenance: '维护中',
     fault: '故障',
+    error: '故障',
   }
   return statusMap[status] || '未知'
 }
@@ -135,9 +146,12 @@ function getStatusText(status) {
 function getStatusTagType(status) {
   const typeMap = {
     active: 'success',
+    online: 'success',
     inactive: 'default',
+    offline: 'default',
     maintenance: 'warning',
     fault: 'error',
+    error: 'error',
   }
   return typeMap[status] || 'default'
 }
@@ -208,6 +222,18 @@ function handleClick(event) {
 }
 
 .device-card--fault {
+  border-left-color: var(--n-error-color);
+}
+
+.device-card--online {
+  border-left-color: var(--n-success-color);
+}
+
+.device-card--offline {
+  border-left-color: var(--n-border-color);
+}
+
+.device-card--error {
   border-left-color: var(--n-error-color);
 }
 

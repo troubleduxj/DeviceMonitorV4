@@ -154,49 +154,70 @@
           />
         </n-form-item>
 
-        <n-divider title-placement="left">展示配置</n-divider>
-        
-        <n-grid :cols="2" :x-gap="24">
-          <n-gi>
-            <n-form-item label="字段分组">
-              <n-select
-                v-model:value="fieldFormData.field_group"
-                :options="fieldGroupOptions"
-                placeholder="输入或选择分组"
-                filterable
-                tag
-                clearable
-              />
-            </n-form-item>
-          </n-gi>
-          <n-gi>
-            <n-form-item label="分组排序">
-              <n-input-number v-model:value="fieldFormData.group_order" placeholder="分组内排序" />
-            </n-form-item>
-          </n-gi>
-          <n-gi>
-            <n-form-item label="卡片显示">
-              <n-switch v-model:value="fieldFormData.is_default_visible">
-                <template #checked>显示</template>
-                <template #unchecked>隐藏</template>
-              </n-switch>
-            </n-form-item>
-          </n-gi>
-          <n-gi>
-            <n-form-item label="全局排序">
-              <n-input-number v-model:value="fieldFormData.sort_order" placeholder="全局列表排序" />
-            </n-form-item>
-          </n-gi>
-        </n-grid>
+        <n-card title="实时监测展示配置" size="small" :bordered="true" class="bg-gray-50 mb-4">
+          <n-grid :cols="2" :x-gap="24">
+            <n-gi :span="2">
+              <n-form-item label="监控关键字段" path="is_monitoring_key">
+                <n-space align="center">
+                  <n-switch v-model:value="fieldFormData.is_monitoring_key" />
+                  <n-text depth="3" style="font-size: 13px">
+                    勾选后，该字段将作为关键指标在卡片摘要、列表等显眼位置优先展示
+                  </n-text>
+                </n-space>
+              </n-form-item>
+            </n-gi>
+            
+            <n-gi>
+              <n-form-item label="展示分组">
+                <n-select
+                  v-model:value="fieldFormData.field_group"
+                  :options="fieldGroupOptions"
+                  placeholder="选择或输入分组"
+                  filterable
+                  tag
+                  clearable
+                />
+              </n-form-item>
+            </n-gi>
+            
+            <n-gi>
+              <n-form-item label="分组排序">
+                <n-input-number v-model:value="fieldFormData.group_order" placeholder="分组内排序" />
+              </n-form-item>
+            </n-gi>
+            
+            <n-gi>
+              <n-form-item label="卡片显示">
+                <n-switch v-model:value="fieldFormData.is_default_visible">
+                  <template #checked>显示</template>
+                  <template #unchecked>隐藏</template>
+                </n-switch>
+              </n-form-item>
+            </n-gi>
+            
+            <n-gi>
+              <n-form-item label="全局排序">
+                <n-input-number v-model:value="fieldFormData.sort_order" placeholder="全局列表排序" />
+              </n-form-item>
+            </n-gi>
+
+            <n-gi>
+              <n-form-item label="图标 (Emoji)">
+                <n-input v-model:value="fieldFormData.display_config.icon" placeholder="输入Emoji，如 ⚡" />
+              </n-form-item>
+            </n-gi>
+            
+            <n-gi>
+              <n-form-item label="显示颜色">
+                <n-color-picker v-model:value="fieldFormData.display_config.color" :show-alpha="false" />
+              </n-form-item>
+            </n-gi>
+          </n-grid>
+        </n-card>
         
         <n-divider title-placement="left">高级属性</n-divider>
         
         <n-grid :cols="2">
-          <n-gi>
-            <n-form-item label="监控关键字段">
-              <n-switch v-model:value="fieldFormData.is_monitoring_key" />
-            </n-form-item>
-          </n-gi>
           <n-gi>
             <n-form-item label="允许报警配置">
               <n-switch v-model:value="fieldFormData.is_alarm_enabled" />
@@ -408,7 +429,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, h, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { NButton, NTag, NSpace, NSwitch, useMessage, NGrid, NGi, NInputNumber, NDrawer, NDrawerContent, NForm, NFormItem, NIcon } from 'naive-ui'
+import { NButton, NTag, NSpace, NSwitch, useMessage, NGrid, NGi, NInputNumber, NDrawer, NDrawerContent, NForm, NFormItem, NIcon, NColorPicker } from 'naive-ui'
 import { 
   SearchOutline, 
   RefreshOutline, 
@@ -612,13 +633,11 @@ const columns = [
         h(NButton, {
           size: 'small',
           type: 'info',
-          text: true,
           onClick: () => handleEdit(row.id)
         }, { default: () => '编辑' }),
         h(NButton, {
           size: 'small',
           type: 'error',
-          text: true,
           onClick: () => handleDelete(row.id)
         }, { default: () => '删除' })
       ]
@@ -628,7 +647,6 @@ const columns = [
         actions.unshift(h(NButton, {
           size: 'small',
           type: 'warning',
-          text: true,
           style: 'margin-right: 8px',
           onClick: () => handleOpenAlarmConfig(row)
         }, { default: () => '阈值' }))
@@ -660,6 +678,7 @@ const fieldFormData = reactive({
   is_monitoring_key: false,
   is_alarm_enabled: false,
   alarm_threshold: { warning: null, critical: null },
+  display_config: { icon: '', color: '' },
   is_ai_feature: false,
   description: '',
   is_active: true
@@ -951,7 +970,8 @@ const handleCreate = () => {
     description: '',
     is_monitoring_key: false,
     is_alarm_enabled: false,
-    is_ai_feature: false
+    is_ai_feature: false,
+    display_config: { icon: '', color: '' }
   })
   showFieldModal.value = true
 }
@@ -961,6 +981,9 @@ const handleEdit = async (id) => {
     const response = await dataModelApi.getField(id)
     if (response.success) {
       Object.assign(fieldFormData, response.data)
+      if (!fieldFormData.display_config) {
+        fieldFormData.display_config = { icon: '', color: '' }
+      }
       showFieldModal.value = true
     } else {
       message.error(response.message || '获取字段详情失败')

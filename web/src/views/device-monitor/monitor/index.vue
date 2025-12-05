@@ -169,66 +169,39 @@
 
             <!-- 真实设备卡片 -->
             <template v-else>
-              <NCard
+              <DeviceCard
                 v-for="device in filteredDevices"
                 :key="device.id"
-                class="device-card"
-                :class="getDeviceCardClass(device.device_status)"
+                :device="device"
+                :monitoring-fields="getDeviceFields(device.device_type)"
+                @click="showDeviceDetails(device)"
               >
-          <!-- 设备状态指示器 -->
-          <div class="status-indicator" :class="getStatusClass(device.device_status)"></div>
-
-          <!-- 设备基本信息 -->
-          <div class="device-header">
-            <div class="device-info">
-              <h3 class="device-name">{{ device.name || device.id }}</h3>
-              <p class="device-id">{{ device.id }}</p>
-            </div>
-            <div class="device-type">
-              <NTag :type="getDeviceTypeTagType(device.device_type)" size="small">
-                {{ getDeviceTypeText(device.device_type) }}
-              </NTag>
-            </div>
-          </div>
-
-          <!-- 设备监控数据 - 分组动态参数展示 -->
-          <GroupedMonitoringData
-            :monitoring-fields="getDeviceFields(device.device_type)"
-            :realtime-data="getDeviceRealtimeData(device)"
-            :loading="realtimeDataLoading"
-          />
-
-          <!-- 设备位置 -->
-          <div class="device-location">
-            <TheIcon icon="material-symbols:location-on" :size="14" class="mr-5" />
-            {{ device.location || '未设置' }}
-          </div>
-
-          <!-- 操作按钮区域 -->
-          <div class="device-actions mt-4 flex flex-col gap-2 px-4">
-            <PermissionButton
-              permission="GET /api/v2/devices/{device_id}/charts"
-              class="w-full"
-              type="default"
-              size="small"
-              @click.stop="showDeviceCharts(device)"
-            >
-              <TheIcon icon="material-symbols:history" :size="14" class="mr-5" />
-              查看历史
-            </PermissionButton>
-            <PermissionButton
-              permission="GET /api/v2/devices/{device_id}"
-              class="w-full analyze-device-btn"
-              type="primary"
-              size="small"
-              secondary
-              @click.stop="showDeviceDetails(device)"
-            >
-              <TheIcon icon="material-symbols:analytics" :size="14" class="mr-5" />
-              分析设备
-            </PermissionButton>
-          </div>
-              </NCard>
+                <template #actions="{ device }">
+                  <div class="flex flex-col gap-2 w-full">
+                    <PermissionButton
+                      permission="GET /api/v2/devices/{device_id}/charts"
+                      class="w-full"
+                      type="default"
+                      size="small"
+                      @click.stop="showDeviceCharts(device)"
+                    >
+                      <TheIcon icon="material-symbols:history" :size="14" class="mr-5" />
+                      查看历史
+                    </PermissionButton>
+                    <PermissionButton
+                      permission="GET /api/v2/devices/{device_id}"
+                      class="w-full analyze-device-btn"
+                      type="primary"
+                      size="small"
+                      secondary
+                      @click.stop="showDeviceDetails(device)"
+                    >
+                      <TheIcon icon="material-symbols:analytics" :size="14" class="mr-5" />
+                      分析设备
+                    </PermissionButton>
+                  </div>
+                </template>
+              </DeviceCard>
             </template>
           </div>
         </template>
@@ -479,8 +452,38 @@
               </div>
             </NCard>
 
-            <!-- 工艺参数 -->
-            <NCard title="工艺参数" class="info-card process-info">
+            <!-- 动态监控参数 -->
+            <NCard
+              v-if="getDeviceFields(selectedDevice.device_type).length > 0"
+              title="监控参数"
+              class="info-card process-info"
+            >
+              <template #header-extra>
+                <TheIcon icon="material-symbols:settings" :size="16" class="text-purple-500" />
+              </template>
+              <div class="info-grid">
+                <div
+                  v-for="field in getDeviceFields(selectedDevice.device_type)"
+                  :key="field.field_code"
+                  class="info-item"
+                  v-show="field.is_default_visible !== false"
+                >
+                  <div class="info-label">
+                    <TheIcon
+                      :icon="field.display_config?.icon || 'material-symbols:circle'"
+                      :size="14"
+                    />
+                    {{ field.field_name }}
+                  </div>
+                  <div class="info-value">
+                    {{ formatFieldValue(selectedDevice[field.field_code], field) }}
+                  </div>
+                </div>
+              </div>
+            </NCard>
+
+            <!-- 降级显示：工艺参数 -->
+            <NCard v-else title="工艺参数" class="info-card process-info">
               <template #header-extra>
                 <TheIcon icon="material-symbols:settings" :size="16" class="text-purple-500" />
               </template>
@@ -592,6 +595,7 @@ import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/page/QueryBarItem.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import ViewToggle from '@/components/common/ViewToggle.vue'
+import DeviceCard from '@/components/card/DeviceCard.vue'
 import DeviceCardSkeleton from '@/components/card/DeviceCardSkeleton.vue'
 import FastPermissionWrapper from '@/components/Permission/FastPermissionWrapper.vue'
 import DynamicMonitoringData from '@/components/device/DynamicMonitoringData.vue'
@@ -942,6 +946,8 @@ function processWebSocketData(data) {
       const device = {
         // 保留所有原始字段（包括动态字段）
         ...item,
+        // 展平realtime_data中的字段，以便GroupedMonitoringData可以直接访问
+        ...(item.realtime_data || {}),
         
         // 基础标识信息
         id: item.device_code, // 使用设备编码作为主要标识符
@@ -1412,6 +1418,7 @@ async function loadDevicesByHttp() {
         status: item.status,
         online: item.online,
         realtime_data: item.realtime_data || {},
+        ...(item.realtime_data || {}), // 展平realtime_data中的字段
         health_status: item.health_status,
         health_score: item.health_score,
         last_maintenance: item.last_maintenance,
@@ -1475,6 +1482,29 @@ function getDeviceFields(deviceType: string) {
   })
   
   return []
+}
+
+/**
+ * 格式化字段值
+ */
+function formatFieldValue(value: any, field: any) {
+  if (value === undefined || value === null || value === '') return '--'
+  
+  let formattedValue = value
+  if (field.field_type === 'float') {
+    const num = Number(value)
+    if (!isNaN(num)) {
+      formattedValue = num.toFixed(2)
+    }
+  } else if (field.field_type === 'boolean') {
+    formattedValue = value ? '是' : '否'
+  }
+  
+  if (field.unit) {
+    return `${formattedValue} ${field.unit}`
+  }
+  
+  return String(formattedValue)
 }
 
 /**
@@ -2225,7 +2255,7 @@ onUnmounted(() => {
 /* 设备网格布局 - 紧凑简洁版本 */
 .device-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
   margin-top: 16px;
   padding: 2px;
@@ -2233,7 +2263,7 @@ onUnmounted(() => {
 
 @media (max-width: 1400px) {
   .device-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 12px;
   }
 }

@@ -583,41 +583,56 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                             logger.debug(f"设备 {device.device_code} 的完整数据: {device_data}")
                             realtime_data_list.append(device_data)
                         else:
-                            # 没有 TDengine 数据的设备，返回基本信息
-                            device_data = {
-                                "device_code": device.device_code,
-                                "device_name": device.device_name or "",
-                                "type_code": device.device_type,
-                                "ts": None,
-                                "device_status": "offline",
-                            }
+                            # 没有 TDengine 数据的设备，尝试从 PostgreSQL 获取
+                            latest_pg_data = await DeviceRealTimeData.filter(device_id=device.id).order_by('-data_timestamp').first()
+                            
+                            if latest_pg_data:
+                                metrics = latest_pg_data.metrics or {}
+                                device_data = {
+                                    "device_code": device.device_code,
+                                    "device_name": device.device_name or "",
+                                    "type_code": device.device_type,
+                                    "ts": latest_pg_data.data_timestamp.isoformat() if latest_pg_data.data_timestamp else None,
+                                    "device_status": latest_pg_data.status or "offline",
+                                }
+                                device_data.update(metrics)
+                            else:
+                                # PostgreSQL 也没有数据
+                                device_data = {
+                                    "device_code": device.device_code,
+                                    "device_name": device.device_name or "",
+                                    "type_code": device.device_type,
+                                    "ts": None,
+                                    "device_status": "offline",
+                                }
                             realtime_data_list.append(device_data)
                 except Exception as device_error:
                     logger.error(f"处理设备实时数据时发生错误: {str(device_error)}", exc_info=True)
                     for device_in_page in current_page_devices:
-                        device_data = {
-                            "device_code": device_in_page.device_code,
-                            "device_name": "",
-                            "type_code": query.type_code,
-                            "ts": None,
-                            "preset_current": None,
-                            "preset_voltage": None,
-                            "weld_current": None,
-                            "weld_voltage": None,
-                            "device_status": "error",
-                            "lock_status": None,
-                            "team_name": None,
-                            "operator": None,
-                            "material": None,
-                            "wire_diameter": None,
-                            "gas_type": None,
-                            "weld_method": None,
-                            "weld_control": None,
-                            "staff_id": None,
-                            "workpiece_id": None,
-                            "ip_quality": None,
-                            "name": device_in_page.device_name or "",
-                        }
+                        # 尝试从 PostgreSQL 获取最新数据
+                        try:
+                            latest_pg_data = await DeviceRealTimeData.filter(device_id=device_in_page.id).order_by('-data_timestamp').first()
+                        except Exception:
+                            latest_pg_data = None
+                            
+                        if latest_pg_data:
+                            metrics = latest_pg_data.metrics or {}
+                            device_data = {
+                                "device_code": device_in_page.device_code,
+                                "device_name": device_in_page.device_name or "",
+                                "type_code": query.type_code,
+                                "ts": latest_pg_data.data_timestamp.isoformat() if latest_pg_data.data_timestamp else None,
+                                "device_status": latest_pg_data.status or "error",
+                            }
+                            device_data.update(metrics)
+                        else:
+                            device_data = {
+                                "device_code": device_in_page.device_code,
+                                "device_name": device_in_page.device_name or "",
+                                "type_code": query.type_code,
+                                "ts": None,
+                                "device_status": "error",
+                            }
                         realtime_data_list.append(device_data)
 
             await tdengine_connector.close()
@@ -717,7 +732,17 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             # 3. 合并数据
             for device in current_page_devices:
                 row_data = device_data_map.get(device.device_code)
+                
+                # 检查TDengine数据有效性：必须有时间戳
+                is_valid_td_data = False
                 if row_data:
+                    ts_check = row_data.get("ts") or row_data.get("last_row(ts)")
+                    if ts_check:
+                        is_valid_td_data = True
+                    else:
+                        logger.warning(f"TDengine返回了无效数据(无时间戳): device={device.device_code}")
+
+                if is_valid_td_data:
 
                     def get_field_value(row_data, field_name):
                         return row_data.get(field_name) or row_data.get(f"last_row({field_name})")
@@ -750,14 +775,30 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                     }
                     realtime_data_list.append(device_data)
                 else:
-                    # TDengine中无数据，使用PostgreSQL中的设备名称
-                    device_data = {
-                        "device_code": device.device_code,
-                        "device_name": device.device_name or "",
-                        "type_code": query.type_code,
-                        "ts": None,
-                        "device_status": "offline",  # ... other fields null
-                    }
+                    # TDengine中无数据，尝试从 PostgreSQL 获取
+                    logger.info(f"TDengine无数据，尝试查询PG: device_id={device.id}, code={device.device_code}")
+                    latest_pg_data = await DeviceRealTimeData.filter(device_id=device.id).order_by('-data_timestamp').first()
+                    logger.info(f"PG查询结果: {latest_pg_data}, metrics={latest_pg_data.metrics if latest_pg_data else 'None'}")
+                    
+                    if latest_pg_data:
+                        metrics = latest_pg_data.metrics or {}
+                        device_data = {
+                            "device_code": device.device_code,
+                            "device_name": device.device_name or "",
+                            "type_code": query.type_code,
+                            "ts": latest_pg_data.data_timestamp.isoformat() if latest_pg_data.data_timestamp else None,
+                            "device_status": latest_pg_data.status or "offline",
+                        }
+                        device_data.update(metrics)
+                    else:
+                        # PostgreSQL 也没有数据
+                        device_data = {
+                            "device_code": device.device_code,
+                            "device_name": device.device_name or "",
+                            "type_code": query.type_code,
+                            "ts": None,
+                            "device_status": "offline",
+                        }
                     realtime_data_list.append(device_data)
 
             return {

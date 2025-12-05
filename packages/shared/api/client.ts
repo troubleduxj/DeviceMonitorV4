@@ -69,8 +69,19 @@ export class ApiClient {
   patch<T = unknown>(path: string, body?: unknown): Promise<T> {
     return this.request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined });
   }
-  delete<T = unknown>(path: string): Promise<T> {
-    return this.request<T>(path, { method: "DELETE" });
+  delete<T = unknown>(path: string, params?: Record<string, any>): Promise<T> {
+    let url = path;
+    if (params) {
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          query.append(key, String(value));
+        }
+      });
+      const queryString = query.toString();
+      if (queryString) url = `${path}?${queryString}`;
+    }
+    return this.request<T>(url, { method: "DELETE" });
   }
 }
 

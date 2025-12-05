@@ -11,12 +11,12 @@
     <template v-else-if="carouselItems.length > 0">
       <!-- 分组标题和导航 -->
       <div class="carousel-header">
-        <div class="group-navigation">
+        <div class="group-navigation" @click.stop>
           <NButton
             text
             size="small"
             :disabled="currentIndex === 0"
-            @click="prevGroup"
+            @click.stop="prevGroup"
             class="nav-btn"
           >
             <template #icon>
@@ -34,7 +34,7 @@
             text
             size="small"
             :disabled="currentIndex === carouselItems.length - 1"
-            @click="nextGroup"
+            @click.stop="nextGroup"
             class="nav-btn"
           >
             <template #icon>
@@ -148,15 +148,18 @@ const groupedFields = computed(() => {
   const groups = new Map<string, { name: string; title: string; icon: string; fields: DeviceField[]; order: number }>()
   
   allFields.value.forEach(field => {
+    // 1. 过滤：只展示监控关键字段
+    if (!field.is_monitoring_key) return
+
     // 如果标记为不显示，直接跳过（兼容旧数据：undefined视为显示）
     if (field.is_default_visible === false) return
 
-    // 确定分组名称
-    let groupName = 'other'
+    // 2. 确定分组名称
+    // 逻辑：如果设置了明确的分组（非default），则归入该分组；否则归入核心参数（Core）
+    let groupName = 'core'
+    
     if (field.field_group && field.field_group !== 'default') {
       groupName = field.field_group
-    } else if (field.is_monitoring_key) {
-      groupName = 'core'
     }
     
     if (!groups.has(groupName)) {

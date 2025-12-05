@@ -124,8 +124,8 @@
           <n-input v-model:value="formData.tdengine_database" placeholder="例如: devicemonitor" />
         </n-form-item>
         
-        <n-form-item label="表名" path="tdengine_table">
-          <n-input v-model:value="formData.tdengine_table" placeholder="例如: weld_realtime_data" />
+        <n-form-item label="表名" path="tdengine_stable">
+          <n-input v-model:value="formData.tdengine_stable" placeholder="例如: weld_realtime_data" />
         </n-form-item>
         
         <n-form-item label="列名" path="tdengine_column">
@@ -380,7 +380,7 @@ const columns = [
   },
   {
     title: 'TDengine表',
-    key: 'tdengine_table',
+    key: 'tdengine_stable',
     width: 150
   },
   {
@@ -422,13 +422,11 @@ const columns = [
           h(NButton, {
             size: 'small',
             type: 'info',
-            text: true,
             onClick: () => handleEdit(row.id)
           }, { default: () => '编辑' }),
           h(NButton, {
             size: 'small',
             type: 'error',
-            text: true,
             onClick: () => handleDelete(row.id)
           }, { default: () => '删除' })
         ]
@@ -448,7 +446,7 @@ const formData = reactive({
   device_type_code: null,
   device_field_id: null,
   tdengine_database: 'devicemonitor',
-  tdengine_table: '',
+  tdengine_stable: '',
   tdengine_column: '',
   is_tag: false,
   transform_rule: null

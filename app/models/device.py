@@ -18,6 +18,7 @@ class DeviceInfo(TimestampMixin, BaseModel):
     team_name = fields.CharField(max_length=100, null=True, description="所属班组")
     is_locked = fields.BooleanField(default=False, description="是否锁定状态")
     description = fields.TextField(null=True, description="备注信息")
+    attributes = fields.JSONField(null=True, description="扩展属性")
     
     class Meta:
         table = "t_device_info"
@@ -29,12 +30,7 @@ class DeviceRealTimeData(TimestampMixin, BaseModel):
     """设备实时数据模型"""
     
     device = fields.ForeignKeyField("models.DeviceInfo", related_name="realtime_data", description="关联设备")
-    voltage = fields.FloatField(null=True, description="电压值(V)")
-    current = fields.FloatField(null=True, description="电流值(A)")
-    power = fields.FloatField(null=True, description="功率值(W)")
-    temperature = fields.FloatField(null=True, description="温度值(°C)")
-    pressure = fields.FloatField(null=True, description="压力值(Pa)")
-    vibration = fields.FloatField(null=True, description="振动值")
+    metrics = fields.JSONField(null=True, description="实时指标快照")
     status = fields.CharField(max_length=20, default="offline", description="设备状态: online/offline/error/maintenance")
     error_code = fields.CharField(max_length=50, null=True, description="错误代码")
     error_message = fields.TextField(null=True, description="错误信息")
@@ -88,11 +84,11 @@ class DeviceType(TimestampMixin, BaseModel):
 
 class DeviceField(TimestampMixin, BaseModel):
     """设备字段模型（扩展支持元数据驱动）"""
-    device_type_code = fields.CharField(max_length=50, description="设备类型代码")
     field_name = fields.CharField(max_length=100, description="字段名称")
     field_code = fields.CharField(max_length=50, description="字段代码")
-    field_type = fields.CharField(max_length=20, description="字段类型")
-    field_category = fields.CharField(max_length=50, default="data_collection", description="字段分类：data_collection/maintenance_record")
+    device_type_code = fields.CharField(max_length=50, description="设备类型代码")
+    field_type = fields.CharField(max_length=20, description="字段类型: string/integer/float/boolean/json")
+    field_category = fields.CharField(max_length=50, default="data_collection", description="字段分类")
     unit = fields.CharField(max_length=20, null=True, description="单位")
     description = fields.TextField(null=True, description="字段描述")
     is_required = fields.BooleanField(default=False, description="是否必填")
@@ -129,8 +125,27 @@ class DeviceField(TimestampMixin, BaseModel):
         app = "models"
 
 
+class DeviceAlarmHistory(TimestampMixin, BaseModel):
+    """设备报警历史表 (通用)"""
+    
+    device = fields.ForeignKeyField("models.DeviceInfo", related_name="alarm_history", description="关联设备")
+    alarm_code = fields.CharField(max_length=50, description="报警代码", index=True)
+    severity = fields.CharField(max_length=20, default="Error", description="报警等级: Info/Warning/Error/Fatal")
+    category = fields.CharField(max_length=50, default="Device", description="报警分类: System/Hardware/Process")
+    content = fields.TextField(description="报警内容")
+    start_time = fields.DatetimeField(description="开始时间", index=True)
+    end_time = fields.DatetimeField(null=True, description="结束时间")
+    context = fields.JSONField(null=True, description="报警上下文数据")
+    
+    class Meta:
+        table = "t_device_alarm_history"
+        table_description = "设备报警历史表"
+        indexes = [("device_id", "start_time"), ("severity",), ("alarm_code",)]
+        app = "models"
+
+
 class WeldingAlarmHistory(TimestampMixin, BaseModel):
-    """焊接报警历史模型"""
+    """焊接报警历史模型 (已弃用，请使用 DeviceAlarmHistory)"""
     prod_code = fields.CharField(max_length=64, description="设备制造编码", index=True)
     alarm_time = fields.DatetimeField(description="报警时刻（开始时间）", index=True)
     alarm_end_time = fields.DatetimeField(null=True, description="报警结束时刻")

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, onMounted, ref, resolveDirective, withDirectives } from 'vue'
-import { NButton, NForm, NFormItem, NInput, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui'
+import { NButton, NForm, NFormItem, NInput, NPopconfirm, NSelect, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/page/QueryBarItem.vue'
@@ -12,7 +12,7 @@ import { formatDate, formatDateTime, renderIcon } from '@/utils'
 import { useCRUD } from '@/composables/useCRUD'
 import api from '@/api'
 // ✅ Shared API 迁移 (2025-10-25)
-import { deviceTypeApi } from '@/api/device-shared'
+import { deviceTypeApi, deviceApi } from '@/api/device-shared'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import IconPicker from '@/components/icon/IconPicker.vue'
 import { useRouter } from 'vue-router'
@@ -20,8 +20,11 @@ import { useRouter } from 'vue-router'
 defineOptions({ name: '设备类型管理' })
 
 const router = useRouter()
+const dialog = useDialog()
+const message = useMessage()
 
 const $table = ref(null)
+const checkedRowKeys = ref([])
 const queryItems = ref({
   type_name: '',
   type_code: '',
@@ -61,7 +64,81 @@ onMounted(() => {
   $table.value?.handleSearch()
 })
 
+const handleDeleteType = async (row) => {
+  const executeDelete = async (cascade = false) => {
+    try {
+      await deviceTypeApi.delete(row.type_code, { cascade })
+      message.success('删除成功')
+      $table.value?.handleSearch()
+    } catch (error: any) {
+      message.error(`删除失败: ${error.message || '未知错误'}`)
+    }
+  }
+
+  try {
+    // 查询真实关联设备数量 (使用 deviceApi 获取实时数据)
+    const res = await deviceApi.list({ 
+        device_type: row.type_code, 
+        page: 1, 
+        page_size: 1 
+    })
+    
+    // 获取总数 (兼容不同的响应格式)
+    // 注意：res 可能是 { data: [], total: 10, meta: {...} }
+    const count = res.total ?? res.meta?.total ?? res.data?.total ?? 0
+    
+    if (count > 0) {
+       dialog.warning({
+           title: '关联设备删除确认',
+           content: `检测到该类型下有 ${count} 台关联设备。\n\n删除设备类型将自动删除所有关联设备及其数据（不可恢复），是否继续？`,
+           positiveText: '确认级联删除',
+           negativeText: '取消',
+           onPositiveClick: () => executeDelete(true)
+       })
+    } else {
+       dialog.warning({
+           title: '删除确认',
+           content: '确定删除该设备类型吗？',
+           positiveText: '确认',
+           negativeText: '取消',
+           onPositiveClick: () => executeDelete(false)
+       })
+    }
+  } catch (e) {
+     // 降级处理
+     dialog.warning({
+         title: '删除确认',
+         content: '确定删除该设备类型吗？',
+         positiveText: '确认',
+         negativeText: '取消',
+         onPositiveClick: () => executeDelete(false)
+     })
+  }
+}
+
+const handleBatchDeleteType = async () => {
+  if (checkedRowKeys.value.length === 0) return
+  
+  dialog.warning({
+    title: '批量删除确认',
+    content: `确定删除选中的 ${checkedRowKeys.value.length} 个设备类型吗？\n\n⚠️ 注意：这将自动级联删除这些类型下的所有关联设备及其数据，且操作不可恢复！`,
+    positiveText: '确认删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await deviceTypeApi.batchDelete(checkedRowKeys.value, { cascade: true })
+        message.success('批量删除成功')
+        checkedRowKeys.value = []
+        $table.value?.handleSearch()
+      } catch (e: any) {
+        message.error(`批量删除失败: ${e.message}`)
+      }
+    }
+  })
+}
+
 const columns = [
+  { type: 'selection' },
   {
     title: '图标',
     key: 'icon',
@@ -192,10 +269,7 @@ const columns = [
             permission: 'DELETE /api/v2/devices/types/{id}',
             size: 'small',
             type: 'error',
-            needConfirm: true,
-            confirmTitle: '删除确认',
-            confirmContent: '确定删除该设备类型吗？此操作不可恢复。',
-            onConfirm: () => handleDelete(row.type_code, false),
+            onClick: () => handleDeleteType(row),
           },
           {
             default: () => '删除',
@@ -211,6 +285,15 @@ const columns = [
 <template>
   <CommonPage show-footer title="设备类型列表">
     <template #action>
+      <PermissionButton
+        permission="DELETE /api/v2/devices/types/{id}"
+        type="error"
+        :disabled="checkedRowKeys.length === 0"
+        class="mr-4"
+        @click="handleBatchDeleteType"
+      >
+        <TheIcon icon="material-symbols:delete-outline" :size="18" class="mr-5" />批量删除
+      </PermissionButton>
       <PermissionButton permission="POST /api/v2/devices/types" type="primary" @click="handleAdd">
         <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建设备类型
       </PermissionButton>
@@ -221,6 +304,7 @@ const columns = [
       v-model:query-items="queryItems"
       :columns="columns"
       :get-data="deviceTypeApi.list"
+      v-model:checked-row-keys="checkedRowKeys"
     >
       <template #queryBar>
         <QueryBarItem label="类型名称" :label-width="70">

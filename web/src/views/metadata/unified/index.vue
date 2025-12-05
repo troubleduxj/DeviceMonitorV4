@@ -66,8 +66,14 @@ import ModelConfig from '@/views/metadata/models/index.vue'
 import AlarmRules from '@/views/alarm/alarm-rules/index.vue'
 import GlobalDashboard from './components/GlobalDashboard.vue'
 
+defineOptions({ name: '统一配置管理' })
+
 const route = useRoute()
 const message = useMessage()
+
+console.log('UnifiedConfig Page Loaded. Route Name:', route.name)
+console.log('UnifiedConfig Page Component Name:', 'UnifiedConfig')
+console.log('Route Meta KeepAlive:', route.meta.keepAlive)
 const selectedDeviceType = ref(null)
 const deviceTypeOptions = ref([])
 const activeTab = ref('fields')

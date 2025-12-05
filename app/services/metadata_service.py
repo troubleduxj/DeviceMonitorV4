@@ -828,8 +828,19 @@ class MetadataService:
         }
 
     @staticmethod
-    async def compare_schema(device_type_code: str) -> Dict[str, Any]:
-        """比较TDengine表结构与系统定义的差异"""
+    async def compare_schema(device_type_code: str, dry_run: bool = True) -> Dict[str, Any]:
+        """比较TDengine表结构与系统定义的差异
+        
+        Args:
+            device_type_code: 设备类型代码
+            dry_run: 是否为试运行模式（只检查不执行，当前版本强制为True）
+            
+        Returns:
+            包含差异信息的字典
+        """
+        # 强制 dry_run 模式，符合文档规划
+        dry_run = True
+        
         # 1. 获取设备类型和关联字段
         device_type = await DeviceType.get_or_none(type_code=device_type_code)
         if not device_type:
@@ -845,61 +856,56 @@ class MetadataService:
         
         # 2. 获取TDengine表结构
         connector = TDengineConnector()
+        td_columns = {}
+        table_exists = False
+        
         try:
             sql = f"DESCRIBE {device_type.tdengine_stable_name}"
             result = await connector.execute_sql(sql)
             
             # Handle TDengine raw response (code/desc)
-            if 'code' in result and result['code'] != 0:
-                error_desc = result.get('desc', '').lower()
-                # Check for "Table does not exist" (code 9731)
-                if result['code'] == 9731 or "not exist" in error_desc or "not found" in error_desc:
-                    return {
-                        "status": "success",
-                        "device_type": device_type_code,
-                        "stable_name": device_type.tdengine_stable_name,
-                        "table_exists": False,
-                        "diff": {
-                            "missing_in_tdengine": [
-                                {
-                                    "field_code": f.field_code, 
-                                    "field_name": f.field_name, 
-                                    "field_type": f.field_type
-                                } for f in fields
-                            ],
-                            "missing_in_system": [],
-                            "type_mismatch": []
+            if 'code' in result:
+                if result['code'] == 0:
+                    table_exists = True
+                    for row in result.get('data', []):
+                        # row format: [field_name, type, length, note]
+                        col_name = row[0]
+                        col_type = row[1]
+                        col_note = row[3] if len(row) > 3 else ""
+                        
+                        # Handle bytes note
+                        note_str = ""
+                        if col_note:
+                             if isinstance(col_note, bytes):
+                                 try:
+                                     note_str = col_note.decode('utf-8', errors='ignore')
+                                 except:
+                                     note_str = str(col_note)
+                             else:
+                                 note_str = str(col_note)
+
+                        td_columns[col_name] = {
+                            'type': col_type,
+                            'is_tag': 'TAG' in note_str.upper()
                         }
-                    }
                 else:
-                    raise APIException(message=f"TDengine Error {result['code']}: {result.get('desc')}", code=500)
-
-            # Handle Legacy format (status/desc)
-            if 'status' in result and result.get('status') != 'succ':
-                raise APIException(message=f"Failed to describe table: {result.get('desc')}", code=500)
-                
-            td_columns = {}
-            for row in result.get('data', []):
-                # row format: [field_name, type, length, note]
-                col_name = row[0]
-                col_type = row[1]
-                col_note = row[3] if len(row) > 3 else ""
-                
-                # Handle bytes note
-                note_str = ""
-                if col_note:
-                     if isinstance(col_note, bytes):
-                         try:
-                             note_str = col_note.decode('utf-8', errors='ignore')
-                         except:
-                             note_str = str(col_note)
-                     else:
-                         note_str = str(col_note)
-
-                td_columns[col_name] = {
-                    'type': col_type,
-                    'is_tag': 'TAG' in note_str.upper()
-                }
+                    # Check for "Table does not exist" (code 9731 or error message)
+                    error_desc = str(result.get('desc', '')).lower()
+                    if result['code'] == 9731 or "not exist" in error_desc or "not found" in error_desc:
+                        table_exists = False
+                    else:
+                        raise APIException(message=f"TDengine Error {result['code']}: {result.get('desc')}", code=500)
+            elif 'status' in result and result.get('status') == 'succ':
+                 # Legacy format
+                 table_exists = True
+                 for row in result.get('data', []):
+                     col_name = row[0]
+                     col_type = row[1]
+                     col_note = row[3] if len(row) > 3 else ""
+                     td_columns[col_name] = {'type': col_type, 'is_tag': 'TAG' in str(col_note).upper()}
+            else:
+                 # Legacy format error or unexpected
+                 raise APIException(message=f"Failed to describe table: {result.get('desc')}", code=500)
                 
         except Exception as e:
             # Table might not exist
@@ -907,78 +913,102 @@ class MetadataService:
             
             error_msg = str(e)
             if isinstance(e, httpx.HTTPStatusError):
-                # Append response text to error message for checking
                 try:
                     error_msg += f" {e.response.text}"
                 except:
                     pass
             
             error_msg_lower = error_msg.lower()
-            
-            # Check for common "table not exists" error messages from TDengine
-            # "Table does not exist" or similar
-            # Use case-insensitive check and broader patterns
             if "not exist" in error_msg_lower or "not found" in error_msg_lower:
-                 return {
-                    "status": "success",
-                    "device_type": device_type_code,
-                    "stable_name": device_type.tdengine_stable_name,
-                    "table_exists": False,
-                    "diff": {
-                        "missing_in_tdengine": [
-                            {
-                                "field_code": f.field_code, 
-                                "field_name": f.field_name, 
-                                "field_type": f.field_type
-                            } for f in fields
-                        ],
-                        "missing_in_system": [],
-                        "type_mismatch": []
-                    }
-                 }
-
-            return {
-                "status": "error", 
-                "message": f"Table {device_type.tdengine_stable_name} does not exist or error occurred: {error_msg}",
-                "diff": None
-            }
+                 table_exists = False
+            else:
+                 raise APIException(message=f"Error connecting to TDengine: {error_msg}", code=500)
 
         # 3. 比较差异
         diff = {
             "missing_in_tdengine": [],
             "missing_in_system": [],
-            "type_mismatch": []
+            "type_mismatch": [],
+            "suggested_actions": [] # 新增：建议执行的 SQL (仅展示)
         }
         
         # System definition
         system_fields = {f.field_code: f for f in fields}
         
-        # Check for missing fields in TDengine
-        for code, field in system_fields.items():
-            if code not in td_columns:
+        if not table_exists:
+            # 整个表缺失
+            create_sql = f"CREATE STABLE {device_type.tdengine_stable_name} (ts TIMESTAMP, "
+            cols = []
+            tags = [f"prod_code BINARY(64)"] # 默认 Tag
+            
+            for code, field in system_fields.items():
+                # 简单映射类型
+                data_type = "FLOAT" # 默认
+                if field.field_type == 'string': data_type = "BINARY(64)"
+                elif field.field_type == 'integer': data_type = "INT"
+                elif field.field_type == 'boolean': data_type = "BOOL"
+                
+                cols.append(f"{code} {data_type}")
+                
+            create_sql += ", ".join(cols)
+            create_sql += f") TAGS ({', '.join(tags)})"
+            
+            diff['suggested_actions'].append({
+                "action": "CREATE_STABLE",
+                "sql": create_sql,
+                "reason": "Super table does not exist"
+            })
+            
+            # 标记所有字段为缺失
+            for code, field in system_fields.items():
                 diff['missing_in_tdengine'].append({
                     "field_code": code,
                     "field_name": field.field_name,
                     "field_type": field.field_type
                 })
-            else:
-                # Type comparison can be added here if needed
-                pass
-                
-        # Check for extra fields in TDengine (missing in system)
-        for col_name, col_info in td_columns.items():
-            if col_name not in system_fields:
-                if col_name == 'ts': continue # Skip timestamp usually
-                diff['missing_in_system'].append({
-                    "field_code": col_name,
-                    "td_type": col_info['type'],
-                    "is_tag": col_info['is_tag']
-                })
-                
+        else:
+            # 表存在，检查列差异
+            
+            # Check for missing fields in TDengine
+            for code, field in system_fields.items():
+                if code not in td_columns:
+                    diff['missing_in_tdengine'].append({
+                        "field_code": code,
+                        "field_name": field.field_name,
+                        "field_type": field.field_type
+                    })
+                    
+                    # 生成建议 SQL
+                    data_type = "FLOAT"
+                    if field.field_type == 'string': data_type = "BINARY(64)"
+                    elif field.field_type == 'integer': data_type = "INT"
+                    elif field.field_type == 'boolean': data_type = "BOOL"
+                    
+                    alter_sql = f"ALTER STABLE {device_type.tdengine_stable_name} ADD COLUMN {code} {data_type}"
+                    diff['suggested_actions'].append({
+                        "action": "ADD_COLUMN",
+                        "sql": alter_sql,
+                        "reason": f"Column {code} missing in TDengine"
+                    })
+                else:
+                    # Type comparison (Basic)
+                    pass
+                    
+            # Check for extra fields in TDengine
+            for col_name, col_info in td_columns.items():
+                if col_name not in system_fields and col_name not in ['ts', 'prod_code']:
+                    diff['missing_in_system'].append({
+                        "field_code": col_name,
+                        "td_type": col_info['type'],
+                        "is_tag": col_info['is_tag']
+                    })
+
         return {
             "status": "success",
             "device_type": device_type_code,
             "stable_name": device_type.tdengine_stable_name,
+            "table_exists": table_exists,
+            "dry_run": dry_run,
             "diff": diff
         }
 

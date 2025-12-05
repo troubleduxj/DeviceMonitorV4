@@ -84,9 +84,10 @@ class DynamicModelService:
         """
         # 1. 检查缓存
         cache_key = f"{model_code}:{version or 'active'}"
-        if use_cache and cache_key in self._model_cache:
-            logger.debug(f"[动态模型] 从缓存加载: {cache_key}")
-            return self._model_cache[cache_key]
+        # Disable cache temporarily to force reload of model definition
+        # if use_cache and cache_key in self._model_cache:
+        #     logger.debug(f"[动态模型] 从缓存加载: {cache_key}")
+        #     return self._model_cache[cache_key]
         
         # 2. 查询数据模型配置
         query = DeviceDataModel.filter(model_code=model_code, is_active=True)
