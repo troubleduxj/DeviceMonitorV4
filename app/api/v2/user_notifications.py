@@ -9,7 +9,8 @@ from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Query, Depends
-from tortoise.expressions import Q
+from tortoise.expressions import Q, RawSQL
+from tortoise import Tortoise
 
 from app.models.notification import Notification, UserNotification
 from app.core.response_formatter_v2 import create_formatter
@@ -30,9 +31,12 @@ async def get_my_notifications(
     """获取当前用户的通知列表"""
     try:
         now = datetime.now()
+        now_str = now.strftime('%Y-%m-%d %H:%M:%S.%f')
         
+        # 使用RawSQL绕过Tortoise的timezone转换问题
+        # 配置 use_tz=True 与 asyncpg + TIMESTAMP(naive) 列冲突
         base_query = Notification.filter(is_published=True).filter(
-            Q(expire_time__isnull=True) | Q(expire_time__gt=now)
+            Q(expire_time__isnull=True) | Q(expire_time__gt=RawSQL(f"'{now_str}'"))
         )
         
         if notification_type:
@@ -90,9 +94,12 @@ async def get_unread_count(user_id: int = Query(..., description="用户ID")):
     """获取当前用户的未读通知数量"""
     try:
         now = datetime.now()
+        now_str = now.strftime('%Y-%m-%d %H:%M:%S.%f')
         
+        # 使用RawSQL绕过Tortoise的timezone转换问题
+        # 配置 use_tz=True 与 asyncpg + TIMESTAMP(naive) 列冲突
         total_notifications = await Notification.filter(is_published=True).filter(
-            Q(expire_time__isnull=True) | Q(expire_time__gt=now)
+            Q(expire_time__isnull=True) | Q(expire_time__gt=RawSQL(f"'{now_str}'"))
         ).count()
         
         read_count = await UserNotification.filter(
@@ -114,7 +121,8 @@ async def get_unread_count(user_id: int = Query(..., description="用户ID")):
     except Exception as e:
         logger.error(f"获取未读数量失败: {str(e)}", exc_info=True)
         formatter = create_formatter()
-        return formatter.error(message="获取未读数量失败")
+        # Return the actual error message for debugging
+        return formatter.error(message=f"获取未读数量失败: {str(e)}")
 
 
 @router.post("/{notification_id}/read", summary="标记通知已读")
@@ -126,16 +134,18 @@ async def mark_as_read(notification_id: int, user_id: int = Query(..., descripti
             formatter = create_formatter()
             return formatter.error(message="通知不存在", code=404)
         
-        un, created = await UserNotification.get_or_create(
-            user_id=user_id,
-            notification_id=notification_id,
-            defaults={"is_read": True, "read_time": datetime.now()}
-        )
+        now = datetime.now()
+        conn = Tortoise.get_connection("default")
         
-        if not created and not un.is_read:
-            un.is_read = True
-            un.read_time = datetime.now()
-            await un.save()
+        # 使用原生SQL进行UPSERT，绕过Tortoise的timezone转换问题
+        sql = """
+            INSERT INTO "t_sys_user_notification" (user_id, notification_id, is_read, read_time, is_deleted, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (user_id, notification_id) 
+            DO UPDATE SET is_read=$3, read_time=$4
+        """
+        # 参数: user_id, notification_id, is_read=True, read_time=now, is_deleted=False, created_at=now
+        await conn.execute_query(sql, [user_id, notification_id, True, now, False, now])
         
         formatter = create_formatter()
         return formatter.success(message="标记已读成功")
@@ -143,7 +153,7 @@ async def mark_as_read(notification_id: int, user_id: int = Query(..., descripti
     except Exception as e:
         logger.error(f"标记已读失败: {str(e)}", exc_info=True)
         formatter = create_formatter()
-        return formatter.error(message="标记已读失败")
+        return formatter.error(message=f"标记已读失败: {str(e)}")
 
 
 @router.post("/read-all", summary="全部标记已读")
@@ -151,22 +161,22 @@ async def mark_all_as_read(user_id: int = Query(..., description="用户ID")):
     """将所有通知标记为已读"""
     try:
         now = datetime.now()
+        conn = Tortoise.get_connection("default")
         
-        notifications = await Notification.filter(is_published=True).filter(
-            Q(expire_time__isnull=True) | Q(expire_time__gt=now)
-        ).all()
+        # 使用原生SQL进行批量UPSERT
+        # 1. 选择所有有效通知
+        # 2. 插入到用户通知表，如果存在则更新
+        sql = """
+            INSERT INTO "t_sys_user_notification" (user_id, notification_id, is_read, read_time, is_deleted, created_at)
+            SELECT $1, id, true, $2, false, $2
+            FROM "t_sys_notification"
+            WHERE is_published = true 
+            AND (expire_time IS NULL OR expire_time > $2)
+            ON CONFLICT (user_id, notification_id) 
+            DO UPDATE SET is_read = true, read_time = $2
+        """
         
-        for n in notifications:
-            un, created = await UserNotification.get_or_create(
-                user_id=user_id,
-                notification_id=n.id,
-                defaults={"is_read": True, "read_time": now}
-            )
-            
-            if not created and not un.is_read:
-                un.is_read = True
-                un.read_time = now
-                await un.save()
+        await conn.execute_query(sql, [user_id, now])
         
         formatter = create_formatter()
         return formatter.success(message="全部标记已读成功")
@@ -174,7 +184,7 @@ async def mark_all_as_read(user_id: int = Query(..., description="用户ID")):
     except Exception as e:
         logger.error(f"全部标记已读失败: {str(e)}", exc_info=True)
         formatter = create_formatter()
-        return formatter.error(message="全部标记已读失败")
+        return formatter.error(message=f"全部标记已读失败: {str(e)}")
 
 
 @router.delete("/{notification_id}", summary="删除通知")

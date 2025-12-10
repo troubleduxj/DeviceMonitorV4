@@ -6,22 +6,13 @@ const route: RouteRecordRaw = {
   path: '/device',
   name: 'Device',
   component: Layout,
+  redirect: '/device/baseinfo',
   meta: {
     title: '设备管理',
     icon: 'mdi-air-humidifier',
     requiresAuth: true,
   },
   children: [
-    {
-      path: '',
-      name: 'DeviceIndex',
-      component: () => import('./index.vue'),
-      meta: {
-        title: '设备管理',
-        icon: 'mdi-air-humidifier',
-        requiresAuth: true,
-      },
-    },
     {
       path: 'baseinfo',
       name: 'DeviceBaseinfo',

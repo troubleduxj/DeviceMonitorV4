@@ -860,7 +860,8 @@ class MetadataService:
         table_exists = False
         
         try:
-            sql = f"DESCRIBE {device_type.tdengine_stable_name}"
+            # Use backticks for stable name
+            sql = f"DESCRIBE `{device_type.tdengine_stable_name}`"
             result = await connector.execute_sql(sql)
             
             # Handle TDengine raw response (code/desc)
@@ -937,7 +938,7 @@ class MetadataService:
         
         if not table_exists:
             # 整个表缺失
-            create_sql = f"CREATE STABLE {device_type.tdengine_stable_name} (ts TIMESTAMP, "
+            create_sql = f"CREATE STABLE `{device_type.tdengine_stable_name}` (ts TIMESTAMP, "
             cols = []
             tags = [f"prod_code BINARY(64)"] # 默认 Tag
             
@@ -984,7 +985,7 @@ class MetadataService:
                     elif field.field_type == 'integer': data_type = "INT"
                     elif field.field_type == 'boolean': data_type = "BOOL"
                     
-                    alter_sql = f"ALTER STABLE {device_type.tdengine_stable_name} ADD COLUMN {code} {data_type}"
+                    alter_sql = f"ALTER STABLE `{device_type.tdengine_stable_name}` ADD COLUMN {code} {data_type}"
                     diff['suggested_actions'].append({
                         "action": "ADD_COLUMN",
                         "sql": alter_sql,

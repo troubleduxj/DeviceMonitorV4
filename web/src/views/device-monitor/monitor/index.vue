@@ -957,9 +957,9 @@ function processWebSocketData(data) {
         ip_address: item.ip_address || '未知', // IP地址
         location: item.location || item.team_name || '未设置', // 位置信息
 
-        // 兼容性字段映射（焊机）
-        welding_current: item.weld_current || item.welding_current,
-        welding_voltage: item.weld_voltage || item.welding_voltage,
+        // 动态字段直接映射
+        // 我们不再硬编码映射特定字段（如welding_current），而是依赖GroupedMonitoringData组件
+        // 根据设备类型的字段配置（DeviceField）来动态读取数据
         
         // 时间戳
         timestamp: item.ts,
@@ -989,7 +989,17 @@ function processWebSocketData(data) {
     })
     .filter((device) => device !== null) // 过滤掉无效的设备对象
 
-  console.log(`从WebSocket数据构建了 ${deviceList.length} 个设备对象`)
+  // 调试日志：打印第一台设备的实时数据，确认是否在更新
+  if (deviceList.length > 0) {
+    const first = deviceList[0]
+    console.log(`[${new Date().toLocaleTimeString()}] WebSocket数据更新 (共${deviceList.length}条):`, {
+      device_code: first.id,
+      timestamp: first.timestamp,
+      device_type: first.device_type,
+      // 动态打印所有字段，不局限于硬编码字段
+      data_preview: Object.keys(first).filter(k => !['id', 'name', 'timestamp', 'created_at', 'updated_at'].includes(k)).slice(0, 10)
+    })
+  }
 
   // 更新allDevices数组
   allDevices.value = deviceList
@@ -2014,6 +2024,7 @@ async function showDeviceCharts(device) {
   }
 
   // 准备跳转参数：携带设备编码、设备名称和设备类型代码
+  // 不传递时间参数，让历史页面根据系统配置自动计算默认时间范围
   const routeParams = {
     path: '/device-monitor/history',
     query: {

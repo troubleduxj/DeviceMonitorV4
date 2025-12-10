@@ -357,6 +357,9 @@ export const compatibilityApi = {
     }
     return response
   }),
+  getSystemConfigByKey: wrapApiWithErrorHandler((key, params = {}) =>
+    requestV2.get(`/system-params/cached/${key}`, { params })
+  ),
   createSystemParam: wrapApiWithErrorHandler((data = {}) => systemApis.systemParams.create(data)),
   updateSystemParam: wrapApiWithErrorHandler((data = {}) => {
     // 修复：与updateMenu保持一致的调用格式，从data对象中提取id

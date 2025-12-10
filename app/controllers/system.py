@@ -184,6 +184,14 @@ class ConfigController:
                 description="控制系统主题颜色（白色、黑色）按钮是否在前端显示",
                 is_editable=True,
             ),
+            SysConfigCreate(
+                param_key="HISTORY_DATA_DEFAULT_INTERVAL",
+                param_value="3600",
+                param_name="历史数据默认查询间隔",
+                param_type="int",
+                description="历史数据查询页面默认的时间间隔（秒），结束时间为当前时间，开始时间为当前时间减去该间隔",
+                is_editable=True,
+            ),
         ]
 
         for config_data in default_configs:

@@ -4,6 +4,7 @@
 
 import { request } from '@/utils/http'
 import { deviceFieldApi } from './device-field'
+import { formatDateTime } from '@/utils'
 
 export interface DeviceType {
   id: number
@@ -143,6 +144,8 @@ export const compatibilityApi = {
     end_time?: number
     limit?: number
     offset?: number
+    page?: number
+    page_size?: number
   }) {
     // 先通过device_code获取设备信息
     const devicesResponse = await devices.list({
@@ -164,21 +167,29 @@ export const compatibilityApi = {
     const deviceId = Number(device.id)
     console.log('Final deviceId:', deviceId)
 
-    // 转换时间格式（从毫秒时间戳转为ISO字符串）
+    // 转换时间格式（从毫秒时间戳转为本地时间字符串）
     const queryParams: any = {}
     if (params.start_time) {
-      queryParams.start_time = new Date(params.start_time).toISOString()
+      queryParams.start_time = formatDateTime(params.start_time)
     }
     if (params.end_time) {
-      queryParams.end_time = new Date(params.end_time).toISOString()
+      queryParams.end_time = formatDateTime(params.end_time)
     }
 
     // 处理分页参数
-    if (params.limit !== undefined) {
+    // 优先使用 page_size, 如果没有则使用 limit
+    if (params.page_size !== undefined) {
+      queryParams.page_size = params.page_size
+    } else if (params.limit !== undefined) {
       queryParams.page_size = params.limit
     }
-    if (params.offset !== undefined) {
-      queryParams.page = Math.floor(params.offset / (params.limit || 20)) + 1
+
+    // 优先使用 page, 如果没有则使用 offset 计算
+    if (params.page !== undefined) {
+      queryParams.page = params.page
+    } else if (params.offset !== undefined) {
+      const limit = queryParams.page_size || 20
+      queryParams.page = Math.floor(params.offset / limit) + 1
     }
 
     // 调用历史数据API

@@ -70,7 +70,11 @@
                   <span v-if="getFieldIcon(field)" class="field-icon">{{ getFieldIcon(field) }}</span>
                   {{ field.field_name }}:
                 </span>
-                <span class="data-value" :style="{ color: getFieldColor(field) }">
+                <span 
+                  class="data-value" 
+                  :class="{ updated: fieldUpdateStatus[field.field_code] }"
+                  :style="{ color: getFieldColor(field) }"
+                >
                   {{ formatValue(realtimeData[field.field_code], field) }}
                 </span>
               </div>
@@ -96,7 +100,7 @@ import TheIcon from '@/components/icon/TheIcon.vue'
 /**
  * 设备字段接口定义
  */
-interface DeviceField {
+export interface DeviceField {
   id: number
   device_type_code: string
   field_name: string
@@ -128,6 +132,28 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false
 })
+
+// 字段更新状态，用于控制闪烁动画
+const fieldUpdateStatus = ref<Record<string, boolean>>({})
+
+// 监听实时数据变化，触发更新动画
+watch(() => props.realtimeData, (newVal, oldVal) => {
+  if (!oldVal) return
+  
+  // 遍历新数据，检查是否有变化
+  Object.keys(newVal).forEach(key => {
+    // 简单的值比较，如果是对象则忽略
+    if (typeof newVal[key] !== 'object' && newVal[key] !== oldVal[key]) {
+      // 标记为已更新
+      fieldUpdateStatus.value[key] = true
+      
+      // 600ms后移除标记（对应CSS动画时间）
+      setTimeout(() => {
+        fieldUpdateStatus.value[key] = false
+      }, 600)
+    }
+  })
+}, { deep: true })
 
 // 轮播相关
 const carouselRef = ref()

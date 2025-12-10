@@ -170,7 +170,8 @@ class TDengineService:
     async def get_table_schema(self, database: str, table_name: str) -> Dict[str, Any]:
         """获取表结构"""
         try:
-            result = await self.execute_query(f"DESCRIBE {database}.{table_name};")
+            # 使用反引号包裹表名以支持特殊字符和区分大小写
+            result = await self.execute_query(f"DESCRIBE `{table_name}`;", database)
             if result.get("data"):
                 columns = []
                 for row in result["data"]:

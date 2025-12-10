@@ -330,17 +330,21 @@ class TransformEngine:
         Returns:
             四舍五入后的值
         """
-        decimals = rule.get('decimals', 0)
+        # 默认为 3 位小数 (用户需求: 监测卡片上关于数值类型的监测参数，默认保留3位小数)
+        decimals = rule.get('decimals', 3)
         
         try:
             # 转换为数值
             if isinstance(value, str):
                 value = float(value)
             
-            result = round(value, decimals)
+            # 如果是浮点数，进行四舍五入
+            if isinstance(value, float):
+                result = round(value, decimals)
+                logger.debug(f"[数据转换] 四舍五入: {field_name} = {value} -> {result}")
+                return result
             
-            logger.debug(f"[数据转换] 四舍五入: {field_name} = {value} -> {result}")
-            return result
+            return value
             
         except Exception as e:
             logger.error(f"[数据转换] 四舍五入失败: {field_name}, error={e}")
@@ -446,6 +450,12 @@ class TransformEngine:
                     transform_rule=transform_rule,
                     field_name=field_code
                 )
+                
+                # 用户需求: 监测卡片上关于数值类型的监测参数，默认保留3位小数
+                # 即使没有配置转换规则，也对浮点数应用默认的 3 位小数处理
+                if isinstance(transformed_value, float):
+                    transformed_value = round(transformed_value, 3)
+                
                 transformed_data[field_code] = transformed_value
             else:
                 transformed_data[field_code] = None

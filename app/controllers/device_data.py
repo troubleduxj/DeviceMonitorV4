@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any
+from decimal import Decimal
 
 from fastapi import HTTPException
 from loguru import logger
@@ -23,6 +24,18 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
 
     def __init__(self):
         super().__init__(model=DeviceRealTimeData)
+
+    @staticmethod
+    def _round_value(val: Any) -> Any:
+        """
+        对数值进行四舍五入保留3位小数
+        支持 float 和 Decimal 类型
+        """
+        if isinstance(val, float):
+            return round(val, 3)
+        if isinstance(val, Decimal):
+            return round(float(val), 3)
+        return val
 
     async def create_realtime_data(self, obj_in: DeviceRealTimeDataCreate) -> DeviceInfo:
         """创建设备实时数据
@@ -187,25 +200,37 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             if not device_info:
                 logger.warning(f"❌ 设备编号 {device_code} 不存在，无法查询历史数据")
                 return 0, []
-            # TDengine 的表名是 tb_{device_code}（小写）
-            table_name = f"tb_{device_code.lower()}"
-            logger.info(f"✅ 设备信息: device_code={device_code}, device_type={device_info.device_type}, table_name={table_name}")
+            
+            # 准备可能的表名列表，稍后连接数据库时验证
+            potential_table_names = [
+                f"tb_{device_code.lower()}",
+                f"record_{device_code}",
+                device_code.lower(),
+                device_code
+            ]
+            # 默认使用第一个，如果没有找到合适的，将在后续逻辑中处理
+            table_name = potential_table_names[0]
+            logger.info(f"✅ 设备信息: device_code={device_code}, device_type={device_info.device_type}, 待验证表名={potential_table_names}")
         else:
             logger.warning("❌ 未提供设备编号，无法查询历史数据")
             return 0, []  # 设备编号是必须的
 
         if start_time:
-            # TDengine 时间戳格式
-            start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            # 使用 isoformat 以支持时区 (TDengine 支持 ISO 8601)
+            # 避免使用 strftime 导致时区信息丢失
+            start_time_str = start_time.isoformat()
             conditions.append(f"ts >= '{start_time_str}'")
             logger.info(f"   时间范围: start_time={start_time_str}")
         if end_time:
-            # TDengine 时间戳格式
-            end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            end_time_str = end_time.isoformat()
             conditions.append(f"ts <= '{end_time_str}'")
             logger.info(f"   时间范围: end_time={end_time_str}")
         if status:
             conditions.append(f"device_status = '{status}'")
+
+        # 添加 device_code 作为过滤条件 (用于超级表查询)
+        if device_code:
+             conditions.append(f"device_code = '{device_code}'")
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
@@ -221,20 +246,64 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             database=tdengine_creds.database,
         )
         try:
-            # 先检查表是否存在
-            check_table_sql = f"SHOW TABLES LIKE '{table_name}'"
-            logger.info(f"🔍 检查表是否存在: {check_table_sql}")
-            try:
-                table_check_result = await td_connector.query_data(check_table_sql)
-                if not table_check_result or not table_check_result.get('data'):
-                    logger.warning(f"❌ TDengine表 {table_name} 不存在")
-                    await td_connector.close()
-                    return 0, []
-                logger.info(f"✅ 表存在: {table_name}")
-            except Exception as e:
-                logger.error(f"❌ 检查表失败: {e}")
+            target_table = None
+            
+            # 1. 优先尝试从设备类型配置中获取超级表名
+            if device_info and device_info.device_type:
+                device_type_obj = await DeviceType.filter(type_code=device_info.device_type).first()
+                if device_type_obj and device_type_obj.tdengine_stable_name:
+                    # 使用反引号包裹表名，防止大小写问题
+                    target_table = f"`{device_type_obj.tdengine_stable_name}`"
+                    logger.info(f"✅ 从设备类型配置获取到超级表: {target_table}")
+            
+            # 2. 如果没找到配置的超级表，尝试之前的逻辑 (作为回退)
+            if not target_table:
+                # 尝试获取超级表 (旧逻辑，可能不准确)
+                try:
+                    stables_res = await td_connector.query_data("SHOW STABLES")
+                    if stables_res and stables_res.get('data'):
+                        for stable in stables_res['data']:
+                            # stable[0] 是表名
+                            if isinstance(stable, list) and len(stable) > 0 and isinstance(stable[0], str) and 'meters' in stable[0]:
+                                target_table = f"`{stable[0]}`"
+                                break
+                        if not target_table and stables_res['data'] and isinstance(stables_res['data'][0], list):
+                             target_table = f"`{stables_res['data'][0][0]}`"
+                        
+                        if target_table:
+                            logger.info(f"✅ 自动发现超级表: {target_table}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 获取超级表失败: {e}")
+
+                # 3. 如果没找到超级表，尝试子表逻辑
+                if not target_table:
+                    # 检查表是否存在 (尝试多个可能的表名)
+                    found_table = None
+                    for name in potential_table_names:
+                        check_table_sql = f"SHOW TABLES LIKE '{name}'"
+                        logger.info(f"🔍 检查表是否存在: {check_table_sql}")
+                        try:
+                            table_check_result = await td_connector.query_data(check_table_sql)
+                            if table_check_result and table_check_result.get('data'):
+                                found_table = name
+                                logger.info(f"✅ 找到表: {found_table}")
+                                break
+                        except Exception as e:
+                            logger.warning(f"⚠️ 检查表 {name} 失败: {e}")
+                    
+                    if found_table:
+                        target_table = f"`{found_table}`"
+                        # 如果是具体子表，不需要 device_code 过滤条件
+                        conditions_sub = [c for c in conditions if not c.startswith("device_code =")]
+                        where_clause = " AND ".join(conditions_sub) if conditions_sub else "1=1"
+            
+            if not target_table:
+                logger.warning(f"❌ 未找到可查询的表 (超级表或子表)")
                 await td_connector.close()
                 return 0, []
+            
+            table_name = target_table
+            logger.info(f"🚀 最终查询表名: {table_name}, 条件: {where_clause}")
             
             # 查询总数
             count_sql = f"SELECT count(*) FROM {table_name} WHERE {where_clause}"
@@ -472,18 +541,24 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             if current_page_devices:
                 try:
                     if super_table_name:
+                        # 统一使用 device_code 作为 tag 列名
+                        tag_col = "device_code"
+                        # 移除对 plasma_cutter_2025 的特殊处理，统一规范
+                        # if super_table_name == "plasma_cutter_2025":
+                        #     tag_col = "device_id"
+
                         # 单一设备类型查询
                         where_clause = ""
                         if query.device_codes:
                             codes_str = ", ".join([f"'{code}'" for code in query.device_codes])
-                            where_clause = f"WHERE device_code IN ({codes_str})"
+                            where_clause = f"WHERE {tag_col} IN ({codes_str})"
                         elif query.device_code:
-                            where_clause = f"WHERE device_code = '{query.device_code}'"
+                            where_clause = f"WHERE {tag_col} = '{query.device_code}'"
 
                         if where_clause:
-                            batch_sql = f"SELECT LAST_ROW(*), device_code FROM {super_table_name} {where_clause} GROUP BY device_code;"
+                            batch_sql = f"SELECT LAST_ROW(*), {tag_col} FROM `{super_table_name}` {where_clause} GROUP BY {tag_col}"
                         else:
-                            batch_sql = f"SELECT LAST_ROW(*), device_code FROM {super_table_name} GROUP BY device_code;"
+                            batch_sql = f"SELECT LAST_ROW(*), {tag_col} FROM `{super_table_name}` GROUP BY {tag_col}"
 
                         logger.info(f"准备执行TDengine超级表查询")
                         logger.debug(f"超级表查询SQL: {batch_sql}")
@@ -494,11 +569,12 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                             rows = raw_result["data"]
                             for row in rows:
                                 row_dict = dict(zip(columns, row))
-                                device_code = row_dict.get("device_code")
-                                if device_code:
-                                    device_data_map[device_code] = row_dict
+                                # Map tag_col back to device_code for internal logic
+                                device_code_val = row_dict.get(tag_col)
+                                if device_code_val:
+                                    device_data_map[device_code_val] = row_dict
                                 else:
-                                    logger.warning(f"Row data missing device_code: {row_dict}. This row will be skipped.")
+                                    logger.warning(f"Row data missing {tag_col}: {row_dict}. This row will be skipped.")
                     else:
                         # 多设备类型查询：按设备类型分组
                         logger.info("按设备类型分组查询TDengine数据")
@@ -519,10 +595,17 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                                 continue
                             
                             type_super_table = device_type_obj.tdengine_stable_name
+                            
+                            # 统一使用 device_code 作为 tag 列名
+                            tag_col = "device_code"
+                            # 移除对 plasma_cutter_2025 的特殊处理
+                            # if type_super_table == "plasma_cutter_2025":
+                            #     tag_col = "device_id"
+                            
                             device_codes_for_type = [d.device_code for d in type_devices]
                             codes_str = ", ".join([f"'{code}'" for code in device_codes_for_type])
                             
-                            type_sql = f"SELECT LAST_ROW(*), device_code FROM {type_super_table} WHERE device_code IN ({codes_str}) GROUP BY device_code;"
+                            type_sql = f"SELECT LAST_ROW(*), {tag_col} FROM `{type_super_table}` WHERE {tag_col} IN ({codes_str}) GROUP BY {tag_col}"
                             logger.debug(f"查询设备类型 {device_type} 的SQL: {type_sql}")
                             
                             type_result = await tdengine_connector.execute_sql(type_sql, target_db=tdengine_creds.database)
@@ -531,9 +614,10 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                                 rows = type_result["data"]
                                 for row in rows:
                                     row_dict = dict(zip(columns, row))
-                                    device_code = row_dict.get("device_code")
-                                    if device_code:
-                                        device_data_map[device_code] = row_dict
+                                    # Map tag_col back to device_code for internal logic
+                                    device_code_val = row_dict.get(tag_col)
+                                    if device_code_val:
+                                        device_data_map[device_code_val] = row_dict
 
                     # 辅助函数：从 TDengine 结果中提取字段值
                     def get_field_value(row_data, field_name):
@@ -559,12 +643,16 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                                     # 提取字段名（去掉 last_row() 前缀）
                                     actual_field_name = field_name[9:-1]  # 去掉 'last_row(' 和 ')'
                                     if actual_field_name not in special_fields:
-                                        data_fields[actual_field_name] = row_data[field_name]
-                                        logger.debug(f"提取字段: {field_name} -> {actual_field_name} = {row_data[field_name]}")
+                                        val = row_data[field_name]
+                                        val = self._round_value(val)
+                                        data_fields[actual_field_name] = val
+                                        logger.debug(f"提取字段: {field_name} -> {actual_field_name} = {val}")
                                 # 处理普通字段
                                 elif field_name not in special_fields:
-                                    data_fields[field_name] = row_data[field_name]
-                                    logger.debug(f"提取字段: {field_name} = {row_data[field_name]}")
+                                    val = row_data[field_name]
+                                    val = self._round_value(val)
+                                    data_fields[field_name] = val
+                                    logger.debug(f"提取字段: {field_name} = {val}")
                             
                             # 提取时间戳
                             ts_value = get_field_value(row_data, "ts")
@@ -578,6 +666,7 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                                 "device_name": tdengine_device_name or device.device_name or "",
                                 "type_code": device.device_type,  # 使用设备实际的类型
                                 "ts": ts_formatted,
+                                "device_status": data_fields.get("device_status", "online"),
                             }
                             device_data.update(data_fields)
                             logger.debug(f"设备 {device.device_code} 的完整数据: {device_data}")
@@ -588,6 +677,10 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                             
                             if latest_pg_data:
                                 metrics = latest_pg_data.metrics or {}
+                                # 对 metrics 中的数值进行四舍五入
+                                for k, v in metrics.items():
+                                    metrics[k] = self._round_value(v)
+                                    
                                 device_data = {
                                     "device_code": device.device_code,
                                     "device_name": device.device_name or "",
@@ -617,6 +710,10 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                             
                         if latest_pg_data:
                             metrics = latest_pg_data.metrics or {}
+                            # 对 metrics 中的数值进行四舍五入
+                            for k, v in metrics.items():
+                                metrics[k] = self._round_value(v)
+                                
                             device_data = {
                                 "device_code": device_in_page.device_code,
                                 "device_name": device_in_page.device_name or "",
@@ -713,10 +810,17 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             
             super_table_name = device_type_obj.tdengine_stable_name
             logger.info(f"使用TDengine超级表: {super_table_name} (设备类型: {query.type_code})")
+            
+            # 统一使用 device_code 作为 tag 列名
+            tag_col = "device_code"
+            # 移除对 plasma_cutter_2025 的特殊处理
+            # if super_table_name == "plasma_cutter_2025":
+            #     tag_col = "device_id"
+                
             codes_str = ", ".join([f"'{code}'" for code in device_codes_for_tdengine])
-            where_clause = f"WHERE device_code IN ({codes_str})"
+            where_clause = f"WHERE {tag_col} IN ({codes_str})"
 
-            batch_sql = f"SELECT LAST_ROW(*), device_code FROM {super_table_name} {where_clause} GROUP BY device_code;"
+            batch_sql = f"SELECT LAST_ROW(*), {tag_col} FROM `{super_table_name}` {where_clause} GROUP BY {tag_col}"
             logger.debug(f"PAGED - TDengine SQL: {batch_sql}")
 
             raw_result = await tdengine_connector.execute_sql(batch_sql, target_db=tdengine_creds.database)
@@ -726,8 +830,10 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                 columns = [col[0] for col in raw_result["column_meta"]]
                 for row in raw_result["data"]:
                     row_dict = dict(zip(columns, row))
-                    if row_dict.get("device_code"):
-                        device_data_map[row_dict["device_code"]] = row_dict
+                    # Map tag_col back to device_code for internal logic
+                    device_code_val = row_dict.get(tag_col)
+                    if device_code_val:
+                        device_data_map[device_code_val] = row_dict
 
             # 3. 合并数据
             for device in current_page_devices:
@@ -757,10 +863,14 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                             # 提取字段名（去掉 last_row() 前缀）
                             actual_field_name = field_name[9:-1]  # 去掉 'last_row(' 和 ')'
                             if actual_field_name not in special_fields:
-                                data_fields[actual_field_name] = row_data[field_name]
+                                val = row_data[field_name]
+                                val = self._round_value(val)
+                                data_fields[actual_field_name] = val
                         # 处理普通字段
                         elif field_name not in special_fields:
-                            data_fields[field_name] = row_data[field_name]
+                            val = row_data[field_name]
+                            val = self._round_value(val)
+                            data_fields[field_name] = val
                     
                     ts_value = get_field_value(row_data, "ts")
                     # 从TDengine的device_name标签获取设备名称，如果没有则使用PostgreSQL中的设备名称
@@ -771,6 +881,7 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                         "device_name": tdengine_name,
                         "type_code": query.type_code,
                         "ts": str(ts_value) if ts_value else None,
+                        "device_status": data_fields.get("device_status", "online"),
                         **data_fields,
                     }
                     realtime_data_list.append(device_data)
@@ -782,6 +893,10 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                     
                     if latest_pg_data:
                         metrics = latest_pg_data.metrics or {}
+                        # 对 metrics 中的数值进行四舍五入
+                        for k, v in metrics.items():
+                            metrics[k] = self._round_value(v)
+                            
                         device_data = {
                             "device_code": device.device_code,
                             "device_name": device.device_name or "",
