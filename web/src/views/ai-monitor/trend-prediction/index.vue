@@ -373,9 +373,9 @@ const refreshPrediction = async () => {
       // 2. 获取风险评估数据
       fetch('/api/v2/ai/predictions/analytics/risk-assessment').then(r => r.json()),
       // 3. 获取健康趋势数据
-      fetch('/api/v2/ai/predictions/analytics/health-trend').then(r => r.json()),
+      fetch('/api/v2/ai/predictions/analytics/health-trend?days=7').then(r => r.json()),
       // 4. 获取预测报告数据
-      fetch('/api/v2/ai/predictions/analytics/report').then(r => r.json())
+      fetch('/api/v2/ai/predictions/analytics/prediction-report').then(r => r.json())
     ])
 
     // 处理批量创建响应

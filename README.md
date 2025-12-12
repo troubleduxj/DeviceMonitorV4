@@ -61,6 +61,17 @@
 
 ## 🚀 快速开始
 
+### ⚡ 开发环境一键启动 (推荐)
+
+直接运行项目根目录下的启动脚本：
+
+```bash
+# Windows
+start_dev.bat
+```
+
+脚本会自动检测虚拟环境、启动后端API、Celery任务队列和前端开发服务器。
+
 ### 📦 离线部署（推荐）
 
 **使用离线打包工具，支持版本管理和多环境部署！**
@@ -99,6 +110,34 @@ scripts\deployment\管理打包版本.bat
 2. ✅ 异常检测
 3. ✅ 健康评分
 4. ✅ 批量预测
+5. ✅ 独立训练系统 (支持断点续训与实时进度)
+
+---
+
+### 🛠️ 手动启动开发环境
+
+如果您需要手动控制各个服务，请按以下步骤操作：
+
+**1. 启动后端 API**
+```bash
+# 激活虚拟环境 (可选)
+# .venv\Scripts\activate
+
+# 启动 FastAPI 服务
+python -m uvicorn app:app --reload --host 0.0.0.0 --port 8001
+```
+
+**2. 启动 AI 任务队列**
+```bash
+# Windows 下推荐使用 solo 模式以避免 asyncio 冲突
+celery -A app.celery_app worker --loglevel=info -P solo -Q celery,ai_training,ai_evaluation
+```
+
+**3. 启动前端**
+```bash
+cd web
+npm run dev
+```
 
 ### 开发环境要求
 

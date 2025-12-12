@@ -62,11 +62,14 @@ const pagination = ref({
 // 获取状态标签类型
 const getStatusType = (status) => {
   const statusMap = {
-    running: 'success',
+    deployed: 'success', // 对应 running/deployed
     stopped: 'default',
     training: 'warning',
-    deploying: 'info',
+    draft: 'default', // 草稿
+    trained: 'info', // 已训练
     error: 'error',
+    failed: 'error',
+    archived: 'default'
   }
   return statusMap[status] || 'default'
 }
@@ -74,11 +77,14 @@ const getStatusType = (status) => {
 // 获取状态文本
 const getStatusText = (status) => {
   const statusMap = {
-    running: '运行中',
+    deployed: '已部署',
     stopped: '已停止',
     training: '训练中',
-    deploying: '部署中',
+    draft: '草稿',
+    trained: '已训练',
     error: '错误',
+    failed: '失败',
+    archived: '已归档'
   }
   return statusMap[status] || status
 }
@@ -137,9 +143,9 @@ const columns = [
   {
     title: '状态',
     key: 'status',
-    width: 100,
+    width: 150,
     render: (row) => {
-      return h(
+      const tag = h(
         NTag,
         {
           type: getStatusType(row.status),
@@ -149,6 +155,27 @@ const columns = [
           default: () => getStatusText(row.status),
         }
       )
+
+      if (row.status === 'training') {
+        return h(
+          NSpace,
+          { vertical: true, size: 'small' },
+          {
+            default: () => [
+              tag,
+              h(NProgress, {
+                type: 'line',
+                percentage: row.progress || 0,
+                showIndicator: true,
+                height: 4,
+                processing: true
+              })
+            ]
+          }
+        )
+      }
+
+      return tag
     },
   },
   {
@@ -239,7 +266,7 @@ const columns = [
             ),
 
             // 部署/停止
-            row.status === 'running'
+            row.status === 'deployed'
               ? h(
                   NTooltip,
                   {
@@ -275,7 +302,7 @@ const columns = [
                           size: 'small',
                           quaternary: true,
                           type: 'success',
-                          disabled: row.status === 'training' || row.status === 'deploying',
+                          disabled: row.status !== 'trained',
                           onClick: () => emit('deploy', row),
                         },
                         {

@@ -372,7 +372,7 @@ async def ValidationErrorHandle(req: Request, exc: ValidationError) -> JSONRespo
                 field=error["field"],
                 code=error["type"],
                 message=error["message"],
-                value=error.get("input")
+                value=str(error.get("input")) if error.get("input") is not None else None
             ))
         
         return formatter.validation_error(
@@ -432,7 +432,7 @@ async def RequestValidationHandle(req: Request, exc: RequestValidationError) -> 
                 field=error["field"],
                 code=error["type"],
                 message=error["message"],
-                value=error.get("input")
+                value=str(error.get("input")) if error.get("input") is not None else None
             ))
         
         return formatter.validation_error(

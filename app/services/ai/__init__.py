@@ -8,4 +8,6 @@ AI服务包
 __version__ = "0.1.0"
 __author__ = "DeviceMonitor Team"
 
-# 导入各个服务（延迟加载，仅在AI模块启用时导入）
+# 导入各个服务
+from app.services.ai.trainer import BaseTrainer
+from app.services.ai.data_loader import TDengineLoader

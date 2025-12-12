@@ -73,6 +73,9 @@ class APIv2ErrorDetail(BaseModel):
     code: str
     message: str
     value: Optional[Any] = None
+    
+    # 允许任意类型的值
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class APIv2ErrorResponse(BaseModel):
@@ -367,7 +370,7 @@ class ResponseFormatterV2:
                         "message": str(detail),
                         "value": detail
                     })
-            error_obj["details"] = processed_details
+        error_obj["details"] = processed_details
         
         if suggestion:
             error_obj["suggestion"] = suggestion

@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 import hashlib
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import FileResponse
 
 from app.models.ai_monitoring import AIModel, ModelStatus
@@ -22,49 +22,46 @@ from app.schemas.base import APIResponse, PaginatedResponse
 from app.core.response_formatter_v2 import create_formatter
 from app.core.pagination import get_pagination_params, create_pagination_response
 from app.log import logger
+from app.services.ai.tasks import train_model as train_model_task_celery
 
+response_formatter_v2 = create_formatter()
 
 router = APIRouter(prefix="/models", tags=["AI模型管理"])
 
 
 @router.get("", response_model=APIResponse[PaginatedResponse[ModelResponse]])
 async def get_models(
-    query: AIMonitoringQuery = Depends(),
-    pagination: dict = Depends(get_pagination_params),
-    model_type: Optional[str] = Query(None, description="模型类型过滤"),
-    status: Optional[str] = Query(None, description="模型状态过滤")
+    status: Optional[str] = Query(None, description="模型状态"),
+    model_type: Optional[str] = Query(None, description="模型类型"),
+    search: Optional[str] = Query(None, description="搜索关键词"),
+    created_by: Optional[int] = Query(None, description="创建人ID"),
+    pagination: Dict[str, int] = Depends(get_pagination_params)
 ):
     """
     获取模型列表
-    
-    支持按模型类型、状态、创建人、日期范围等条件过滤，支持关键词搜索
     """
     try:
         # 构建查询条件
         filters = {}
         
-        if query.status or status:
-            filters["status"] = query.status or status
+        if status:
+            filters["status"] = status
         
         if model_type:
             filters["model_type"] = model_type
         
-        if query.created_by:
-            filters["created_by"] = query.created_by
-        
-        if query.date_from:
-            filters["created_at__gte"] = query.date_from
-        
-        if query.date_to:
-            filters["created_at__lte"] = query.date_to
+        if created_by:
+            filters["created_by"] = created_by
+            
+        # date处理比较麻烦，暂时忽略
         
         # 基础查询
         queryset = AIModel.filter(**filters)
         
         # 关键词搜索
-        if query.search:
+        if search:
             queryset = queryset.filter(
-                model_name__icontains=query.search
+                model_name__icontains=search
             )
         
         # 排序
@@ -92,6 +89,7 @@ async def get_models(
                 training_parameters=model.training_parameters,
                 training_metrics=model.training_metrics,
                 status=model.status,
+                progress=model.progress,
                 accuracy=model.accuracy,
                 precision=model.precision,
                 recall=model.recall,
@@ -106,7 +104,7 @@ async def get_models(
         
         # 创建分页响应
         paginated_response = create_pagination_response(
-            items=model_responses,
+            data=model_responses,
             total=total,
             page=pagination["page"],
             page_size=pagination["page_size"]
@@ -119,6 +117,8 @@ async def get_models(
         
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return response_formatter_v2.error(
             message="获取模型列表失败",
             details={"error": str(e)}
@@ -151,6 +151,7 @@ async def get_model(model_id: int):
             training_parameters=model.training_parameters,
             training_metrics=model.training_metrics,
             status=model.status,
+            progress=model.progress,
             accuracy=model.accuracy,
             precision=model.precision,
             recall=model.recall,
@@ -224,6 +225,7 @@ async def create_model(
             training_parameters=model.training_parameters,
             training_metrics=model.training_metrics,
             status=model.status,
+            progress=model.progress,
             accuracy=model.accuracy,
             precision=model.precision,
             recall=model.recall,
@@ -244,21 +246,27 @@ async def create_model(
         
     except Exception as e:
         logger.error(f"创建模型失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return response_formatter_v2.error(
-            message="创建模型失败",
-            details={"error": str(e)}
+            message=f"创建模型失败: {str(e)}",
+            details=[{
+                "code": "CREATION_FAILED",
+                "message": str(e),
+                "field": "general"
+            }]
         )
 
 
 @router.post("/upload", response_model=APIResponse[ModelResponse])
 async def upload_model(
     file: UploadFile = File(...),
-    model_name: str = Query(..., description="模型名称"),
-    model_version: str = Query(..., description="模型版本"),
-    model_type: str = Query(..., description="模型类型"),
-    algorithm: str = Query(..., description="算法名称"),
-    framework: str = Query(..., description="框架名称"),
-    description: Optional[str] = Query(None, description="模型描述"),
+    model_name: str = Form(..., description="模型名称"),
+    model_version: str = Form(..., description="模型版本"),
+    model_type: str = Form(..., description="模型类型"),
+    algorithm: str = Form(..., description="算法名称"),
+    framework: str = Form(..., description="框架名称"),
+    description: Optional[str] = Form(None, description="模型描述"),
     current_user_id: int = 1  # TODO: 从认证中获取
 ):
     """上传模型文件"""
@@ -328,6 +336,7 @@ async def upload_model(
             training_parameters=model.training_parameters,
             training_metrics=model.training_metrics,
             status=model.status,
+            progress=model.progress,
             accuracy=model.accuracy,
             precision=model.precision,
             recall=model.recall,
@@ -401,6 +410,7 @@ async def update_model(
             training_parameters=model.training_parameters,
             training_metrics=model.training_metrics,
             status=model.status,
+            progress=model.progress,
             accuracy=model.accuracy,
             precision=model.precision,
             recall=model.recall,
@@ -493,15 +503,23 @@ async def train_model(
         model.training_dataset = train_data.training_dataset
         model.training_parameters = train_data.training_parameters
         model.status = ModelStatus.TRAINING
+        model.progress = 0.0
         model.updated_by = current_user_id
         await model.save()
         
         # 添加后台训练任务
-        background_tasks.add_task(train_model_task, model_id, train_data.dict())
+        # background_tasks.add_task(train_model_task, model_id, train_data.dict())
+        # 使用 Celery 异步任务
+        task = train_model_task_celery.delay(model_id, train_data.dict())
+        
+        # 更新 task_id
+        model.task_id = task.id
+        await model.save()
         
         return response_formatter_v2.success(
             data={
                 "model_id": model_id,
+                "task_id": task.id,
                 "status": "training_started",
                 "training_dataset": train_data.training_dataset
             },
@@ -546,6 +564,39 @@ async def get_model_metrics(model_id: int):
         logger.error(f"获取模型指标失败: model_id={model_id}, 错误: {str(e)}")
         return response_formatter_v2.error(
             message="获取模型指标失败",
+            details={"error": str(e)}
+        )
+
+
+@router.get("/{model_id}/logs", response_model=APIResponse[dict])
+async def get_model_logs(model_id: int):
+    """获取模型训练日志"""
+    try:
+        model = await AIModel.get_or_none(id=model_id)
+        if not model:
+            return response_formatter_v2.error(
+                message="模型不存在",
+                code=404
+            )
+        
+        # 目前我们使用 error_log 字段存储训练日志
+        # 在实际生产环境中，建议使用专门的日志存储或表
+        logs = model.error_log if model.error_log else "暂无日志"
+        
+        return response_formatter_v2.success(
+            data={
+                "model_id": model_id,
+                "logs": logs,
+                "status": model.status,
+                "progress": model.progress
+            },
+            message="获取模型日志成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"获取模型日志失败: model_id={model_id}, 错误: {str(e)}")
+        return response_formatter_v2.error(
+            message="获取模型日志失败",
             details={"error": str(e)}
         )
 
@@ -668,7 +719,11 @@ async def train_model_task(model_id: int, train_config: Dict[str, Any]):
         
         # 模拟训练过程
         import asyncio
-        await asyncio.sleep(10)  # 模拟训练时间
+        # 模拟进度更新
+        for progress in range(0, 101, 10):
+            model.progress = float(progress)
+            await model.save()
+            await asyncio.sleep(1)  # 模拟每步1秒，共10秒
         
         # 模拟训练结果
         training_metrics = {

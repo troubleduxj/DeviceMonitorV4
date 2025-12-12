@@ -2,7 +2,7 @@
   <n-modal
     v-model:show="showModal"
     preset="dialog"
-    title="上传模型"
+    title="新建模型训练"
     :style="{ width: '600px' }"
     :mask-closable="false"
   >
@@ -60,42 +60,21 @@
         />
       </n-form-item>
 
-      <n-form-item label="模型文件" path="file">
-        <n-upload
-          ref="uploadRef"
-          :file-list="fileList"
-          :max="1"
-          :on-before-upload="handleBeforeUpload"
-          :on-remove="handleRemove"
-          :on-finish="handleFinish"
-          :on-error="handleError"
-          accept=".pkl,.h5,.onnx,.pt,.pth,.joblib,.model"
-          :show-file-list="true"
-          :custom-request="customRequest"
-        >
-          <n-upload-dragger>
-            <div style="margin-bottom: 12px">
-              <n-icon size="48" :depth="3">
-                <cloud-upload-outline />
-              </n-icon>
-            </div>
-            <n-text style="font-size: 16px"> 点击或者拖动文件到该区域来上传 </n-text>
-            <n-p depth="3" style="margin: 8px 0 0 0">
-              支持 .pkl, .h5, .onnx, .pt, .pth, .joblib, .model 格式
-            </n-p>
-          </n-upload-dragger>
-        </n-upload>
+      <n-divider title-placement="left">训练配置</n-divider>
+
+      <n-form-item label="训练数据集" path="training_dataset">
+        <n-input 
+          v-model:value="formData.training_dataset" 
+          placeholder="请输入数据集标识或路径" 
+          clearable 
+        />
       </n-form-item>
 
-      <n-form-item label="标签" path="tags">
-        <n-dynamic-tags v-model:value="formData.tags" placeholder="添加标签" />
-      </n-form-item>
-
-      <n-form-item label="配置参数">
+      <n-form-item label="训练参数">
         <n-card size="small" style="width: 100%">
           <template #header>
             <n-space justify="space-between">
-              <span>模型参数</span>
+              <span>参数配置</span>
               <n-button size="small" @click="addParameter"> 添加参数 </n-button>
             </n-space>
           </template>
@@ -124,8 +103,8 @@
     <template #action>
       <n-space>
         <n-button @click="handleCancel">取消</n-button>
-        <n-button type="primary" :loading="uploading" @click="handleSubmit">
-          {{ uploading ? '上传中...' : '确认上传' }}
+        <n-button type="primary" :loading="loading" @click="handleSubmit">
+          {{ loading ? '提交中...' : '开始训练' }}
         </n-button>
       </n-space>
     </template>
@@ -133,26 +112,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import {
   NModal,
   NForm,
   NFormItem,
   NInput,
   NSelect,
-  NUpload,
-  NUploadDragger,
   NIcon,
-  NText,
-  NP,
-  NDynamicTags,
   NCard,
   NSpace,
   NButton,
   NEmpty,
+  NDivider,
   useMessage,
 } from 'naive-ui'
-import { CloudUploadOutline, TrashOutline } from '@vicons/ionicons5'
+import { TrashOutline } from '@vicons/ionicons5'
 import { modelManagementApi } from '@/api/v2/ai-module'
 
 // Props
@@ -168,9 +143,7 @@ const emit = defineEmits(['update:show', 'success'])
 
 // 响应式数据
 const formRef = ref(null)
-const uploadRef = ref(null)
-const uploading = ref(false)
-const fileList = ref([])
+const loading = ref(false)
 
 // 表单数据
 const formData = ref({
@@ -180,9 +153,12 @@ const formData = ref({
   version: '',
   algorithm: '',
   framework: '',
-  file: null,
-  tags: [],
-  parameters: [],
+  training_dataset: '',
+  parameters: [
+    { key: 'epochs', value: '100' },
+    { key: 'batch_size', value: '32' },
+    { key: 'learning_rate', value: '0.001' }
+  ],
 })
 
 // 模型类型选项
@@ -251,10 +227,10 @@ const rules = {
     message: '请输入框架名称',
     trigger: ['input', 'blur'],
   },
-  file: {
+  training_dataset: {
     required: true,
-    message: '请上传模型文件',
-    trigger: ['change'],
+    message: '请输入训练数据集',
+    trigger: ['input', 'blur'],
   },
 }
 
@@ -266,42 +242,6 @@ const showModal = computed({
 
 // 消息提示
 const message = useMessage()
-
-// 文件上传前的处理
-const handleBeforeUpload = (data) => {
-  const { file } = data
-  const maxSize = 500 * 1024 * 1024 // 500MB
-
-  if (file.size > maxSize) {
-    message.error('文件大小不能超过 500MB')
-    return false
-  }
-
-  formData.value.file = file.file // 保存原始File对象
-  return true
-}
-
-// 自定义上传请求 (仅用于阻止默认上传)
-const customRequest = ({ file, onFinish }) => {
-  // 实际上载逻辑在提交表单时处理
-  onFinish()
-}
-
-// 文件移除处理
-const handleRemove = () => {
-  formData.value.file = null
-  return true
-}
-
-// 上传完成处理
-const handleFinish = ({ file, event }) => {
-  // message.success('文件已选择')
-}
-
-// 上传错误处理
-const handleError = ({ file, event }) => {
-  message.error('文件选择失败')
-}
 
 // 添加参数
 const addParameter = () => {
@@ -325,11 +265,13 @@ const resetForm = () => {
     version: '',
     algorithm: '',
     framework: '',
-    file: null,
-    tags: [],
-    parameters: [],
+    training_dataset: '',
+    parameters: [
+      { key: 'epochs', value: '100' },
+      { key: 'batch_size', value: '32' },
+      { key: 'learning_rate', value: '0.001' }
+    ],
   }
-  fileList.value = []
   if (formRef.value) {
     formRef.value.restoreValidation()
   }
@@ -345,48 +287,43 @@ const handleCancel = () => {
 const handleSubmit = async () => {
   try {
     await formRef.value?.validate()
+    loading.value = true
 
-    if (!formData.value.file) {
-      message.error('请上传模型文件')
-      return
+    // 1. 创建模型
+    const createData = {
+      model_name: formData.value.name,
+      model_version: formData.value.version,
+      description: formData.value.description,
+      model_type: formData.value.type,
+      algorithm: formData.value.algorithm,
+      framework: formData.value.framework,
+      training_dataset: formData.value.training_dataset,
+      training_parameters: formData.value.parameters.reduce((acc, curr) => {
+        if (curr.key) acc[curr.key] = curr.value
+        return acc
+      }, {})
     }
 
-    uploading.value = true
+    const createRes = await modelManagementApi.create(createData)
+    const modelId = createRes.data.id
 
-    const form = new FormData()
-    form.append('file', formData.value.file)
-    form.append('model_name', formData.value.name)
-    form.append('model_version', formData.value.version)
-    form.append('model_type', formData.value.type)
-    form.append('algorithm', formData.value.algorithm)
-    form.append('framework', formData.value.framework)
-    form.append('description', formData.value.description)
+    // 2. 触发训练
+    const trainData = {
+      training_dataset: formData.value.training_dataset,
+      training_parameters: createData.training_parameters
+    }
+    
+    await modelManagementApi.train(modelId, trainData)
 
-    const res = await modelManagementApi.uploadModel(form)
-
-    emit('success', res.data)
-    message.success('模型上传成功')
+    message.success('模型创建成功，开始后台训练')
+    emit('success')
     resetForm()
     showModal.value = false
   } catch (error) {
     console.error(error)
-    message.error('上传失败: ' + (error.response?.data?.message || error.message))
+    message.error('操作失败: ' + (error.response?.data?.message || error.message))
   } finally {
-    uploading.value = false
+    loading.value = false
   }
 }
-
-// 监听弹窗显示状态
-watch(
-  () => props.show,
-  (newVal) => {
-    if (!newVal) {
-      resetForm()
-    }
-  }
-)
 </script>
-
-<style scoped>
-/* 可以添加自定义样式 */
-</style>

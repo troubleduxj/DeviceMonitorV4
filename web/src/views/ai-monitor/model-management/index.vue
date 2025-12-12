@@ -11,6 +11,15 @@
           <PermissionButton
             permission="POST /api/v2/ai-monitor/models"
             type="primary"
+            @click="showTrainModal = true"
+          >
+            <template #icon>
+              <n-icon><add-outline /></n-icon>
+            </template>
+            新建模型
+          </PermissionButton>
+          <PermissionButton
+            permission="POST /api/v2/ai-monitor/models"
             @click="showUploadModal = true"
           >
             <template #icon>
@@ -126,6 +135,9 @@
     <!-- 上传模型弹窗 -->
     <ModelUpload v-model:show="showUploadModal" @success="handleUploadSuccess" />
 
+    <!-- 新建模型训练弹窗 -->
+    <ModelTrain v-model:show="showTrainModal" @success="handleTrainSuccess" />
+
     <!-- 模型详情弹窗 -->
     <ModelDetail v-model:show="showDetailModal" :model="selectedModel" />
   </div>
@@ -155,15 +167,20 @@ import {
   TimeOutline,
   AnalyticsOutline,
   SearchOutline,
+  AddOutline,
 } from '@vicons/ionicons5'
 import PermissionButton from '@/components/common/PermissionButton.vue'
 import ModelList from './components/ModelList.vue'
 import ModelUpload from './components/ModelUpload.vue'
+import ModelTrain from './components/ModelTrain.vue'
 import ModelDetail from './components/ModelDetail.vue'
+
+import { modelManagementApi } from '@/api/v2/ai-module'
 
 // 响应式数据
 const loading = ref(false)
 const showUploadModal = ref(false)
+const showTrainModal = ref(false)
 const showDetailModal = ref(false)
 const selectedModel = ref(null)
 const searchKeyword = ref('')
@@ -184,11 +201,13 @@ const models = ref([])
 
 // 筛选选项
 const statusOptions = [
-  { label: '运行中', value: 'running' },
+  { label: '已部署', value: 'deployed' },
   { label: '已停止', value: 'stopped' },
   { label: '训练中', value: 'training' },
-  { label: '部署中', value: 'deploying' },
+  { label: '已训练', value: 'trained' },
+  { label: '草稿', value: 'draft' },
   { label: '错误', value: 'error' },
+  { label: '失败', value: 'failed' },
 ]
 
 const typeOptions = [
@@ -199,93 +218,28 @@ const typeOptions = [
   { label: '回归模型', value: 'regression' },
 ]
 
-// 计算属性 - 过滤后的模型列表
-const filteredModels = computed(() => {
-  let result = models.value
-
-  // 关键词搜索
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(
-      (model) =>
-        model.name.toLowerCase().includes(keyword) ||
-        model.description.toLowerCase().includes(keyword)
-    )
-  }
-
-  // 状态筛选
-  if (filterStatus.value) {
-    result = result.filter((model) => model.status === filterStatus.value)
-  }
-
-  // 类型筛选
-  if (filterType.value) {
-    result = result.filter((model) => model.type === filterType.value)
-  }
-
-  // 日期范围筛选
-  if (dateRange.value && dateRange.value.length === 2) {
-    const [startDate, endDate] = dateRange.value
-    result = result.filter((model) => {
-      const modelDate = new Date(model.createdAt)
-      return modelDate >= startDate && modelDate <= endDate
-    })
-  }
-
-  return result
+// 监听筛选条件变化，自动刷新
+import { watch } from 'vue'
+watch([searchKeyword, filterStatus, filterType, dateRange], () => {
+  refreshData()
 })
+
+// 计算属性 - 过滤后的模型列表 (现在由后端处理过滤，直接返回models)
+const filteredModels = computed(() => models.value)
 
 // 消息和对话框
 const message = useMessage()
 const dialog = useDialog()
 
-// 生成模拟数据
-const generateMockData = () => {
-  const mockModels = []
-  const statuses = ['running', 'stopped', 'training', 'deploying']
-  const types = ['anomaly_detection', 'trend_prediction', 'health_scoring', 'classification']
-  const names = [
-    '设备异常检测模型',
-    '生产趋势预测模型',
-    '设备健康评分模型',
-    '质量分类模型',
-    '故障预警模型',
-  ]
-
-  for (let i = 1; i <= 15; i++) {
-    mockModels.push({
-      id: i,
-      name: `${names[i % names.length]}_v${Math.floor(i / 3) + 1}.${i % 3}`,
-      description: `这是一个用于${names[i % names.length]}的AI模型，具有高精度和稳定性`,
-      type: types[i % types.length],
-      status: statuses[i % statuses.length],
-      version: `v${Math.floor(i / 3) + 1}.${i % 3}`,
-      accuracy: (85 + Math.random() * 10).toFixed(2),
-      size: `${(Math.random() * 500 + 50).toFixed(1)}MB`,
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-      author: `用户${(i % 5) + 1}`,
-      deployedAt:
-        Math.random() > 0.5
-          ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
-          : null,
-      metrics: {
-        precision: (80 + Math.random() * 15).toFixed(2),
-        recall: (75 + Math.random() * 20).toFixed(2),
-        f1Score: (78 + Math.random() * 17).toFixed(2),
-      },
-    })
-  }
-
-  return mockModels
-}
-
 // 计算统计数据
 const calculateStats = () => {
   const totalModels = models.value.length
-  const runningModels = models.value.filter((m) => m.status === 'running').length
+  const runningModels = models.value.filter((m) => m.status === 'deployed').length
   const trainingModels = models.value.filter((m) => m.status === 'training').length
-  const avgAccuracy = models.value.reduce((sum, m) => sum + parseFloat(m.accuracy), 0) / totalModels
+  const avgAccuracy =
+    totalModels > 0
+      ? models.value.reduce((sum, m) => sum + (parseFloat(m.accuracy) || 0), 0) / totalModels
+      : 0
 
   stats.value = {
     totalModels,
@@ -295,38 +249,113 @@ const calculateStats = () => {
   }
 }
 
+import { onMounted, onUnmounted } from 'vue'
+
+let pollingTimer = null
+
 // 刷新数据
-const refreshData = async () => {
-  loading.value = true
+const refreshData = async (isPolling = false) => {
+  if (!isPolling) loading.value = true
   try {
-    // 模拟API调用
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    models.value = generateMockData()
+    const params = {
+      page: 1,
+      page_size: 100, // 暂时获取较多数据，后续可添加分页组件
+      search: searchKeyword.value || undefined,
+      status: filterStatus.value || undefined,
+      model_type: filterType.value || undefined,
+    }
+
+    // 处理日期范围
+    if (dateRange.value && dateRange.value.length === 2) {
+      params.date_from = new Date(dateRange.value[0]).toISOString()
+      params.date_to = new Date(dateRange.value[1]).toISOString()
+    }
+
+    const res = await modelManagementApi.getList(params)
+    
+    // 映射后端数据格式到前端
+    const newModels = (res.data.items || []).map(item => ({
+      id: item.id,
+      name: item.model_name,
+      description: item.description,
+      type: item.model_type,
+      status: item.status,
+      version: item.model_version,
+      accuracy: item.accuracy ? parseFloat(item.accuracy).toFixed(2) : '0.00',
+      size: item.model_file_size || '0MB',
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      author: item.created_by,
+      deployedAt: item.deployed_at,
+      progress: typeof item.progress === 'number' ? item.progress : parseFloat(item.progress || 0),
+      metrics: {
+        precision: item.precision ? parseFloat(item.precision).toFixed(2) : '0.00',
+        recall: item.recall ? parseFloat(item.recall).toFixed(2) : '0.00',
+        f1Score: item.f1_score ? parseFloat(item.f1_score).toFixed(2) : '0.00',
+      }
+    }))
+
+    // 如果数据长度变化或ID不匹配，直接替换
+    if (models.value.length !== newModels.length || !models.value.every((m, i) => m.id === newModels[i].id)) {
+      models.value = newModels
+    } else {
+      // 否则进行增量更新，保持引用以避免闪烁
+      newModels.forEach((newItem, index) => {
+        const oldItem = models.value[index]
+        // 仅更新变化字段
+        if (oldItem.status !== newItem.status) oldItem.status = newItem.status
+        if (oldItem.progress !== newItem.progress) oldItem.progress = newItem.progress
+        if (oldItem.accuracy !== newItem.accuracy) oldItem.accuracy = newItem.accuracy
+        if (oldItem.deployedAt !== newItem.deployedAt) oldItem.deployedAt = newItem.deployedAt
+        // 更新其他可能变化的字段...
+        Object.assign(oldItem.metrics, newItem.metrics)
+      })
+    }
+    
     calculateStats()
-    message.success('数据刷新成功')
+    if (!isPolling) message.success('数据刷新成功')
+
+    // 如果有训练中的任务，开启快速轮询
+    const hasTrainingTask = models.value.some(m => m.status === 'training')
+    startPolling(hasTrainingTask ? 5000 : 30000)
+
   } catch (error) {
-    message.error('数据刷新失败')
+    console.error(error)
+    if (!isPolling) message.error('数据刷新失败')
   } finally {
-    loading.value = false
+    if (!isPolling) loading.value = false
   }
 }
+
+const startPolling = (interval) => {
+  stopPolling()
+  pollingTimer = setTimeout(() => {
+    refreshData(true)
+  }, interval)
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearTimeout(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+onMounted(() => {
+  refreshData()
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
 
 // 处理模型部署
 const handleDeploy = async (model) => {
   try {
-    // 模拟部署过程
-    message.loading('正在部署模型...', { duration: 2000 })
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
-    // 更新模型状态
-    const index = models.value.findIndex((m) => m.id === model.id)
-    if (index !== -1) {
-      models.value[index].status = 'running'
-      models.value[index].deployedAt = new Date().toISOString()
-    }
-
-    calculateStats()
+    message.loading('正在部署模型...')
+    await modelManagementApi.deploy(model.id, {})
     message.success('模型部署成功')
+    refreshData()
   } catch (error) {
     message.error('模型部署失败')
   }
@@ -335,12 +364,9 @@ const handleDeploy = async (model) => {
 // 处理模型停止
 const handleStop = async (model) => {
   try {
-    const index = models.value.findIndex((m) => m.id === model.id)
-    if (index !== -1) {
-      models.value[index].status = 'stopped'
-    }
-    calculateStats()
-    message.success('模型已停止')
+    // await modelManagementApi.stop(model.id)
+    message.warning('停止功能暂未开放')
+    // refreshData()
   } catch (error) {
     message.error('停止模型失败')
   }
@@ -355,12 +381,9 @@ const handleDelete = (model) => {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        const index = models.value.findIndex((m) => m.id === model.id)
-        if (index !== -1) {
-          models.value.splice(index, 1)
-        }
-        calculateStats()
+        await modelManagementApi.delete(model.id)
         message.success('模型删除成功')
+        refreshData()
       } catch (error) {
         message.error('删除模型失败')
       }
@@ -381,10 +404,15 @@ const handleDownload = (model) => {
 }
 
 // 上传成功回调
-const handleUploadSuccess = (newModel) => {
-  models.value.unshift(newModel)
-  calculateStats()
+const handleUploadSuccess = () => {
+  refreshData()
   message.success('模型上传成功')
+}
+
+// 训练任务创建成功回调
+const handleTrainSuccess = () => {
+  refreshData()
+  // message already shown in component
 }
 
 // 组件挂载时初始化数据

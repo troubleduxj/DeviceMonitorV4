@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings
 import os
+from app.settings.config import get_env_file
 
 
 class AIModuleSettings(BaseSettings):
@@ -13,7 +14,7 @@ class AIModuleSettings(BaseSettings):
     
     # 全局开关
     ai_module_enabled: bool = Field(
-        default=False,
+        default=True,
         env='AI_MODULE_ENABLED',
         description='是否启用AI监测模块'
     )
@@ -52,7 +53,7 @@ class AIModuleSettings(BaseSettings):
         return feature_map.get(feature_name, False)
     
     class Config:
-        env_file = '.env'
+        env_file = get_env_file()
         env_file_encoding = 'utf-8'
         extra = 'ignore'  # 忽略额外的环境变量字段
 

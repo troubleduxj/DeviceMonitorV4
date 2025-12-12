@@ -176,7 +176,61 @@ const emit = defineEmits(['update:modelValue', 'change', 'search', 'refresh', 'u
 // 响应式数据
 const loading = ref(false)
 const refreshing = ref(false)
-const models = ref([])
+// 默认初始化模拟数据，避免加载延迟导致列表为空
+const models = ref([
+  {
+    id: 1,
+    name: '异常检测模型-V1',
+    type: 'anomaly-detection',
+    version: '1.0.0',
+    status: 'deployed',
+    accuracy: 0.95,
+    description: '基于LSTM的设备异常检测模型',
+    createdAt: '2024-01-15T10:30:00Z',
+  },
+  {
+    id: 2,
+    name: '趋势预测模型-V2',
+    type: 'trend-prediction',
+    version: '2.1.0',
+    status: 'deployed',
+    accuracy: 0.92,
+    description: '设备性能趋势预测模型',
+    createdAt: '2024-01-20T14:20:00Z',
+    features: ['temperature', 'pressure', 'vibration'], // 模拟模型特征
+  },
+  {
+    id: 3,
+    name: '健康评分模型-V1',
+    type: 'health-scoring',
+    version: '1.2.0',
+    status: 'training',
+    accuracy: 0.88,
+    description: '设备健康状态评分模型',
+    createdAt: '2024-01-25T09:15:00Z',
+  },
+  {
+    id: 4,
+    name: '分类模型-V3',
+    type: 'classification',
+    version: '3.0.0',
+    status: 'pending',
+    accuracy: 0.91,
+    description: '设备故障分类模型',
+    createdAt: '2024-01-28T16:45:00Z',
+  },
+  {
+    id: 5,
+    name: '高级趋势预测模型-XGB',
+    type: 'trend-prediction',
+    version: '1.5.0',
+    status: 'deployed',
+    accuracy: 0.94,
+    description: '基于XGBoost的高精度预测模型',
+    createdAt: '2024-02-01T09:00:00Z',
+    features: ['temperature', 'pressure', 'vibration', 'current', 'speed'],
+  },
+])
 const searchKeyword = ref('')
 const message = useMessage()
 
@@ -300,67 +354,14 @@ const formatDate = (date) => {
 const loadModels = async () => {
   if (props.customModels.length > 0) return
 
-  loading.value = true
-  try {
-    // 模拟API调用
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // 模拟模型数据
-    models.value = [
-      {
-        id: 1,
-        name: '异常检测模型-V1',
-        type: 'anomaly-detection',
-        version: '1.0.0',
-        status: 'deployed',
-        accuracy: 0.95,
-        description: '基于LSTM的设备异常检测模型',
-        createdAt: '2024-01-15T10:30:00Z',
-      },
-      {
-        id: 2,
-        name: '趋势预测模型-V2',
-        type: 'trend-prediction',
-        version: '2.1.0',
-        status: 'deployed',
-        accuracy: 0.92,
-        description: '设备性能趋势预测模型',
-        createdAt: '2024-01-20T14:20:00Z',
-      },
-      {
-        id: 3,
-        name: '健康评分模型-V1',
-        type: 'health-scoring',
-        version: '1.2.0',
-        status: 'training',
-        accuracy: 0.88,
-        description: '设备健康状态评分模型',
-        createdAt: '2024-01-25T09:15:00Z',
-      },
-      {
-        id: 4,
-        name: '分类模型-V3',
-        type: 'classification',
-        version: '3.0.0',
-        status: 'pending',
-        accuracy: 0.91,
-        description: '设备故障分类模型',
-        createdAt: '2024-01-28T16:45:00Z',
-      },
-    ]
-
-    // 这里应该调用实际的API
-    // const response = await modelApi.getModelList({
-    //   type: props.modelType,
-    //   status: props.modelStatus
-    // })
-    // models.value = response.data
-  } catch (error) {
-    console.error('加载模型列表失败:', error)
-    message.error('加载模型列表失败')
-  } finally {
-    loading.value = false
-  }
+  // 模拟API调用 - 已改为直接初始化数据
+  // loading.value = true
+  // try {
+  //   await new Promise((resolve) => setTimeout(resolve, 1000))
+  //   models.value = [...]
+  // } finally {
+  //   loading.value = false
+  // }
 }
 
 // 刷新模型列表

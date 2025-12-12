@@ -203,6 +203,8 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             
             # 准备可能的表名列表，稍后连接数据库时验证
             potential_table_names = [
+                f"device_{device_code}",
+                f"device_{device_code.lower()}",
                 f"tb_{device_code.lower()}",
                 f"record_{device_code}",
                 device_code.lower(),
@@ -216,13 +218,21 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             return 0, []  # 设备编号是必须的
 
         if start_time:
-            # 使用 isoformat 以支持时区 (TDengine 支持 ISO 8601)
-            # 避免使用 strftime 导致时区信息丢失
-            start_time_str = start_time.isoformat()
+            # TDengine REST API 最好使用 ISO 8601 格式 (UTC) 以避免时区歧义
+            if start_time.tzinfo:
+                 start_time_str = start_time.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            else:
+                 # 如果是 naive 时间，保持原样，但在 TDEngine 中可能会被解释为服务器本地时间
+                 start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S.%f')
+            
             conditions.append(f"ts >= '{start_time_str}'")
             logger.info(f"   时间范围: start_time={start_time_str}")
         if end_time:
-            end_time_str = end_time.isoformat()
+            if end_time.tzinfo:
+                 end_time_str = end_time.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            else:
+                 end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S.%f')
+            
             conditions.append(f"ts <= '{end_time_str}'")
             logger.info(f"   时间范围: end_time={end_time_str}")
         if status:
@@ -280,11 +290,14 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                     # 检查表是否存在 (尝试多个可能的表名)
                     found_table = None
                     for name in potential_table_names:
+                        # TDengine 表名可能包含特殊字符，需要用反引号包裹
+                        # 但 SHOW TABLES LIKE 不需要包裹，它匹配的是字符串
                         check_table_sql = f"SHOW TABLES LIKE '{name}'"
                         logger.info(f"🔍 检查表是否存在: {check_table_sql}")
                         try:
                             table_check_result = await td_connector.query_data(check_table_sql)
                             if table_check_result and table_check_result.get('data'):
+                                # 确保找到的表名是正确的
                                 found_table = name
                                 logger.info(f"✅ 找到表: {found_table}")
                                 break
@@ -292,6 +305,7 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
                             logger.warning(f"⚠️ 检查表 {name} 失败: {e}")
                     
                     if found_table:
+                        # 构造查询时，表名必须加反引号，特别是当表名包含连字符时
                         target_table = f"`{found_table}`"
                         # 如果是具体子表，不需要 device_code 过滤条件
                         conditions_sub = [c for c in conditions if not c.startswith("device_code =")]
@@ -305,25 +319,30 @@ class DeviceDataController(CRUDBase[DeviceInfo, DeviceRealTimeDataCreate, dict])
             table_name = target_table
             logger.info(f"🚀 最终查询表名: {table_name}, 条件: {where_clause}")
             
-            # 查询总数
-            count_sql = f"SELECT count(*) FROM {table_name} WHERE {where_clause}"
-            logger.info(f"🔍 查询总数: {count_sql}")
-            count_result = await td_connector.query_data(count_sql)
-            total_count = count_result["data"][0][0] if count_result and count_result.get("data") else 0
-            logger.info(f"✅ 总记录数: {total_count}")
-
-            if total_count == 0:
-                logger.warning(f"⚠️ 没有找到符合条件的历史数据")
-                await td_connector.close()
-                return 0, []
-
-            # 使用 SELECT * 查询所有字段，而不是硬编码字段列表
-            # 对于历史曲线图，返回时间段内的所有数据点（不分页）
-            # 对于表格视图，仍然使用分页
-            if page_size >= 1000:  # 当page_size很大时，认为是图表查询，返回所有数据
-                query_sql = f"SELECT * FROM {table_name} WHERE {where_clause} ORDER BY ts ASC"
-                logger.info(f"🔍 执行全量查询（图表模式）: {query_sql}")
+            # 使用 SELECT * 查询所有字段
+            # 对于历史曲线图 (page_size >= 1000)，按时间正序排列，并限制返回数量防止超时
+            # 对于表格视图，按时间倒序排列，支持分页
+            if page_size >= 1000:
+                # 图表模式：跳过Count查询以提高性能，且限制最大返回数量
+                total_count = 0 
+                # 安全限制：即使是图表模式，也限制最大返回数量（例如 page_size 或 5000）
+                # 这里使用传入的 page_size 作为限制，前端应负责传入合适的大小
+                limit = page_size
+                query_sql = f"SELECT * FROM {table_name} WHERE {where_clause} ORDER BY ts ASC LIMIT {limit}"
+                logger.info(f"🔍 执行查询（图表模式 - 限制{limit}条）: {query_sql}")
             else:
+                # 表格模式：需要Count查询
+                count_sql = f"SELECT count(*) FROM {table_name} WHERE {where_clause}"
+                logger.info(f"🔍 查询总数: {count_sql}")
+                count_result = await td_connector.query_data(count_sql)
+                total_count = count_result["data"][0][0] if count_result and count_result.get("data") else 0
+                logger.info(f"✅ 总记录数: {total_count}")
+
+                if total_count == 0:
+                    logger.warning(f"⚠️ 没有找到符合条件的历史数据")
+                    await td_connector.close()
+                    return 0, []
+
                 # 构建分页查询
                 offset = (page - 1) * page_size
                 limit = page_size

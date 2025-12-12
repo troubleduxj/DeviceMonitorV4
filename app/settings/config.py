@@ -178,6 +178,21 @@ class RedisCredentials(BaseSettings):
         extra = "ignore"
 
 
+class CelerySettings(BaseSettings):
+    broker_url: str = Field(default="redis://localhost:6379/0")
+    result_backend: str = Field(default="redis://localhost:6379/1")
+    task_serializer: str = Field(default="json")
+    result_serializer: str = Field(default="json")
+    accept_content: typing.List[str] = Field(default=["json"])
+    timezone: str = Field(default="Asia/Shanghai")
+    enable_utc: bool = Field(default=True)
+
+    class Config:
+        env_prefix = "CELERY_"
+        env_file = get_env_file()
+        extra = "ignore"
+
+
 class Settings(BaseSettings):
     class Config:
         env_file = get_env_file()
@@ -194,6 +209,9 @@ class Settings(BaseSettings):
     
     # Redis配置
     redis: RedisCredentials = Field(default_factory=RedisCredentials)
+    
+    # Celery配置
+    celery: CelerySettings = Field(default_factory=CelerySettings)
     
     # TDengine配置 (添加此配置)
     tdengine: TDengineConnection = Field(default_factory=TDengineConnection)

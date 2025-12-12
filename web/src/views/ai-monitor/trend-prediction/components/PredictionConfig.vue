@@ -5,11 +5,28 @@
       <n-grid-item>
         <n-card title="算法配置" size="small" hoverable>
           <n-space vertical>
-            <n-form-item label="预测算法">
+            <n-form-item label="算法来源">
+              <n-radio-group v-model:value="configData.sourceType" @update:value="handleConfigChange">
+                <n-radio-button value="preset">系统预设</n-radio-button>
+                <n-radio-button value="custom">自定义模型</n-radio-button>
+              </n-radio-group>
+            </n-form-item>
+
+            <n-form-item label="预测算法" v-if="configData.sourceType === 'preset'">
               <n-select
                 v-model:value="configData.algorithm"
                 :options="algorithmOptions"
                 @update:value="handleConfigChange"
+              />
+            </n-form-item>
+
+            <n-form-item label="选择模型" v-if="configData.sourceType === 'custom'">
+              <ModelSelector
+                v-model:modelValue="configData.modelId"
+                model-type="trend-prediction"
+                :show-stats="false"
+                :show-selected-info="true"
+                @change="handleModelChange"
               />
             </n-form-item>
 
@@ -315,6 +332,7 @@ import {
   CheckmarkOutline,
   DownloadOutline,
 } from '@vicons/ionicons5'
+import ModelSelector from '@/components/ai-monitor/common/ModelSelector.vue'
 
 const props = defineProps({
   config: {
@@ -328,7 +346,11 @@ const emit = defineEmits(['update', 'reset'])
 const message = useMessage()
 
 // 响应式数据
-const configData = ref({ ...props.config })
+const configData = ref({
+  sourceType: 'preset', // 'preset' | 'custom'
+  modelId: null,
+  ...props.config
+})
 const showTrainingModal = ref(false)
 const isTraining = ref(false)
 const trainingProgress = ref(0)
@@ -390,6 +412,7 @@ const presets = [
   {
     name: '快速预测',
     config: {
+      sourceType: 'preset',
       algorithm: 'rf',
       timeWindow: 7,
       features: ['temperature', 'pressure'],
@@ -402,6 +425,7 @@ const presets = [
   {
     name: '标准配置',
     config: {
+      sourceType: 'preset',
       algorithm: 'lstm',
       timeWindow: 30,
       features: ['temperature', 'pressure', 'vibration', 'current'],
@@ -414,6 +438,7 @@ const presets = [
   {
     name: '高精度模式',
     config: {
+      sourceType: 'preset',
       algorithm: 'xgboost',
       timeWindow: 60,
       features: ['temperature', 'pressure', 'vibration', 'current', 'speed', 'power'],
@@ -426,6 +451,20 @@ const presets = [
 ]
 
 // 方法
+const handleModelChange = (val: any, option: any) => {
+  if (option && option.model) {
+    configData.value.modelId = val
+    
+    // 如果模型包含特征配置，自动更新特征参数
+    if (option.model.features && Array.isArray(option.model.features)) {
+      configData.value.features = [...option.model.features]
+      message.success(`已根据模型"${option.model.name}"自动加载特征参数`)
+    }
+    
+    handleConfigChange()
+  }
+}
+
 const handleConfigChange = () => {
   emit('update', configData.value)
 }

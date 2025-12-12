@@ -144,10 +144,28 @@ async def get_user_menu(request: Request, current_user=DependAuth):
     """
     获取当前用户可访问的菜单 - API v2版本
     """
+    # 强制将 current_user 设置到 request.state 中
+    if hasattr(current_user, "id"):
+        request.state.user = current_user
+        request.state.user_id = current_user.id
+        
     formatter = ResponseFormatterV2(request)
     
     try:
-        user_obj = await user_controller.get(id=current_user.id)
+        # 如果 current_user 是依赖项返回的，它可能已经是一个 User 对象
+        # 但如果是 None 或者不是预期的类型，我们需要处理
+        if not current_user:
+            # 尝试从 request.state 获取
+            if hasattr(request.state, "user") and request.state.user:
+                current_user = request.state.user
+            else:
+                return formatter.error(
+                    message="未认证用户",
+                    code=401
+                )
+        
+        user_id = current_user.id
+        user_obj = await user_controller.get(id=user_id)
         if not user_obj:
             return formatter.not_found("用户不存在", "user")
         

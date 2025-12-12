@@ -34,6 +34,8 @@ class ModelStatus(str, Enum):
     TRAINED = "trained"
     DEPLOYED = "deployed"
     ARCHIVED = "archived"
+    FAILED = "failed"
+    ERROR = "error"
 
 
 class AnnotationStatus(str, Enum):
@@ -248,7 +250,7 @@ class ModelCreate(BaseModel):
     model_type: str = Field(..., description="模型类型", max_length=50)
     algorithm: str = Field(..., description="算法名称", max_length=100)
     framework: str = Field(..., description="框架名称", max_length=50)
-    training_dataset: Optional[str] = Field(None, description="训练数据集", max_length=200)
+    training_dataset: Optional[str] = Field(None, description="训练数据集", max_length=2000)
     training_parameters: Dict[str, Any] = Field(default_factory=dict, description="训练参数")
 
 
@@ -260,7 +262,7 @@ class ModelUpdate(BaseModel):
     model_type: Optional[str] = Field(None, description="模型类型", max_length=50)
     algorithm: Optional[str] = Field(None, description="算法名称", max_length=100)
     framework: Optional[str] = Field(None, description="框架名称", max_length=50)
-    training_dataset: Optional[str] = Field(None, description="训练数据集", max_length=200)
+    training_dataset: Optional[str] = Field(None, description="训练数据集", max_length=2000)
     training_parameters: Optional[Dict[str, Any]] = Field(None, description="训练参数")
     deployment_config: Optional[Dict[str, Any]] = Field(None, description="部署配置")
 
@@ -281,6 +283,7 @@ class ModelResponse(BaseModel):
     training_parameters: Dict[str, Any] = Field(..., description="训练参数")
     training_metrics: Optional[Dict[str, Any]] = Field(None, description="训练指标")
     status: ModelStatus = Field(..., description="模型状态")
+    progress: float = Field(0.0, description="训练进度(0-100)")
     accuracy: Optional[float] = Field(None, description="准确率")
     precision: Optional[float] = Field(None, description="精确率")
     recall: Optional[float] = Field(None, description="召回率")
@@ -516,6 +519,7 @@ class AnalysisResultsResponse(BaseModel):
 class AIMonitoringQuery(BaseModel):
     """AI监控查询参数"""
     status: Optional[str] = Field(None, description="状态过滤")
+    model_type: Optional[str] = Field(None, description="模型类型过滤")
     created_by: Optional[int] = Field(None, description="创建人过滤")
     date_from: Optional[datetime] = Field(None, description="开始日期")
     date_to: Optional[datetime] = Field(None, description="结束日期")

@@ -188,7 +188,7 @@ const aiMonitorV2Api = {
   modelManagement: {
     getModels: (params) => {
       return request({
-        url: '/api/v2/ai-monitor/model-management/models',
+        url: '/api/v2/ai/models',
         method: 'GET',
         params,
       })
@@ -196,7 +196,7 @@ const aiMonitorV2Api = {
 
     createModel: (data) => {
       return request({
-        url: '/api/v2/ai-monitor/model-management/models',
+        url: '/api/v2/ai/models',
         method: 'POST',
         data,
       })
@@ -204,7 +204,7 @@ const aiMonitorV2Api = {
 
     updateModel: (id, data) => {
       return request({
-        url: `/api/v2/ai-monitor/model-management/models/${id}`,
+        url: `/api/v2/ai/models/${id}`,
         method: 'PUT',
         data,
       })
@@ -212,21 +212,21 @@ const aiMonitorV2Api = {
 
     deleteModel: (id) => {
       return request({
-        url: `/api/v2/ai-monitor/model-management/models/${id}`,
+        url: `/api/v2/ai/models/${id}`,
         method: 'DELETE',
       })
     },
 
     deployModel: (id) => {
       return request({
-        url: `/api/v2/ai-monitor/model-management/models/${id}/deploy`,
+        url: `/api/v2/ai/models/${id}/deploy`,
         method: 'POST',
       })
     },
 
     getModelMetrics: (id) => {
       return request({
-        url: `/api/v2/ai-monitor/model-management/models/${id}/metrics`,
+        url: `/api/v2/ai/models/${id}/metrics`,
         method: 'GET',
       })
     },

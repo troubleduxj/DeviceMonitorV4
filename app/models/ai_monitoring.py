@@ -36,6 +36,8 @@ class ModelStatus(str, Enum):
     TRAINED = "trained"
     DEPLOYED = "deployed"
     ARCHIVED = "archived"
+    FAILED = "failed"
+    ERROR = "error"
 
 
 class AnnotationStatus(str, Enum):
@@ -135,17 +137,23 @@ class AIModel(BaseModel):
     framework = fields.CharField(max_length=50, description="框架名称")
     
     # 文件信息
-    model_file_path = fields.CharField(max_length=500, description="模型文件路径")
+    model_file_path = fields.CharField(max_length=500, null=True, description="模型文件路径")
     model_file_size = fields.BigIntField(null=True, description="模型文件大小(字节)")
     model_file_hash = fields.CharField(max_length=64, null=True, description="模型文件哈希")
     
     # 训练信息
-    training_dataset = fields.CharField(max_length=200, null=True, description="训练数据集")
+    training_dataset = fields.TextField(null=True, description="训练数据集")
     training_parameters = fields.JSONField(default=dict, description="训练参数(JSON)")
     training_metrics = fields.JSONField(null=True, description="训练指标(JSON)")
     
     # 状态信息
     status = fields.CharEnumField(ModelStatus, default=ModelStatus.DRAFT, description="模型状态")
+    progress = fields.FloatField(default=0.0, description="训练进度(0-100)")
+    task_id = fields.CharField(max_length=64, null=True, description="Celery Task ID")
+    error_log = fields.TextField(null=True, description="详细错误堆栈")
+    started_at = fields.DatetimeField(null=True, description="实际开始时间")
+    finished_at = fields.DatetimeField(null=True, description="实际结束时间")
+    resource_usage = fields.JSONField(default={}, description="资源消耗快照")
     
     # 性能指标
     accuracy = fields.FloatField(null=True, description="准确率")
@@ -304,3 +312,39 @@ class AIAnalysis(BaseModel):
     updated_at = fields.DatetimeField(auto_now=True, description="更新时间")
     created_by = fields.BigIntField(null=True, description="创建人ID")
     updated_by = fields.BigIntField(null=True, description="更新人ID")
+
+
+# =====================================================
+# 异常检测记录模型
+# =====================================================
+
+class AIAnomalyRecord(BaseModel):
+    """AI异常检测记录模型"""
+    
+    class Meta:
+        table = "t_ai_anomaly_records"
+        table_description = "AI异常检测记录表"
+    
+    # 基本信息
+    device_code = fields.CharField(max_length=50, description="设备编码", index=True)
+    device_name = fields.CharField(max_length=100, null=True, description="设备名称")
+    
+    # 异常信息
+    anomaly_type = fields.CharField(max_length=50, description="异常类型/检测方法")
+    severity = fields.CharField(max_length=20, default="低", description="严重程度")
+    anomaly_score = fields.FloatField(default=0.0, description="异常分数")
+    
+    # 详细数据
+    anomaly_data = fields.JSONField(default=dict, description="异常详情数据(JSON)")
+    
+    # 时间信息
+    detection_time = fields.DatetimeField(auto_now_add=True, description="检测时间", index=True)
+    
+    # 处理状态
+    is_handled = fields.BooleanField(default=False, description="是否已处理", index=True)
+    handle_time = fields.DatetimeField(null=True, description="处理时间")
+    handle_by = fields.CharField(max_length=100, null=True, description="处理人")
+    handle_note = fields.TextField(null=True, description="处理备注")
+    
+    # 审计字段
+    created_at = fields.DatetimeField(auto_now_add=True, description="创建时间")

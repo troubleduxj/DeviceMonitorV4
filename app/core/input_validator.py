@@ -27,11 +27,14 @@ class ValidationRule:
     
     def get_error_detail(self, value: Any) -> APIv2ErrorDetail:
         """获取错误详情"""
+        # 将值转换为字符串，避免序列化问题
+        safe_value = str(value) if value is not None else None
+        
         return APIv2ErrorDetail(
             field=self.field_name,
             code=self.__class__.__name__.upper(),
             message=self.message,
-            value=value
+            value=safe_value
         )
 
 

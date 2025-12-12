@@ -149,26 +149,34 @@ v2_router.include_router(mock_data_router, tags=["Mock数据管理 v2"])
 # ⭐ 条件注册AI模块路由（统一前缀：/ai）
 # 只在AI模块启用时注册路由，避免资源浪费
 from app.settings.ai_settings import ai_settings
+import logging
+
+# 强制启用日志调试
+logger = logging.getLogger(__name__)
+logger.info(f"正在初始化v2路由, AI模块配置: enabled={ai_settings.ai_module_enabled}, trend_enabled={ai_settings.ai_trend_prediction_enabled}")
 
 if ai_settings.ai_module_enabled and ai_settings.ai_trend_prediction_enabled:
     try:
+        logger.info("尝试注册AI预测模块路由...")
         # 预测模块 - 统一使用 /ai 前缀
         from .ai.predictions import router as predictions_router
         from .ai.prediction_analytics import router as prediction_analytics_router
         from .ai.trend_prediction import router as trend_prediction_router
+        from .ai.models import router as models_router
         
         # 全部注册到 /ai 前缀下
         v2_router.include_router(predictions_router, prefix="/ai")
         v2_router.include_router(prediction_analytics_router, prefix="/ai")
         v2_router.include_router(trend_prediction_router, prefix="/ai")
+        v2_router.include_router(models_router, prefix="/ai")
         
-        import logging
         logging.info("✅ AI预测模块路由已注册（统一前缀: /api/v2/ai）")
         logging.info("   - /ai/predictions/tasks/...")
         logging.info("   - /ai/predictions/execute/...")
         logging.info("   - /ai/predictions/analytics/...")
+        logging.info("   - /ai/models/...")
     except ImportError as e:
-        import logging
         logging.warning(f"⚠️ 无法加载AI预测模块路由: {e}")
+        logger.exception(e)
 
 __all__ = ["v2_router"]

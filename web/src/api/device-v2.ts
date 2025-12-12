@@ -114,6 +114,22 @@ const devices = {
   },
 
   /**
+   * 获取设备监控数据 (V2)
+   */
+  getMonitoring(deviceId: number, params?: {
+    start_time?: string
+    end_time?: string
+    page?: number
+    page_size?: number
+  }) {
+    return request({
+      url: `/api/v2/devices/${deviceId}/monitoring`,
+      method: 'get',
+      params
+    })
+  },
+
+  /**
    * 获取设备统计信息
    */
   getStatistics() {

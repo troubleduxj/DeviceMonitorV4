@@ -109,6 +109,77 @@ export const anomalyDetectionApi = {
 }
 
 /**
+ * 模型管理API
+ */
+export const modelManagementApi = {
+  /**
+   * 获取模型列表
+   * @param {Object} params 查询参数
+   * @returns {Promise} 模型列表
+   */
+  getList: (params = {}) => requestV2.get('/ai/models', { params }),
+
+  /**
+   * 创建模型
+   * @param {Object} data 模型数据
+   * @returns {Promise} 创建结果
+   */
+  create: (data) => requestV2.post('/ai/models', data),
+
+  /**
+   * 更新模型
+   * @param {number} id 模型ID
+   * @param {Object} data 模型数据
+   * @returns {Promise} 更新结果
+   */
+  update: (id, data) => requestV2.put(`/ai/models/${id}`, data),
+
+  /**
+   * 删除模型
+   * @param {number} id 模型ID
+   * @returns {Promise} 删除结果
+   */
+  delete: (id) => requestV2.delete(`/ai/models/${id}`),
+
+  /**
+   * 训练模型
+   * @param {number} id 模型ID
+   * @param {Object} data 训练配置
+   * @returns {Promise} 训练任务信息
+   */
+  train: (id, data) => requestV2.post(`/ai/models/${id}/train`, data),
+
+  /**
+   * 部署模型
+   * @param {number} id 模型ID
+   * @param {Object} data 部署配置
+   * @returns {Promise} 部署结果
+   */
+  deploy: (id, data) => requestV2.post(`/ai/models/${id}/deploy`, data),
+
+  /**
+   * 获取模型详情
+   * @param {number} id 模型ID
+   * @returns {Promise} 模型详情
+   */
+  getDetail: (id) => requestV2.get(`/ai/models/${id}`),
+  
+  /**
+   * 获取模型指标
+   * @param {number} id 模型ID
+   * @returns {Promise} 模型指标
+   */
+  getMetrics: (id) => requestV2.get(`/ai/models/${id}/metrics`),
+
+  /**
+   * 获取模型训练日志
+   * @param {number} id 模型ID
+   * @returns {Promise} 模型日志
+   */
+  getLogs: (id) => requestV2.get(`/ai/models/${id}/logs`),
+}
+
+/**
  * 趋势预测API
  */
 export const trendPredictionApi = {
@@ -346,6 +417,7 @@ export default {
   anomalyDetectionApi,
   trendPredictionApi,
   predictionManagementApi, // 新增预测任务管理API
+  modelManagementApi, // 新增模型管理API
   healthScoringApi,
   aiFeaturesApi,
 }

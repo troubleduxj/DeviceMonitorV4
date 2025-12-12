@@ -64,6 +64,16 @@ const route: RouteRecordRaw = {
       },
     },
     {
+      name: 'ModelTraining',
+      path: 'model-training',
+      component: () => import('./model-training/index.vue'),
+      meta: {
+        title: '模型训练',
+        icon: 'mdi:school',
+        keepAlive: true,
+      },
+    },
+    {
       name: 'SmartAnalysis',
       path: 'smart-analysis',
       component: () => import('./smart-analysis/index.vue'),

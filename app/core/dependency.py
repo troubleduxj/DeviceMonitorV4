@@ -42,7 +42,8 @@ class AuthControl:
     async def is_authed(
         cls, 
         token: Optional[str] = Header(None, description="token验证"),
-        authorization: Optional[str] = Header(None, description="Authorization头")
+        authorization: Optional[str] = Header(None, description="Authorization头"),
+        request: Request = None  # 添加 request 参数
     ) -> Optional["User"]:
         auth_start_time = datetime.now()
         user = None
@@ -57,6 +58,10 @@ class AuthControl:
                     auth_token = authorization[7:]  # 移除"Bearer "前缀
                 else:
                     auth_token = authorization
+            
+            # 如果 Header 中都没有，尝试从 request.query_params 获取 (临时兼容)
+            if not auth_token and request:
+                auth_token = request.query_params.get("token")
             
             # 记录认证调试信息
             debug_info = detailed_logger.log_authentication_debug(
@@ -96,6 +101,11 @@ class AuthControl:
                 user = await User.filter(id=user_id).first()
                 
                 if user:
+                    # 将用户信息注入 request.state (如果 request 存在)
+                    if request:
+                        request.state.user = user
+                        request.state.user_id = user.id
+
                     detailed_logger.log_authentication_debug(
                         token=auth_token,
                         user_info={

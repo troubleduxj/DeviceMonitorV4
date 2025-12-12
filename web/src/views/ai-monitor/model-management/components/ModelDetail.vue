@@ -63,7 +63,7 @@
             <n-statistic label="精确率" :value="model.metrics?.precision || 0" suffix="%">
               <template #prefix>
                 <n-icon color="#2080f0">
-                  <target-outline />
+                  <locate-outline />
                 </n-icon>
               </template>
             </n-statistic>
@@ -153,6 +153,20 @@
         </n-timeline>
       </n-card>
 
+      <!-- 训练日志 -->
+      <n-card title="训练日志" class="detail-section">
+        <n-log
+          :log="trainingLogs"
+          :loading="loadingLogs"
+          :rows="15"
+          trim
+          style="background-color: #1e1e1e; padding: 10px; border-radius: 4px; font-family: monospace;"
+        />
+        <n-space justify="end" style="margin-top: 8px">
+          <n-button size="small" @click="fetchLogs">刷新日志</n-button>
+        </n-space>
+      </n-card>
+
       <!-- 操作日志 -->
       <n-card title="操作日志" class="detail-section">
         <n-table size="small">
@@ -195,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import {
   NModal,
   NCard,
@@ -214,13 +228,16 @@ import {
   NButton,
   NEmpty,
   useMessage,
+  NLog,
 } from 'naive-ui'
 import {
   CheckmarkCircleOutline,
   SearchOutline,
   AnalyticsOutline,
   DownloadOutline,
+  LocateOutline,
 } from '@vicons/ionicons5'
+import { modelManagementApi } from '@/api/v2/ai-module'
 
 // Props
 const props = defineProps({
@@ -245,6 +262,78 @@ const showModal = computed({
 
 // 消息提示
 const message = useMessage()
+
+// 训练日志
+const trainingLogs = ref('')
+const loadingLogs = ref(false)
+let logPollingTimer = null
+
+// 获取日志
+const fetchLogs = async (isPolling = false) => {
+  if (!props.model?.id) return
+  
+  if (!isPolling) loadingLogs.value = true
+  try {
+    const res = await modelManagementApi.getLogs(props.model.id)
+    trainingLogs.value = res.data.logs || '暂无日志'
+  } catch (error) {
+    console.error('获取日志失败:', error)
+    if (!isPolling) trainingLogs.value = '获取日志失败'
+  } finally {
+    if (!isPolling) loadingLogs.value = false
+  }
+}
+
+// 轮询控制
+const startLogPolling = () => {
+  stopLogPolling()
+  // 如果是训练中，开启轮询
+  if (props.model?.status === 'training') {
+    logPollingTimer = setInterval(() => {
+      fetchLogs(true)
+    }, 2000) // 2秒轮询一次
+  }
+}
+
+const stopLogPolling = () => {
+  if (logPollingTimer) {
+    clearInterval(logPollingTimer)
+    logPollingTimer = null
+  }
+}
+
+// 监听弹窗打开，自动获取日志
+watch(
+  () => props.show,
+  (val) => {
+    if (val && props.model?.id) {
+      fetchLogs()
+      startLogPolling()
+    } else {
+      stopLogPolling()
+    }
+  }
+)
+
+// 监听状态变化
+watch(
+  () => props.model?.status,
+  (newStatus) => {
+    if (props.show) {
+      if (newStatus === 'training') {
+        startLogPolling()
+      } else {
+        stopLogPolling()
+        // 状态变为非训练时，最后拉取一次日志
+        fetchLogs()
+      }
+    }
+  }
+)
+
+onUnmounted(() => {
+  stopLogPolling()
+})
 
 // 模拟操作日志
 const mockLogs = ref([

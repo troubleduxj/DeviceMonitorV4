@@ -1577,7 +1577,7 @@ async def get_device_monitoring(
     start_time: Optional[datetime] = Query(None, description="开始时间"),
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=2000, description="每页数量"),
     current_user: User = DependAuth
 ):
     """

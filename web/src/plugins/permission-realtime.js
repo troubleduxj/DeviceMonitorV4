@@ -95,7 +95,7 @@ class PermissionRealtimeManager {
       const response = await originalFetch.apply(window, args)
 
       // 检查权限相关API
-      await this.checkPermissionApiResponse(args[0], response)
+      this.checkPermissionApiResponse(args[0], response)
 
       return response
     }
