@@ -1,788 +1,552 @@
 <template>
-  <div v-permission="{ action: 'read', resource: 'anomaly_detection' }" class="anomaly-detection">
-    <!-- 页面标题 -->
-    <n-page-header title="异常检测" subtitle="基于AI算法的设备异常智能识别">
-      <template #extra>
-        <n-space>
-          <n-button
-            v-permission="{ action: 'control', resource: 'anomaly_detection' }"
-            type="primary"
-            @click="startDetection"
-          >
-            <template #icon>
-              <n-icon><PlayOutline /></n-icon>
-            </template>
-            开始检测
-          </n-button>
-          <n-button
-            v-permission="{ action: 'control', resource: 'anomaly_detection' }"
-            :disabled="!isDetecting"
-            @click="stopDetection"
-          >
-            <template #icon>
-              <n-icon><StopOutline /></n-icon>
-            </template>
-            停止检测
-          </n-button>
-          <n-button
-            v-permission="{ action: 'export', resource: 'anomaly_detection' }"
-            @click="exportAnomalies"
-          >
-            <template #icon>
-              <n-icon><DownloadOutline /></n-icon>
-            </template>
-            导出异常
-          </n-button>
-        </n-space>
-      </template>
-    </n-page-header>
+  <CommonPage title="异常检测看板">
+    <template #action>
+      <n-space>
+        <n-button type="primary" size="small" @click="refreshData">
+          <template #icon><n-icon><RefreshOutline /></n-icon></template>
+          刷新数据
+        </n-button>
+        <n-button size="small">导出报表</n-button>
+      </n-space>
+    </template>
 
-    <!-- 检测状态卡片 -->
-    <n-grid :cols="4" :x-gap="16" class="mb-4">
-      <n-grid-item>
-        <n-card hoverable>
-          <n-statistic label="检测状态" :value="detectionStatus" tabular-nums>
-            <template #prefix>
-              <n-icon :color="isDetecting ? '#18a058' : '#d03050'">
-                <component :is="isDetecting ? PlayCircleOutline : PauseCircleOutline" />
-              </n-icon>
-            </template>
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card hoverable>
-          <n-statistic label="今日异常" :value="todayAnomalies" tabular-nums>
-            <template #prefix>
-              <n-icon color="#f0a020"><WarningOutline /></n-icon>
-            </template>
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card hoverable>
-          <n-statistic label="检测精度" :value="detectionAccuracy" suffix="%" tabular-nums>
-            <template #prefix>
-              <n-icon color="#2080f0"><CheckmarkCircleOutline /></n-icon>
-            </template>
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card hoverable>
-          <n-statistic label="处理中" :value="processingCount" tabular-nums>
-            <template #prefix>
-              <n-icon color="#722ed1"><TimeOutline /></n-icon>
-            </template>
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-    </n-grid>
-
-    <!-- 异常检测配置 -->
-    <n-card title="检测配置" class="mb-4" hoverable>
-      <ThresholdConfig
-        :config="thresholdConfig"
-        @update="updateThresholdConfig"
-        @reset="resetThresholdConfig"
-      />
+    <!-- 1. 顶部操作与筛选 -->
+    <n-card :bordered="false" class="mb-4 shadow-sm" size="small">
+      <div class="flex items-center gap-4">
+        <n-form-item label="设备分类" label-placement="left" :show-feedback="false">
+          <n-tree-select
+            v-model:value="selectedDeviceTypes"
+            multiple
+            filterable
+            placeholder="选择设备分类"
+            :options="deviceTypeOptions"
+            style="width: 300px"
+            size="small"
+            @update:value="handleDeviceFilterChange"
+          />
+        </n-form-item>
+        <n-form-item label="时间范围" label-placement="left" :show-feedback="false">
+          <n-radio-group v-model:value="timeRange" size="small">
+            <n-radio-button value="1h">1小时</n-radio-button>
+            <n-radio-button value="24h">24小时</n-radio-button>
+            <n-radio-button value="7d">7天</n-radio-button>
+          </n-radio-group>
+        </n-form-item>
+      </div>
     </n-card>
 
-    <!-- 实时异常监控 -->
-    <n-grid :cols="2" :x-gap="16" class="mb-4">
+    <!-- 2. 核心指标卡片 -->
+    <n-grid :x-gap="16" :cols="4" class="mb-4">
       <n-grid-item>
-        <n-card title="实时异常趋势" hoverable>
-          <AnomalyChart :data="realtimeAnomalyData" :height="300" />
+        <n-card size="small" :bordered="false" class="shadow-sm stats-card">
+          <n-statistic label="监控设备总数" :value="deviceOptions.length">
+            <template #prefix>
+              <n-icon color="#2080f0" class="p-1 bg-blue-50 rounded"><ServerOutline /></n-icon>
+            </template>
+          </n-statistic>
         </n-card>
       </n-grid-item>
       <n-grid-item>
-        <n-card title="异常类型分布" hoverable>
-          <div ref="pieChartRef" style="height: 300px"></div>
+        <n-card size="small" :bordered="false" class="shadow-sm stats-card">
+          <n-statistic label="今日异常总数" :value="stats.total">
+            <template #prefix>
+              <n-icon color="#d03050" class="p-1 bg-red-50 rounded"><AlertCircleOutline /></n-icon>
+            </template>
+            <template #suffix>
+              <span class="text-xs text-red-500 flex items-center ml-2">
+                <n-icon><ArrowUpOutline /></n-icon> {{ stats.trend }}%
+              </span>
+            </template>
+          </n-statistic>
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card size="small" :bordered="false" class="shadow-sm stats-card">
+          <n-statistic label="高风险设备" :value="stats.riskDevices">
+            <template #prefix>
+              <n-icon color="#f0a020" class="p-1 bg-yellow-50 rounded"><WarningOutline /></n-icon>
+            </template>
+          </n-statistic>
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card size="small" :bordered="false" class="shadow-sm stats-card">
+          <n-statistic label="平均健康度" :value="98.5" :precision="1">
+             <template #prefix>
+              <n-icon color="#18a058" class="p-1 bg-green-50 rounded"><PulseOutline /></n-icon>
+            </template>
+             <template #suffix><span class="text-xs text-gray-400">分</span></template>
+          </n-statistic>
         </n-card>
       </n-grid-item>
     </n-grid>
 
-    <!-- 异常列表 -->
-    <n-card title="异常记录" hoverable>
+    <!-- 3. 图表分析区 -->
+    <n-grid :x-gap="20" :y-gap="20" cols="1 s:2" responsive="screen" class="mb-4 mt-4">
+      <n-grid-item>
+        <n-card title="全局异常趋势分析" :bordered="false" class="shadow-sm rounded-xl" hoverable>
+          <template #header-extra>
+             <n-tag type="info" size="small" round>近24小时</n-tag>
+          </template>
+          <div ref="trendChartRef" style="height: 400px"></div>
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card title="设备风险排行 Top 5" :bordered="false" class="shadow-sm rounded-xl" hoverable>
+           <div ref="rankChartRef" style="height: 400px"></div>
+        </n-card>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- 4. 实时监控设备列表 -->
+    <n-card title="实时监控设备列表" :bordered="false" size="small" class="shadow-sm">
       <template #header-extra>
         <n-space>
-          <n-select
-            v-model:value="filterStatus"
-            :options="statusOptions"
-            placeholder="筛选状态"
-            style="width: 120px"
-            clearable
-          />
-          <n-select
-            v-model:value="filterSeverity"
-            :options="severityOptions"
-            placeholder="筛选严重程度"
-            style="width: 120px"
-            clearable
-          />
-          <n-button @click="refreshAnomalyList">
-            <template #icon>
-              <n-icon><RefreshOutline /></n-icon>
-            </template>
-            刷新
+          <n-button type="primary" size="small" @click="handleAddDevice">
+            <template #icon><n-icon><AddOutline /></n-icon></template>
+            新增检测设备
           </n-button>
+          <n-input-group size="small">
+             <n-input placeholder="搜索设备名称/编号" v-model:value="searchKeyword" @keyup.enter="refreshData" />
+             <n-button type="primary" ghost @click="refreshData">搜索</n-button>
+          </n-input-group>
         </n-space>
       </template>
-      <AnomalyList
-        :data="filteredAnomalyList"
+      <n-data-table
+        :columns="deviceColumns"
+        :data="deviceTableData"
         :loading="loading"
-        @view-detail="viewAnomalyDetail"
-        @handle-anomaly="handleAnomaly"
-        @ignore-anomaly="ignoreAnomaly"
+        :pagination="{ pageSize: 10 }"
+        size="small"
+        :row-key="row => row.device_code"
       />
     </n-card>
 
-    <!-- 异常详情抽屉 -->
-    <n-drawer v-model:show="showDetailDrawer" :width="600" placement="right">
-      <n-drawer-content title="异常详情">
-        <div v-if="selectedAnomaly">
-          <n-descriptions :column="1" bordered>
-            <n-descriptions-item label="异常ID">{{ selectedAnomaly.id }}</n-descriptions-item>
-            <n-descriptions-item label="设备名称">{{
-              selectedAnomaly.deviceName
-            }}</n-descriptions-item>
-            <n-descriptions-item label="异常类型">
-              <n-tag :type="getAnomalyTypeColor(selectedAnomaly.type)">
-                {{ selectedAnomaly.typeName }}
-              </n-tag>
-            </n-descriptions-item>
-            <n-descriptions-item label="严重程度">
-              <n-tag :type="getSeverityColor(selectedAnomaly.severity)">
-                {{ selectedAnomaly.severityName }}
-              </n-tag>
-            </n-descriptions-item>
-            <n-descriptions-item label="检测时间">{{
-              selectedAnomaly.detectedAt
-            }}</n-descriptions-item>
-            <n-descriptions-item label="异常描述">{{
-              selectedAnomaly.description
-            }}</n-descriptions-item>
-            <n-descriptions-item label="AI置信度"
-              >{{ selectedAnomaly.confidence }}%</n-descriptions-item
-            >
-          </n-descriptions>
-
-          <div class="mt-4">
-            <h4>处理建议</h4>
-            <n-alert type="info" :show-icon="false">
-              <template #icon>
-                <n-icon><BulbOutline /></n-icon>
-              </template>
-              {{ selectedAnomaly.suggestion }}
-            </n-alert>
-          </div>
-
-          <div class="mt-4">
-            <n-space>
-              <n-button type="primary" @click="handleSelectedAnomaly"> 标记已处理 </n-button>
-              <n-button @click="ignoreSelectedAnomaly"> 忽略异常 </n-button>
-              <n-button @click="exportAnomalyDetail"> 导出详情 </n-button>
-            </n-space>
-          </div>
-        </div>
+    <!-- 抽屉：单设备详情 -->
+    <n-drawer v-model:show="showDetail" width="90%" placement="right">
+      <n-drawer-content :title="`设备详情: ${currentDeviceName}`" closable :body-content-style="{ padding: '0' }">
+        <AnomalyDetail :device-code="currentDeviceCode" v-if="showDetail" />
       </n-drawer-content>
     </n-drawer>
-  </div>
+
+    <!-- 弹窗：新增检测设备配置 -->
+    <n-modal v-model:show="showConfigModal" preset="card" title="新增检测设备配置" style="width: 800px">
+      <DetectionConfig 
+        :config="{}" 
+        @update="handleConfigUpdate"
+        @reset="handleConfigReset"
+      />
+    </n-modal>
+
+  </CommonPage>
 </template>
 
-<script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, type ComputedRef } from 'vue'
-import { useMessage } from 'naive-ui'
-import * as echarts from 'echarts'
-import type { ECharts, EChartsOption } from 'echarts'
-import {
-  PlayOutline,
-  StopOutline,
-  DownloadOutline,
-  PlayCircleOutline,
-  PauseCircleOutline,
-  WarningOutline,
-  CheckmarkCircleOutline,
-  TimeOutline,
-  RefreshOutline,
-  BulbOutline,
+<script setup>
+import { ref, onMounted, onUnmounted, h, computed } from 'vue'
+import { 
+  RefreshOutline, 
+  AlertCircleOutline, 
+  WarningOutline, 
+  ArrowUpOutline, 
+  ServerOutline, 
+  PulseOutline,
+  AddOutline,
 } from '@vicons/ionicons5'
-import ThresholdConfig from './components/ThresholdConfig.vue'
-import AnomalyChart from './components/AnomalyChart.vue'
-import AnomalyList from './components/AnomalyList.vue'
-import aiMonitorV2Api from '@/api/ai-monitor-v2'
-// 导入新的AI API客户端
-import { anomalyDetectionApi, featureExtractionApi } from '@/api/v2/ai-module'
+import { NTag, NButton, useMessage, NProgress, NModal } from 'naive-ui'
+import * as echarts from 'echarts'
+import dayjs from 'dayjs'
+import CommonPage from '@/components/page/CommonPage.vue'
+import AnomalyDetail from './components/AnomalyDetail.vue'
+import DetectionConfig from './components/DetectionConfig.vue'
+import { deviceApi, deviceTypeApi } from '@/api/device-v2'
+import { useRouter } from 'vue-router'
 
-// ==================== 类型定义 ====================
+const router = useRouter()
+import { anomalyDetectionApi } from '@/api/v2/ai-module'
 
-interface ThresholdItem {
-  min: number
-  max: number
-  enabled: boolean
-}
-
-interface ThresholdConfig {
-  temperature: ThresholdItem
-  pressure: ThresholdItem
-  vibration: ThresholdItem
-  current: ThresholdItem
-}
-
-interface RealtimeAnomalyItem {
-  time: string
-  value: number
-}
-
-interface AnomalyTypeItem {
-  name: string
-  value: number
-  color: string
-}
-
-interface AnomalyData {
-  id: string | number
-  [key: string]: any
-}
-
+// --- State ---
+const selectedDeviceTypes = ref([])
+const timeRange = ref('24h')
+const showDetail = ref(false)
+const showConfigModal = ref(false)
+const currentDeviceCode = ref('')
+const currentDeviceName = ref('')
+const searchKeyword = ref('')
 const message = useMessage()
+const loading = ref(false)
 
-// 响应式数据
-const isDetecting = ref<boolean>(false)
-const loading = ref<boolean>(false)
-const showDetailDrawer = ref<boolean>(false)
-const selectedAnomaly = ref<AnomalyData | null>(null)
-const filterStatus = ref<string | null>(null)
-const filterSeverity = ref<string | null>(null)
-const pieChartRef = ref<HTMLElement | null>(null)
-let pieChartInstance: ECharts | null = null
-let autoRefreshTimer: number | null = null // 自动刷新定时器
+const deviceTypeOptions = ref([])
+const deviceTableData = ref([]) // Stores the list of devices with their status
+const allRecords = ref([]) // Stores the raw anomaly records for calculation
 
-// 检测状态
-const detectionStatus: ComputedRef<string> = computed(() => (isDetecting.value ? '运行中' : '已停止'))
-const todayAnomalies = ref<number>(23)
-const detectionAccuracy = ref<number>(94.8)
-const processingCount = ref<number>(5)
-
-// 阈值配置
-const thresholdConfig = ref<ThresholdConfig>({
-  temperature: { min: 20, max: 80, enabled: true },
-  pressure: { min: 0.5, max: 2.0, enabled: true },
-  vibration: { min: 0, max: 10, enabled: true },
-  current: { min: 5, max: 50, enabled: true },
+const stats = ref({
+  total: 0,
+  riskDevices: 0,
+  rate: 0,
+  trend: 0
 })
 
-// 实时异常数据
-const realtimeAnomalyData = ref<RealtimeAnomalyItem[]>([
-  { time: '14:00', value: 2 },
-  { time: '14:15', value: 1 },
-  { time: '14:30', value: 4 },
-  { time: '14:45', value: 3 },
-  { time: '15:00', value: 6 },
-  { time: '15:15', value: 2 },
-])
-
-// 异常类型分布数据
-const anomalyTypeData = ref<AnomalyTypeItem[]>([
-  { name: '温度异常', value: 35, color: '#ff6b6b' },
-  { name: '压力异常', value: 28, color: '#ffa726' },
-  { name: '振动异常', value: 22, color: '#42a5f5' },
-  { name: '电流异常', value: 15, color: '#ab47bc' },
-])
-
-// 异常列表数据
-const anomalyList = ref([
-  {
-    id: 'ANO-001',
-    deviceId: 'WLD-001',
-    deviceName: '焊接设备01',
-    type: 'temperature',
-    typeName: '温度异常',
-    severity: 'high',
-    severityName: '高',
-    status: 'pending',
-    statusName: '待处理',
-    detectedAt: '2024-01-15 15:23:45',
-    description: '设备温度超过安全阈值，当前温度85°C',
-    confidence: 96.5,
-    suggestion: '立即检查冷却系统，确认冷却液是否充足，检查散热风扇是否正常工作。',
+// --- Columns for Device List ---
+const deviceColumns = [
+  { 
+    title: '设备编号', 
+    key: 'device_code', 
+    width: 120,
+    fixed: 'left',
+    render(row) {
+      return h('span', { class: 'font-mono' }, row.device_code)
+    }
+  },
+  { 
+    title: '设备名称', 
+    key: 'device_name', 
+    width: 150 
+  },
+  { 
+    title: '监控状态', 
+    key: 'status',
+    width: 100,
+    render(row) {
+      // Determine status based on recent anomalies
+      if (row.severity === 'high') {
+        return h(NTag, { type: 'error', size: 'small', round: true }, { default: () => '高风险' })
+      } else if (row.severity === 'medium') {
+        return h(NTag, { type: 'warning', size: 'small', round: true }, { default: () => '警告' })
+      } else {
+        return h(NTag, { type: 'success', size: 'small', round: true }, { default: () => '正常' })
+      }
+    }
   },
   {
-    id: 'ANO-002',
-    deviceId: 'WLD-002',
-    deviceName: '焊接设备02',
-    type: 'vibration',
-    typeName: '振动异常',
-    severity: 'medium',
-    severityName: '中',
-    status: 'processing',
-    statusName: '处理中',
-    detectedAt: '2024-01-15 15:18:32',
-    description: '设备振动频率异常，超出正常范围',
-    confidence: 89.2,
-    suggestion: '检查设备固定螺栓是否松动，确认设备基础是否稳固。',
-  },
-  {
-    id: 'ANO-003',
-    deviceId: 'WLD-003',
-    deviceName: '焊接设备03',
-    type: 'pressure',
-    typeName: '压力异常',
-    severity: 'low',
-    severityName: '低',
-    status: 'resolved',
-    statusName: '已解决',
-    detectedAt: '2024-01-15 15:10:15',
-    description: '气压略低于标准值',
-    confidence: 78.9,
-    suggestion: '检查气压调节阀，适当调整气压至标准范围。',
-  },
-])
-
-// 筛选选项
-const statusOptions = [
-  { label: '待处理', value: 'pending' },
-  { label: '处理中', value: 'processing' },
-  { label: '已解决', value: 'resolved' },
-  { label: '已忽略', value: 'ignored' },
-]
-
-const severityOptions = [
-  { label: '高', value: 'high' },
-  { label: '中', value: 'medium' },
-  { label: '低', value: 'low' },
-]
-
-// 计算属性
-const filteredAnomalyList = computed(() => {
-  let filtered = anomalyList.value
-
-  if (filterStatus.value) {
-    filtered = filtered.filter((item) => item.status === filterStatus.value)
-  }
-
-  if (filterSeverity.value) {
-    filtered = filtered.filter((item) => item.severity === filterSeverity.value)
-  }
-
-  return filtered
-})
-
-// 方法
-const startDetection = async () => {
-  try {
-    // 切换检测状态
-    isDetecting.value = true
-    message.success('异常检测已启动')
-    
-    // 立即刷新异常列表
-    await refreshAnomalyList()
-    
-    // 开始定期刷新
-    startAutoRefresh()
-  } catch (error) {
-    console.error('启动异常检测失败:', error)
-    message.error('启动异常检测失败')
-    isDetecting.value = false
-  }
-}
-
-const stopDetection = async () => {
-  try {
-    isDetecting.value = false
-    message.info('异常检测已停止')
-    
-    // 停止自动刷新
-    stopAutoRefresh()
-  } catch (error) {
-    console.error('停止异常检测失败:', error)
-    message.error('停止异常检测失败')
-  }
-}
-
-const exportAnomalies = () => {
-  message.info('正在导出异常数据...')
-  setTimeout(() => {
-    message.success('异常数据导出完成')
-  }, 2000)
-}
-
-const updateThresholdConfig = (config) => {
-  thresholdConfig.value = { ...config }
-  message.success('阈值配置已更新')
-}
-
-const resetThresholdConfig = () => {
-  thresholdConfig.value = {
-    temperature: { min: 20, max: 80, enabled: true },
-    pressure: { min: 0.5, max: 2.0, enabled: true },
-    vibration: { min: 0, max: 10, enabled: true },
-    current: { min: 5, max: 50, enabled: true },
-  }
-  message.info('阈值配置已重置')
-}
-
-const refreshAnomalyList = async () => {
-  try {
-    loading.value = true
-    console.log('🔄 刷新异常记录列表...')
-
-    // 获取异常记录
-    const response = await anomalyDetectionApi.getRecords({
-      page: 1,
-      page_size: 100,
-      is_handled: filterStatus.value === 'resolved' ? true : filterStatus.value === 'pending' ? false : null,
-      severity_level: getSeverityLevelFromFilter(filterSeverity.value),
-    })
-
-    if (response.data && response.data.records) {
-      console.log('✅ 获取异常记录:', response.data)
+    title: '异常置信度',
+    key: 'anomaly_score',
+    width: 150,
+    render(row) {
+      const score = row.anomaly_score || 0
+      let status = 'success'
+      if (score > 80) status = 'error'
+      else if (score > 50) status = 'warning'
       
-      // 转换API数据格式到UI格式
-      anomalyList.value = response.data.records.map((record) => ({
-        id: record.id,
-        deviceId: record.device_code,
-        deviceName: record.device_name || record.device_code,
-        type: mapAnomalyType(record.anomaly_type),
-        typeName: record.anomaly_type,
-        severity: mapSeverityLevel(record.severity_level),
-        severityName: getSeverityName(record.severity_level),
-        status: record.is_handled ? 'resolved' : 'pending',
-        statusName: record.is_handled ? '已解决' : '待处理',
-        detectedAt: formatDateTime(record.detection_time),
-        description: record.description || '检测到异常数据',
-        confidence: Math.round(record.confidence_score * 100 * 10) / 10,
-        suggestion: generateSuggestion(record),
-        rawData: record, // 保留原始数据用于后续处理
+      return h(NProgress, {
+        type: 'line',
+        percentage: score > 100 ? 100 : score,
+        indicatorPlacement: 'inside',
+        status: status,
+        height: 18
+      })
+    }
+  },
+  { 
+    title: '最近检测时间', 
+    key: 'last_check_time', 
+    width: 160,
+    render(row) {
+      return row.last_check_time ? dayjs(row.last_check_time).format('YYYY-MM-DD HH:mm:ss') : '-'
+    }
+  },
+  { 
+    title: '异常统计(24h)', 
+    key: 'anomaly_count', 
+    width: 120,
+    align: 'center',
+    render(row) {
+      return h('span', { class: row.anomaly_count > 0 ? 'text-red-500 font-bold' : 'text-gray-400' }, row.anomaly_count)
+    }
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 120,
+    fixed: 'right',
+    render(row) {
+      return h(
+        NButton,
+        {
+          size: 'tiny',
+          type: 'primary',
+          secondary: true,
+          onClick: () => openDetail(row)
+        },
+        { default: () => '详情分析' }
+      )
+    }
+  }
+]
+
+// --- API Methods ---
+
+/**
+ * 获取设备列表并整合异常状态
+ */
+const fetchDevicesAndStatus = async () => {
+  loading.value = true
+  try {
+    // 1. 获取设备分类 (用于筛选)
+    if (deviceTypeOptions.value.length === 0) {
+      const typeRes = await deviceTypeApi.list()
+      const items = typeRes.data?.items || (Array.isArray(typeRes.data) ? typeRes.data : [])
+      deviceTypeOptions.value = items.map(t => ({
+        label: t.type_name || t.type_code,
+        key: t.type_code
       }))
-
-      // 更新统计信息
-      updateStatistics(response.data)
-      
-      // 更新图表数据
-      updateChartData()
     }
 
-    message.success(`已刷新 ${anomalyList.value.length} 条异常记录`)
+    // 2. 获取所有设备
+    const deviceParams = { page_size: 1000 }
+    if (searchKeyword.value) {
+      deviceParams.search = searchKeyword.value
+    }
+    const deviceRes = await deviceApi.list(deviceParams) // Fetch enough devices
+    let devices = deviceRes.data?.items || (Array.isArray(deviceRes.data) ? deviceRes.data : [])
+    
+    // Client-side filtering removed as backend handles search
+    // if (searchKeyword.value) {
+    //   const k = searchKeyword.value.toLowerCase()
+    //   devices = devices.filter(d => 
+    //     (d.device_name && d.device_name.toLowerCase().includes(k)) || 
+    //     (d.device_code && d.device_code.toLowerCase().includes(k))
+    //   )
+    // }
+    
+    // Filter by Device Type if selected
+    if (selectedDeviceTypes.value.length > 0) {
+      devices = devices.filter(d => selectedDeviceTypes.value.includes(d.device_type))
+    }
+
+    // 3. 获取近期异常记录用于计算状态
+    // Use a wider time range to capture recent status
+    const recordRes = await anomalyDetectionApi.getRecords({
+      page: 1,
+      page_size: 100, 
+      // time_range: timeRange.value // API support needed, assuming backend handles or we filter
+    })
+    
+    const records = recordRes.data?.records || []
+    allRecords.value = records // Save for charts
+
+    // 3. Merge Status
+    // Map: device_code -> { severity, score, last_time, count }
+    const statusMap = {}
+    
+    records.forEach(r => {
+      const code = r.device_code
+      if (!statusMap[code]) {
+        statusMap[code] = {
+          count: 0,
+          maxSeverity: 'low',
+          maxScore: 0,
+          lastTime: null
+        }
+      }
+      
+      statusMap[code].count++
+      
+      // Update Max Score
+      if (r.anomaly_score > statusMap[code].maxScore) {
+        statusMap[code].maxScore = r.anomaly_score
+      }
+      
+      // Update Severity (high > medium > low)
+      const currentSev = statusMap[code].maxSeverity
+      if (r.severity === 'high') statusMap[code].maxSeverity = 'high'
+      else if (r.severity === 'medium' && currentSev !== 'high') statusMap[code].maxSeverity = 'medium'
+      
+      // Update Last Time
+      const rTime = dayjs(r.detection_time)
+      if (!statusMap[code].lastTime || rTime.isAfter(dayjs(statusMap[code].lastTime))) {
+        statusMap[code].lastTime = r.detection_time
+      }
+    })
+
+    // 4. Build Table Data
+    deviceTableData.value = devices.map(d => {
+      const stat = statusMap[d.device_code] || {}
+      return {
+        ...d,
+        severity: stat.maxSeverity || 'low',
+        anomaly_score: stat.maxScore || 0, // In reality this should be the *latest* score, using max for now to highlight risk
+        last_check_time: stat.lastTime || null, // Or d.updated_at
+        anomaly_count: stat.count || 0
+      }
+    })
+    
+    // Sort by Risk (High severity first, then score)
+    deviceTableData.value.sort((a, b) => {
+       const severityWeight = { high: 3, medium: 2, low: 1 }
+       const sa = severityWeight[a.severity] || 0
+       const sb = severityWeight[b.severity] || 0
+       if (sa !== sb) return sb - sa
+       return b.anomaly_score - a.anomaly_score
+    })
+
+    // 5. Update Stats
+    updateStats(records, deviceTableData.value)
+    updateCharts(records)
+
   } catch (error) {
-    console.error('❌ 刷新异常列表失败:', error)
-    message.error(`刷新异常列表失败: ${error.message || '未知错误'}`)
+    console.error('获取数据失败', error)
+    message.error('数据加载失败')
   } finally {
     loading.value = false
   }
 }
 
-// 辅助函数：映射严重程度筛选
-const getSeverityLevelFromFilter = (filterValue: string | null): number | null => {
-  if (!filterValue) return null
-  const map = { high: 5, medium: 3, low: 1 }
-  return map[filterValue] || null
+const updateStats = (records, devices) => {
+  stats.value.total = records.length
+  stats.value.riskDevices = devices.filter(d => d.severity === 'high').length
+  // Simple trend mock
+  stats.value.trend = 12.5 
 }
 
-// 辅助函数：映射异常类型
-const mapAnomalyType = (type: string): string => {
-  const typeMap = {
-    'temperature_high': 'temperature',
-    'temperature_low': 'temperature',
-    'pressure_high': 'pressure',
-    'pressure_low': 'pressure',
-    'vibration_high': 'vibration',
-    'current_high': 'current',
-    'current_low': 'current',
-  }
-  return typeMap[type] || 'other'
-}
+// --- Charts ---
+const trendChartRef = ref(null)
+const rankChartRef = ref(null)
+let trendChart = null
+let rankChart = null
 
-// 辅助函数：映射严重程度
-const mapSeverityLevel = (level: number): string => {
-  if (level >= 4) return 'high'
-  if (level >= 2) return 'medium'
-  return 'low'
-}
-
-// 辅助函数：获取严重程度名称
-const getSeverityName = (level: number): string => {
-  if (level >= 4) return '高'
-  if (level >= 2) return '中'
-  return '低'
-}
-
-// 辅助函数：格式化日期时间
-const formatDateTime = (dateStr: string): string => {
-  if (!dateStr) return '-'
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }).replace(/\//g, '-')
-  } catch {
-    return dateStr
-  }
-}
-
-// 辅助函数：生成处理建议
-const generateSuggestion = (record: any): string => {
-  const suggestions = {
-    'temperature_high': '立即检查冷却系统，确认冷却液是否充足，检查散热风扇是否正常工作。',
-    'temperature_low': '检查加热系统，确认环境温度是否适宜，检查温度传感器是否正常。',
-    'pressure_high': '检查压力调节阀，确认管道是否堵塞，适当降低工作压力。',
-    'pressure_low': '检查气压调节阀，确认气源是否充足，检查管道是否泄漏。',
-    'vibration_high': '检查设备固定螺栓是否松动，确认设备基础是否稳固，检查轴承是否磨损。',
-    'current_high': '检查负载是否过大，确认电路是否正常，检查电机是否过载。',
-    'current_low': '检查电源是否稳定，确认接线是否松动，检查设备是否正常工作。',
-  }
-  return suggestions[record.anomaly_type] || '请联系技术人员进行详细检查，确保设备安全运行。'
-}
-
-// 辅助函数：更新统计信息
-const updateStatistics = (data: any) => {
-  todayAnomalies.value = data.total || 0
-  processingCount.value = data.records?.filter(r => !r.is_handled).length || 0
+/**
+ * 更新图表数据
+ */
+const updateCharts = (records) => {
+  if (!trendChartRef.value || !rankChartRef.value) return
   
-  // 模拟检测精度（实际应从API获取）
-  detectionAccuracy.value = 94.8
-}
-
-// 辅助函数：更新图表数据
-const updateChartData = () => {
-  // 按时间聚合异常数据（用于折线图）
-  const trendMap = new Map<string, number>()
-  const typeMap = new Map<string, number>()
+  if (!trendChart) trendChart = echarts.init(trendChartRef.value)
+  if (!rankChart) rankChart = echarts.init(rankChartRef.value)
   
-  anomalyList.value.forEach((anomaly) => {
-    // 时间趋势
-    if (anomaly.detectedAt) {
-      const hour = anomaly.detectedAt.split(' ')[1]?.substring(0, 5) || '00:00'
-      trendMap.set(hour, (trendMap.get(hour) || 0) + 1)
-    }
-    
-    // 类型分布
-    typeMap.set(anomaly.typeName, (typeMap.get(anomaly.typeName) || 0) + 1)
+  // 1. Rank Chart (Top Risk Devices)
+  const deviceCount = {}
+  records.forEach(r => {
+    const name = r.device_name || r.device_code
+    deviceCount[name] = (deviceCount[name] || 0) + 1
   })
   
-  // 更新实时异常趋势数据（取最近6个时间点）
-  const sortedTrend = Array.from(trendMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-6)
-  
-  realtimeAnomalyData.value = sortedTrend.map(([time, value]) => ({ time, value }))
-  
-  // 更新异常类型分布数据
-  const colors = ['#ff6b6b', '#ffa726', '#42a5f5', '#ab47bc', '#66bb6a']
-  anomalyTypeData.value = Array.from(typeMap.entries()).map(([name, value], index) => ({
-    name,
-    value,
-    color: colors[index % colors.length],
-  }))
-  
-  // 重新渲染饼图
-  if (pieChartInstance && anomalyTypeData.value.length > 0) {
-    pieChartInstance.setOption({
-      series: [
-        {
-          data: anomalyTypeData.value,
-        },
-      ],
-    })
-  }
-}
-
-const viewAnomalyDetail = (anomaly) => {
-  selectedAnomaly.value = anomaly
-  showDetailDrawer.value = true
-}
-
-const handleAnomaly = async (anomaly) => {
-  try {
-    console.log('🔧 处理异常:', anomaly.id)
+  const sortedDevices = Object.entries(deviceCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
     
-    // 调用API处理异常
-    await anomalyDetectionApi.handleRecord(anomaly.id, {
-      handled_by: '当前用户', // 实际应从用户信息获取
-      handle_notes: '异常已确认并处理',
-    })
-    
-    // 更新本地数据
-    const index = anomalyList.value.findIndex((item) => item.id === anomaly.id)
-    if (index !== -1) {
-      anomalyList.value[index].status = 'resolved'
-      anomalyList.value[index].statusName = '已解决'
-    }
-    
-    // 更新统计
-    processingCount.value = Math.max(0, processingCount.value - 1)
-    
-    message.success(`异常 ${anomaly.id} 已标记为已解决`)
-  } catch (error) {
-    console.error('❌ 处理异常失败:', error)
-    message.error(`处理异常失败: ${error.message || '未知错误'}`)
-  }
-}
-
-const ignoreAnomaly = async (anomaly) => {
-  try {
-    console.log('🚫 忽略异常:', anomaly.id)
-    
-    // 调用API忽略异常（标记为已处理）
-    await anomalyDetectionApi.handleRecord(anomaly.id, {
-      handled_by: '当前用户',
-      handle_notes: '异常已忽略',
-    })
-    
-    // 更新本地数据
-    const index = anomalyList.value.findIndex((item) => item.id === anomaly.id)
-    if (index !== -1) {
-      anomalyList.value[index].status = 'ignored'
-      anomalyList.value[index].statusName = '已忽略'
-    }
-    
-    // 更新统计
-    processingCount.value = Math.max(0, processingCount.value - 1)
-    
-    message.info(`异常 ${anomaly.id} 已忽略`)
-  } catch (error) {
-    console.error('❌ 忽略异常失败:', error)
-    message.error(`忽略异常失败: ${error.message || '未知错误'}`)
-  }
-}
-
-const handleSelectedAnomaly = () => {
-  if (selectedAnomaly.value) {
-    handleAnomaly(selectedAnomaly.value)
-    showDetailDrawer.value = false
-  }
-}
-
-const ignoreSelectedAnomaly = () => {
-  if (selectedAnomaly.value) {
-    ignoreAnomaly(selectedAnomaly.value)
-    showDetailDrawer.value = false
-  }
-}
-
-const exportAnomalyDetail = () => {
-  message.info('正在导出异常详情...')
-  setTimeout(() => {
-    message.success('异常详情导出完成')
-  }, 1500)
-}
-
-const getAnomalyTypeColor = (type) => {
-  const colorMap = {
-    temperature: 'error',
-    pressure: 'warning',
-    vibration: 'info',
-    current: 'success',
-  }
-  return colorMap[type] || 'default'
-}
-
-const getSeverityColor = (severity) => {
-  const colorMap = {
-    high: 'error',
-    medium: 'warning',
-    low: 'info',
-  }
-  return colorMap[severity] || 'default'
-}
-
-// 自动刷新功能
-const startAutoRefresh = () => {
-  // 清除已有的定时器
-  stopAutoRefresh()
-  
-  // 每30秒自动刷新一次
-  autoRefreshTimer = window.setInterval(() => {
-    if (isDetecting.value) {
-      console.log('⏰ 自动刷新异常记录...')
-      refreshAnomalyList()
-    }
-  }, 30000) // 30秒
-}
-
-const stopAutoRefresh = () => {
-  if (autoRefreshTimer !== null) {
-    clearInterval(autoRefreshTimer)
-    autoRefreshTimer = null
-  }
-}
-
-// 初始化饼图
-const initPieChart = () => {
-  if (!pieChartRef.value) return
-
-  pieChartInstance = echarts.init(pieChartRef.value)
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)',
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
-      textStyle: {
-        fontSize: 12,
+  rankChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { top: 10, right: 20, bottom: 20, left: 10, containLabel: true },
+    xAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
+    yAxis: { type: 'category', data: sortedDevices.map(d => d[0]).reverse() },
+    series: [{
+      name: '异常次数',
+      type: 'bar',
+      barWidth: 20,
+      data: sortedDevices.map(d => d[1]).reverse(),
+      itemStyle: { 
+        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+          { offset: 0, color: '#83bff6' },
+          { offset: 0.5, color: '#188df0' },
+          { offset: 1, color: '#188df0' }
+        ])
       },
-    },
-    series: [
-      {
-        name: '异常类型',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['60%', '50%'],
-        data: anomalyTypeData.value,
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)',
-          },
-        },
-        label: {
-          show: true,
-          formatter: '{b}: {d}%',
-        },
-      },
-    ],
+      label: { show: true, position: 'right' }
+    }]
+  })
+  
+  // 2. Trend Chart
+  // Group by hour
+  const timeMap = {}
+  records.forEach(r => {
+     const hour = dayjs(r.detection_time).format('HH:00')
+     timeMap[hour] = (timeMap[hour] || 0) + 1
+  })
+  
+  // Fill last 24h
+  const hours = []
+  const data = []
+  for(let i=23; i>=0; i--) {
+    const h = dayjs().subtract(i, 'hour').format('HH:00')
+    hours.push(h)
+    data.push(timeMap[h] || 0)
   }
-  pieChartInstance.setOption(option)
+
+  trendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { top: 30, right: 20, bottom: 20, left: 40, containLabel: true },
+    xAxis: { type: 'category', boundaryGap: false, data: hours },
+    yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
+    series: [{
+      name: '异常数量',
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      data: data,
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(208, 48, 80, 0.5)' },
+          { offset: 1, color: 'rgba(208, 48, 80, 0.05)' }
+        ])
+      },
+      itemStyle: { color: '#d03050' }
+    }]
+  })
 }
 
-// 生命周期
+// --- Actions ---
+const openDetail = (row) => {
+  currentDeviceCode.value = row.device_code
+  currentDeviceName.value = row.device_name || row.device_code
+  showDetail.value = true
+}
+
+const handleDeviceFilterChange = () => {
+  fetchDevicesAndStatus()
+}
+
+const handleAddDevice = () => {
+  showConfigModal.value = true
+}
+
+const handleConfigUpdate = () => {
+  // Config updated, maybe refresh list or just log
+  // message.success('配置已更新')
+}
+
+const handleConfigReset = () => {
+  // message.info('配置已重置')
+}
+
+const refreshData = () => {
+  fetchDevicesAndStatus()
+  message.success('数据已刷新')
+}
+
+// --- Lifecycle ---
 onMounted(() => {
-  initPieChart()
-  
-  // 初始加载异常列表
-  refreshAnomalyList()
+  fetchDevicesAndStatus()
+  window.addEventListener('resize', handleResize)
 })
 
-onBeforeUnmount(() => {
-  // 清理定时器
-  stopAutoRefresh()
-  
-  // 清理图表实例
-  if (pieChartInstance) {
-    pieChartInstance.dispose()
-    pieChartInstance = null
-  }
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  if (trendChart) trendChart.dispose()
+  if (rankChart) rankChart.dispose()
 })
+
+const handleResize = () => {
+  if (trendChart) trendChart.resize()
+  if (rankChart) rankChart.resize()
+}
 </script>
 
 <style scoped>
-.anomaly-detection {
+.anomaly-dashboard {
+  background-color: #f5f7f9;
+  min-height: 100vh;
   padding: 16px;
 }
 
-.mb-4 {
-  margin-bottom: 16px;
+.stats-card {
+  transition: all 0.3s;
+}
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.mt-4 {
-  margin-top: 16px;
+:deep(.n-card__content) {
+  padding: 16px;
 }
 </style>
